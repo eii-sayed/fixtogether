@@ -90,7 +90,7 @@ const register = asyncHandler(async (req, res) => {
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: config.env === 'production',
-    sameSite: 'strict',
+    sameSite: config.env === 'production' ? 'none' : 'strict',
     maxAge: parseDuration(config.jwt.refreshExpiresIn),
   });
 
@@ -159,7 +159,7 @@ const login = asyncHandler(async (req, res) => {
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: config.env === 'production',
-    sameSite: 'strict',
+    sameSite: config.env === 'production' ? 'none' : 'strict',
     maxAge: parseDuration(config.jwt.refreshExpiresIn),
   });
 
@@ -229,7 +229,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   res.cookie('refreshToken', newRefreshToken, {
     httpOnly: true,
     secure: config.env === 'production',
-    sameSite: 'strict',
+    sameSite: config.env === 'production' ? 'none' : 'strict',
     maxAge: parseDuration(config.jwt.refreshExpiresIn),
   });
 

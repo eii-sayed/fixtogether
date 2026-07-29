@@ -32,8 +32,9 @@ app.use(helmet({
 }));
 
 // CORS
+const corsOrigin = config.clientUrl.replace(/\/+$/, '');
 app.use(cors({
-  origin: config.clientUrl,
+  origin: corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
