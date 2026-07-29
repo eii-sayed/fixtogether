@@ -67,7 +67,7 @@ const itemCategorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-itemCategorySchema.index({ slug: 1 }, { unique: true });
+// itemCategorySchema.index({ slug: 1 }, { unique: true }); // Removed duplicate index
 itemCategorySchema.index({ parent: 1 });
 itemCategorySchema.index({ active: 1, sortOrder: 1 });
 

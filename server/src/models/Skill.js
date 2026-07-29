@@ -35,7 +35,7 @@ const skillSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-skillSchema.index({ slug: 1 }, { unique: true });
+// skillSchema.index({ slug: 1 }, { unique: true }); // Removed duplicate index
 skillSchema.index({ category: 1, active: 1 });
 
 const Skill = mongoose.model('Skill', skillSchema);
