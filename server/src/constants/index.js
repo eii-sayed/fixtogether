@@ -1,0 +1,370 @@
+/**
+ * Constants for the FixTogether application
+ */
+
+const ROLES = {
+  OWNER: 'owner',
+  TECHNICIAN: 'technician',
+  ORGANIZATION: 'organization',
+  ADMIN: 'admin',
+};
+
+const ACCOUNT_STATUS = {
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+  DEACTIVATED: 'deactivated',
+  PENDING_VERIFICATION: 'pending_verification',
+};
+
+const ORGANIZATION_TYPES = {
+  REPAIR_GROUP: 'repair_group',
+  DONATION_ORG: 'donation_organization',
+  RECYCLING_FACILITY: 'recycling_facility',
+};
+
+const VERIFICATION_STATUS = {
+  NOT_SUBMITTED: 'not_submitted',
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+};
+
+const ITEM_CONDITION = {
+  NEW: 'new',
+  GOOD: 'good',
+  FAIR: 'fair',
+  POOR: 'poor',
+  BROKEN: 'broken',
+  FOR_PARTS: 'for_parts',
+};
+
+const ITEM_STATUS = {
+  ACTIVE: 'active',
+  IN_REPAIR: 'in_repair',
+  DONATED: 'donated',
+  PARTS_RECOVERED: 'parts_recovered',
+  RECYCLED: 'recycled',
+  REMOVED: 'removed',
+};
+
+const PATHWAYS = {
+  REPAIR: 'repair',
+  REFURBISHMENT: 'refurbishment',
+  DONATION: 'donation',
+  PARTS: 'parts',
+  RECYCLING: 'recycling',
+};
+
+const REPAIR_REQUEST_STATUS = {
+  DRAFT: 'draft',
+  AWAITING_AI_ANALYSIS: 'awaiting_ai_analysis',
+  AWAITING_OWNER_REVIEW: 'awaiting_owner_review',
+  AWAITING_CLARIFICATION: 'awaiting_clarification',
+  PUBLISHED: 'published',
+  MATCHING_TECHNICIANS: 'matching_technicians',
+  AWAITING_QUOTATIONS: 'awaiting_quotations',
+  QUOTATIONS_RECEIVED: 'quotations_received',
+  QUOTATION_ACCEPTED: 'quotation_accepted',
+  APPOINTMENT_SCHEDULED: 'appointment_scheduled',
+  UNDER_INSPECTION: 'under_inspection',
+  AWAITING_OWNER_APPROVAL: 'awaiting_owner_approval',
+  WAITING_FOR_PARTS: 'waiting_for_parts',
+  REPAIR_IN_PROGRESS: 'repair_in_progress',
+  QUALITY_CHECK: 'quality_check',
+  READY_FOR_COLLECTION: 'ready_for_collection',
+  COMPLETED: 'completed',
+  REPAIR_UNSUCCESSFUL: 'repair_unsuccessful',
+  DONATION_OFFERED: 'donation_offered',
+  PARTS_REUSE_APPROVED: 'parts_reuse_approved',
+  SENT_FOR_RECYCLING: 'sent_for_recycling',
+  CANCELLED: 'cancelled',
+  DISPUTED: 'disputed',
+};
+
+/**
+ * Valid status transitions for repair requests.
+ * Maps current status -> array of allowed next statuses.
+ */
+const REPAIR_STATUS_TRANSITIONS = {
+  [REPAIR_REQUEST_STATUS.DRAFT]: [
+    REPAIR_REQUEST_STATUS.AWAITING_AI_ANALYSIS,
+    REPAIR_REQUEST_STATUS.PUBLISHED, // manual fallback
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.AWAITING_AI_ANALYSIS]: [
+    REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW,
+    REPAIR_REQUEST_STATUS.PUBLISHED, // AI failure fallback
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW]: [
+    REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION,
+    REPAIR_REQUEST_STATUS.PUBLISHED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION]: [
+    REPAIR_REQUEST_STATUS.PUBLISHED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.PUBLISHED]: [
+    REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.DONATION_OFFERED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS]: [
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS]: [
+    REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED]: [
+    REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED,
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED]: [
+    REPAIR_REQUEST_STATUS.APPOINTMENT_SCHEDULED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+    REPAIR_REQUEST_STATUS.DISPUTED,
+  ],
+  [REPAIR_REQUEST_STATUS.APPOINTMENT_SCHEDULED]: [
+    REPAIR_REQUEST_STATUS.UNDER_INSPECTION,
+    REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED, // reschedule
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.UNDER_INSPECTION]: [
+    REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL,
+    REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+    REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL]: [
+    REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+    REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+    REPAIR_REQUEST_STATUS.DISPUTED,
+  ],
+  [REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS]: [
+    REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS]: [
+    REPAIR_REQUEST_STATUS.QUALITY_CHECK,
+    REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+    REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.QUALITY_CHECK]: [
+    REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION,
+    REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS, // rework
+    REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
+  ],
+  [REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION]: [
+    REPAIR_REQUEST_STATUS.COMPLETED,
+    REPAIR_REQUEST_STATUS.DISPUTED,
+  ],
+  [REPAIR_REQUEST_STATUS.COMPLETED]: [
+    REPAIR_REQUEST_STATUS.DISPUTED,
+  ],
+  [REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL]: [
+    REPAIR_REQUEST_STATUS.DONATION_OFFERED,
+    REPAIR_REQUEST_STATUS.PARTS_REUSE_APPROVED,
+    REPAIR_REQUEST_STATUS.SENT_FOR_RECYCLING,
+    REPAIR_REQUEST_STATUS.DISPUTED,
+  ],
+  [REPAIR_REQUEST_STATUS.DONATION_OFFERED]: [
+    REPAIR_REQUEST_STATUS.COMPLETED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+  [REPAIR_REQUEST_STATUS.PARTS_REUSE_APPROVED]: [
+    REPAIR_REQUEST_STATUS.COMPLETED,
+  ],
+  [REPAIR_REQUEST_STATUS.SENT_FOR_RECYCLING]: [
+    REPAIR_REQUEST_STATUS.COMPLETED,
+  ],
+  [REPAIR_REQUEST_STATUS.CANCELLED]: [],
+  [REPAIR_REQUEST_STATUS.DISPUTED]: [
+    REPAIR_REQUEST_STATUS.COMPLETED,
+    REPAIR_REQUEST_STATUS.CANCELLED,
+  ],
+};
+
+const QUOTATION_STATUS = {
+  PENDING: 'pending',
+  SUBMITTED: 'submitted',
+  REVISED: 'revised',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  WITHDRAWN: 'withdrawn',
+  EXPIRED: 'expired',
+  NOT_SELECTED: 'not_selected',
+};
+
+const APPOINTMENT_STATUS = {
+  SCHEDULED: 'scheduled',
+  CONFIRMED: 'confirmed',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  RESCHEDULED: 'rescheduled',
+  NO_SHOW: 'no_show',
+};
+
+const APPOINTMENT_TYPE = {
+  INSPECTION: 'inspection',
+  REPAIR: 'repair',
+  PICKUP: 'pickup',
+  DROPOFF: 'dropoff',
+};
+
+const REPAIR_JOB_STATUS = {
+  PENDING_INSPECTION: 'pending_inspection',
+  INSPECTING: 'inspecting',
+  AWAITING_APPROVAL: 'awaiting_approval',
+  WAITING_FOR_PARTS: 'waiting_for_parts',
+  IN_PROGRESS: 'in_progress',
+  QUALITY_CHECK: 'quality_check',
+  COMPLETED: 'completed',
+  UNSUCCESSFUL: 'unsuccessful',
+  CANCELLED: 'cancelled',
+  DISPUTED: 'disputed',
+};
+
+const DONATION_STATUS = {
+  DRAFT: 'draft',
+  PUBLISHED: 'published',
+  MATCHED: 'matched',
+  ACCEPTED: 'accepted',
+  PICKUP_SCHEDULED: 'pickup_scheduled',
+  IN_TRANSIT: 'in_transit',
+  RECEIVED: 'received',
+  COMPLETED: 'completed',
+  REJECTED: 'rejected',
+  CANCELLED: 'cancelled',
+};
+
+const DISPUTE_STATUS = {
+  OPEN: 'open',
+  UNDER_REVIEW: 'under_review',
+  AWAITING_RESPONSE: 'awaiting_response',
+  RESOLVED: 'resolved',
+  CLOSED: 'closed',
+};
+
+const DISPUTE_CATEGORIES = {
+  QUALITY: 'quality',
+  COST: 'cost',
+  TIMELINE: 'timeline',
+  COMMUNICATION: 'communication',
+  DAMAGE: 'damage',
+  WARRANTY: 'warranty',
+  OTHER: 'other',
+};
+
+const WARRANTY_STATUS = {
+  ACTIVE: 'active',
+  EXPIRED: 'expired',
+  CLAIMED: 'claimed',
+  VOIDED: 'voided',
+};
+
+const PART_STATUS = {
+  AVAILABLE: 'available',
+  RESERVED: 'reserved',
+  SOLD: 'sold',
+  REMOVED: 'removed',
+};
+
+const PART_CONDITION = {
+  NEW: 'new',
+  TESTED_WORKING: 'tested_working',
+  UNTESTED: 'untested',
+  DAMAGED: 'damaged',
+};
+
+const RISK_LEVEL = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  CRITICAL: 'critical',
+};
+
+const SERVICE_METHOD = {
+  ONSITE: 'onsite',
+  PICKUP: 'pickup',
+  DROPOFF: 'dropoff',
+  REMOTE: 'remote',
+};
+
+const NOTIFICATION_TYPES = {
+  ACCOUNT_VERIFIED: 'account_verified',
+  ACCOUNT_REJECTED: 'account_rejected',
+  ACCOUNT_SUSPENDED: 'account_suspended',
+  ACCOUNT_RESTORED: 'account_restored',
+  REPAIR_REQUEST_PUBLISHED: 'repair_request_published',
+  TECHNICIAN_MATCH: 'technician_match',
+  QUOTATION_INVITATION: 'quotation_invitation',
+  QUOTATION_SUBMITTED: 'quotation_submitted',
+  QUOTATION_REVISED: 'quotation_revised',
+  QUOTATION_ACCEPTED: 'quotation_accepted',
+  QUOTATION_REJECTED: 'quotation_rejected',
+  APPOINTMENT_SCHEDULED: 'appointment_scheduled',
+  APPOINTMENT_CHANGED: 'appointment_changed',
+  APPOINTMENT_CANCELLED: 'appointment_cancelled',
+  REPAIR_STATUS_UPDATED: 'repair_status_updated',
+  OWNER_APPROVAL_REQUIRED: 'owner_approval_required',
+  PART_REQUIRED: 'part_required',
+  REPAIR_COMPLETED: 'repair_completed',
+  WARRANTY_CREATED: 'warranty_created',
+  WARRANTY_CLAIM_UPDATED: 'warranty_claim_updated',
+  DONATION_MATCH: 'donation_match',
+  DONATION_ACCEPTED: 'donation_accepted',
+  PICKUP_SCHEDULED: 'pickup_scheduled',
+  HANDOVER_COMPLETED: 'handover_completed',
+  REVIEW_RECEIVED: 'review_received',
+  DISPUTE_OPENED: 'dispute_opened',
+  DISPUTE_RESOLVED: 'dispute_resolved',
+};
+
+const MODERATION_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  FLAGGED: 'flagged',
+  REMOVED: 'removed',
+};
+
+const SEVERITY = {
+  UNKNOWN: 'unknown',
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+};
+
+module.exports = {
+  ROLES,
+  ACCOUNT_STATUS,
+  ORGANIZATION_TYPES,
+  VERIFICATION_STATUS,
+  ITEM_CONDITION,
+  ITEM_STATUS,
+  PATHWAYS,
+  REPAIR_REQUEST_STATUS,
+  REPAIR_STATUS_TRANSITIONS,
+  QUOTATION_STATUS,
+  APPOINTMENT_STATUS,
+  APPOINTMENT_TYPE,
+  REPAIR_JOB_STATUS,
+  DONATION_STATUS,
+  DISPUTE_STATUS,
+  DISPUTE_CATEGORIES,
+  WARRANTY_STATUS,
+  PART_STATUS,
+  PART_CONDITION,
+  RISK_LEVEL,
+  SERVICE_METHOD,
+  NOTIFICATION_TYPES,
+  MODERATION_STATUS,
+  SEVERITY,
+};

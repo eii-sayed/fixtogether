@@ -1,0 +1,68 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
+import api from '../../api/axios';
+import { PageLoader, ErrorState, EmptyState, StatusBadge, Pagination } from '../../components/ui';
+import { Wrench, ArrowRight, Calendar } from 'lucide-react';
+
+export default function RepairJobsPage() {
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['repair-jobs', page, status],
+    queryFn: () => api.get(`/repair-jobs?page=${page}&limit=12${status ? `&status=${status}` : ''}`).then(r => r.data.data),
+  });
+
+  if (isLoading) return <PageLoader />;
+  if (error) return <ErrorState error={error} />;
+
+  const statuses = ['', 'pending_inspection', 'inspecting', 'in_progress', 'waiting_for_parts', 'completed', 'disputed'];
+
+  return (
+    <div className="page-container">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Repair Jobs</h1>
+        <p className="text-sm text-gray-500 mt-1">Track your active and completed repair jobs</p>
+      </div>
+
+      <div className="flex gap-1 flex-wrap mb-6">
+        {statuses.map((s) => (
+          <button key={s} onClick={() => { setStatus(s); setPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${status === s ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {s ? s.replace(/_/g, ' ') : 'All'}
+          </button>
+        ))}
+      </div>
+
+      {data?.repairJobs?.length === 0 ? (
+        <EmptyState icon={Wrench} title="No repair jobs" description="Repair jobs appear after a quotation is accepted." />
+      ) : (
+        <div className="space-y-3">
+          {data?.repairJobs?.map((job) => (
+            <Link key={job._id} to={`/repair-jobs/${job._id}`}
+              className="card flex items-center gap-5 p-5 hover:shadow-md transition-shadow group">
+              <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+                <Wrench className="w-6 h-6 text-primary-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-sm font-semibold text-gray-900">Job #{job._id.slice(-6)}</h3>
+                  <StatusBadge status={job.currentStatus} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Owner: {job.owner?.fullName} • Tech: {job.technician?.fullName}
+                </p>
+                <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
+                  <Calendar className="w-3 h-3" /> {new Date(job.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary-500 transition-colors shrink-0" />
+            </Link>
+          ))}
+          <Pagination pagination={data?.pagination} onPageChange={setPage} />
+        </div>
+      )}
+    </div>
+  );
+}

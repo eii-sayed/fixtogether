@@ -1,0 +1,47 @@
+{
+  "name": "fixtogether-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx",
+    "format": "prettier --write src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npx playwright test"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.9.0",
+    "@tanstack/react-query": "^5.56.2",
+    "axios": "^1.7.7",
+    "lucide-react": "^0.441.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.0",
+    "react-router-dom": "^6.26.2",
+    "recharts": "^2.12.7",
+    "sonner": "^1.5.0",
+    "socket.io-client": "^4.7.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.35.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "jsdom": "^25.0.0",
+    "postcss": "^8.4.45",
+    "prettier": "^3.3.3",
+    "tailwindcss": "^3.4.10",
+    "vite": "^5.4.3",
+    "vitest": "^2.0.5"
+  }
+}
