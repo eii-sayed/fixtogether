@@ -6,6 +6,11 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import App from './App';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+if ('serviceWorker' in navigator) {
+  registerSW({ immediate: true });
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
