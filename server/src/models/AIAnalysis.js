@@ -7,7 +7,6 @@ const aiAnalysisSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'RepairRequest',
       required: true,
-      index: true,
     },
     provider: {
       type: String,

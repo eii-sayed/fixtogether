@@ -1,92 +1,163 @@
 # FixTogether: AI-Assisted Community Repair & Donation Platform
 
-FixTogether is a comprehensive, full-stack community platform designed to help people repair, reuse, donate, and responsibly recycle damaged or unwanted items. Built with the MERN stack (MongoDB, Express, React, Node.js), it connects item owners with verified technicians, donation organizations, and recycling facilities. 
+[![Live Demo](https://img.shields.io/badge/Live-fixtogether.vercel.app-0ea5e9?style=for-the-badge&logo=vercel)](https://fixtogether.vercel.app)
+[![API](https://img.shields.io/badge/API-fixtogether--api.onrender.com-10b981?style=for-the-badge&logo=render)](https://fixtogether-api.onrender.com/api/health)
+
+FixTogether is a full-stack community platform that helps people **repair, reuse, donate**, and **responsibly recycle** damaged or unwanted items. Built with the MERN stack, it connects item owners with verified technicians, donation organizations, and recycling facilities.
 
 A core feature is the **AI-Powered Diagnosis & Safety Engine**, which analyzes problem descriptions to suggest repair pathways, flag safety hazards, and match users with appropriate technicians.
 
-## Features
+## 🌐 Live Demo
 
-* **Multi-Role System**: Distinct workflows for Item Owners, Technicians, Organizations, and Admins.
-* **AI Diagnosis**: Analyzes repair requests to extract symptoms, suggest pathways, and identify required skills.
-* **Safety First Engine**: Intercepts descriptions with dangerous keywords (e.g., "spark", "swollen battery") to immediately flag risks and optionally block AI advice, prioritizing human safety.
-* **Smart Matching**: Connects owners with technicians based on skills, categories, location, and availability.
-* **Quotation System**: Transparent quoting system with labor, parts, and warranty breakdowns.
-* **End-to-End Tracking**: Real-time status updates for repair jobs (Draft -> Published -> Awaiting Quotes -> In Progress -> Completed).
-* **Donations & Recycling**: Dedicated flow for items that can't be repaired, connecting them to verified charities or recyclers.
-* **Real-time Notifications**: Socket.IO integration for instant alerts.
+| Service | URL |
+|---------|-----|
+| **Frontend** | [fixtogether.vercel.app](https://fixtogether.vercel.app) |
+| **Backend API** | [fixtogether-api.onrender.com](https://fixtogether-api.onrender.com/api/health) |
 
-## Technology Stack
+### Demo Credentials
 
-* **Frontend**: React 18, Vite, Tailwind CSS, TanStack Query (React Query), React Hook Form, Zod, React Router, Sonner.
-* **Backend**: Node.js, Express.js, MongoDB (Mongoose).
-* **Authentication**: JWT (Access & Refresh tokens), HTTP-only cookies.
-* **File Uploads**: Cloudinary (or local fallback).
-* **AI Integration**: OpenAI (configurable to use mock provider for dev).
-* **DevOps**: Docker, Docker Compose, Vitest (Frontend), Jest (Backend).
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@fixtogether.com` | `Admin123!` |
+| Owner | `rahim@example.com` | `Owner123!` |
+| Technician | `sumon@example.com` | `Tech123!` |
+| Organization | `hope@example.com` | `Org1234!` |
 
-## Quick Start (Docker)
+> **Note:** The Render free tier may take ~30 seconds to spin up on first request if the server has been idle.
 
-The easiest way to run the entire application (Database, Backend, Frontend) is using Docker Compose.
+## ✨ Features
 
-1. Ensure Docker and Docker Compose are installed.
-2. Run the application:
-   ```bash
-   npm run docker:up
-   # Or directly: docker compose up -d
-   ```
-3. Access the platforms:
-   - **Frontend**: http://localhost:5173
-   - **Backend API**: http://localhost:5000/api/v1
+- **Multi-Role System** — Distinct workflows for Item Owners, Technicians, Organizations, and Admins
+- **AI Diagnosis** — Analyzes repair requests to extract symptoms, suggest pathways, and identify required skills
+- **Safety First Engine** — Intercepts descriptions with dangerous keywords (e.g., "spark", "swollen battery") to flag risks and block unsafe AI advice
+- **Smart Matching** — Connects owners with technicians based on skills, categories, and availability
+- **Quotation System** — Transparent quoting with labor, parts, and warranty breakdowns
+- **End-to-End Tracking** — Real-time status updates (Draft → Published → Awaiting Quotes → In Progress → Completed)
+- **Donations & Recycling** — Dedicated flow for unrepairable items, connecting to verified charities or recyclers
+- **Real-time Notifications** — Socket.IO integration for instant alerts
 
-## Local Development Setup
+## 🛠 Technology Stack
 
-If you prefer to run the services manually without Docker:
+### Frontend
+- React 18, Vite, Tailwind CSS
+- TanStack Query (React Query), React Hook Form, Zod
+- React Router, Sonner (toast notifications)
+- Lucide React (icons), Leaflet (maps)
+
+### Backend
+- Node.js, Express.js, MongoDB (Mongoose)
+- JWT Authentication (Access & Refresh tokens), HTTP-only cookies
+- Socket.IO (real-time), Winston (logging)
+- Joi (validation), Multer (file uploads)
+- Helmet, CORS, express-rate-limit (security)
+
+### Infrastructure
+- **Frontend Hosting**: Vercel
+- **Backend Hosting**: Render
+- **Database**: MongoDB Atlas
+- **File Storage**: Cloudinary (with local fallback)
+- **AI**: OpenAI API (with mock provider for development)
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v18+)
-- MongoDB (running locally on port 27017 or a cloud URI)
+- Node.js v18+
+- MongoDB (local or Atlas URI)
 
-### 1. Install Dependencies
-From the root directory, install everything:
+### 1. Clone & Install
 ```bash
+git clone https://github.com/eii-sayed/fixtogether.git
+cd fixtogether
 npm run install:all
 ```
 
-### 2. Configure Environment Variables
-* **Server**: A `.env` file is already created in `server/` with default development settings. If you want to use real OpenAI analysis, change `AI_PROVIDER=openai` and add `OPENAI_API_KEY=your_key`.
-* **Client**: A `.env` file is already created in `client/` pointing to the local API.
+### 2. Configure Environment
+Copy and configure the example env files:
+```bash
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
+Edit `server/.env` with your MongoDB URI and other settings.
 
-### 3. Seed the Database (Important)
-Populate the database with test users, categories, safety rules, items, and repair requests:
+### 3. Seed the Database
 ```bash
 npm run seed
 ```
-*Note: Check the console output of this script for demo login credentials!*
+Check the console output for demo login credentials.
 
-### 4. Run the Application
-Run both frontend and backend concurrently:
+### 4. Run Development Server
 ```bash
 npm run dev
 ```
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:5000/api/v1
 
-## Testing
-
-Run backend tests:
+### Docker (Alternative)
 ```bash
-npm run test:server
+docker compose up
 ```
-Run frontend tests:
+
+## 🧪 Testing
+
 ```bash
+# Backend tests
+npm run test:server
+
+# Frontend tests
 npm run test:client
 ```
 
-## Assumptions & Design Decisions
+## 📁 Project Structure
 
-1. **AI Abstraction**: The AI service uses a factory pattern. By default, it runs on a `mock` provider to avoid incurring API costs during general testing and development.
-2. **Safety Engine**: We implemented a deterministic keyword-based safety engine *before* the AI step. LLMs can hallucinate or downplay risks. Hardcoded rules ensure critical safety hazards (like lithium battery fires) are flagged instantly.
-3. **Payments**: The platform currently tracks costs and status internally. Real payment gateway integration (Stripe/PayPal) is architected for future phases but currently mocked as state transitions.
-4. **Location**: For matching, we assume coordinates are provided during profile creation. The demo uses basic scoring.
-5. **No TypeScript**: As per the project requirements, standard JavaScript was used throughout, relying on Joi/Zod for strict runtime validation.
+```
+fixtogether/
+├── client/                  # React frontend (Vite)
+│   ├── src/
+│   │   ├── api/             # Axios API client
+│   │   ├── components/      # Reusable UI components
+│   │   ├── context/         # React context (Auth)
+│   │   └── pages/           # Route pages
+│   └── vercel.json          # Vercel SPA routing config
+├── server/                  # Express.js backend
+│   ├── src/
+│   │   ├── config/          # App configuration
+│   │   ├── controllers/     # Route handlers
+│   │   ├── middleware/      # Auth, validation, error handling
+│   │   ├── models/          # Mongoose schemas
+│   │   ├── routes/          # API route definitions
+│   │   ├── services/        # Business logic (AI, matching, safety)
+│   │   ├── validators/      # Joi validation schemas
+│   │   └── scripts/         # Database seeding
+│   └── tests/               # Jest test suites
+├── docker-compose.yml       # Docker development setup
+└── package.json             # Root workspace scripts
+```
 
-## Author
-Built for the University Software Engineering Project.
+## 🔑 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/register` | Register new user |
+| `POST` | `/api/v1/auth/login` | Login |
+| `GET` | `/api/v1/auth/me` | Get current user |
+| `GET` | `/api/v1/items` | List items |
+| `POST` | `/api/v1/items` | Create item |
+| `GET` | `/api/v1/repair-requests` | List repair requests |
+| `POST` | `/api/v1/repair-requests` | Create repair request |
+| `GET` | `/api/v1/technicians` | List technicians |
+| `GET` | `/api/v1/donations` | List donations |
+| `GET` | `/api/v1/categories` | List categories |
+| `GET` | `/api/v1/notifications` | List notifications |
+| `GET` | `/api/v1/admin/dashboard` | Admin dashboard stats |
+
+## 📝 Design Decisions
+
+1. **AI Abstraction** — Factory pattern with `mock` and `openai` providers. Mock provider runs without API costs during development.
+2. **Safety Engine** — Deterministic keyword-based safety checks run *before* AI analysis. Hardcoded rules ensure critical hazards (battery fires, electric shocks) are flagged instantly without relying on LLM accuracy.
+3. **JWT Strategy** — Access tokens (15min) + Refresh tokens (7 days) with rotation. Refresh tokens stored in HTTP-only cookies with `SameSite=None` for cross-origin deployment.
+4. **Payments** — Cost tracking is internal. Payment gateway integration (Stripe/PayPal) is architected for future phases.
+5. **No TypeScript** — Standard JavaScript with strict runtime validation via Joi (backend) and Zod (frontend).
+
+## 👤 Author
+
+University Software Engineering Project by [Abu Sayed](https://github.com/eii-sayed)
