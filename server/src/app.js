@@ -68,6 +68,10 @@ app.use('/api', limiter);
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'FixTogether API is running', environment: config.env });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: config.env });
 });
