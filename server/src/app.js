@@ -23,6 +23,7 @@ const repairJobRoutes = require('./routes/repairJobRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const { donationRoutes, partsRoutes, warrantyRoutes, warrantyClaimsRoutes,
   reviewRoutes, disputeRoutes, notificationRoutes } = require('./routes/additionalRoutes');
+const messageRoutes = require('./routes/messageRoutes');
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use(`${API_PREFIX}/warranty-claims`, warrantyClaimsRoutes);
 app.use(`${API_PREFIX}/reviews`, reviewRoutes);
 app.use(`${API_PREFIX}/disputes`, disputeRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
+app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 
 // Error handling

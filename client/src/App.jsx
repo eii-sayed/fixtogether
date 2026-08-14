@@ -14,7 +14,9 @@ import RepairRequestDetailPage from './pages/repairs/RepairRequestDetailPage';
 import NewRepairRequestPage from './pages/repairs/NewRepairRequestPage';
 import RepairJobsPage from './pages/repairs/RepairJobsPage';
 import DonationsPage from './pages/donations/DonationsPage';
+import ConversationsPage from './pages/messages/ConversationsPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import TechnicianProfilePage from './pages/profile/TechnicianProfilePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
@@ -33,6 +35,7 @@ export default function App() {
         {/* Authenticated routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/technicians/:id" element={<ProtectedRoute><TechnicianProfilePage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
         {/* Items */}
@@ -49,6 +52,9 @@ export default function App() {
 
         {/* Donations */}
         <Route path="/donations" element={<ProtectedRoute><DonationsPage /></ProtectedRoute>} />
+
+        {/* Messages */}
+        <Route path="/messages" element={<ProtectedRoute><ConversationsPage /></ProtectedRoute>} />
 
         {/* Admin */}
         <Route path="/admin" element={<ProtectedRoute roles={['admin']}><DashboardPage /></ProtectedRoute>} />

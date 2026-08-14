@@ -37,6 +37,43 @@ const startServer = async () => {
       }
     });
 
+    // Join a repair-request-specific chat room
+    socket.on('chat:join', (repairRequestId) => {
+      if (repairRequestId) {
+        socket.join(`chat:${repairRequestId}`);
+        logger.debug(`Socket ${socket.id} joined chat room: ${repairRequestId}`);
+      }
+    });
+
+    // Leave a chat room
+    socket.on('chat:leave', (repairRequestId) => {
+      if (repairRequestId) {
+        socket.leave(`chat:${repairRequestId}`);
+        logger.debug(`Socket ${socket.id} left chat room: ${repairRequestId}`);
+      }
+    });
+
+    // Typing indicator — relay to other participants in the room
+    socket.on('chat:typing', ({ repairRequestId, userId, fullName }) => {
+      if (repairRequestId) {
+        socket.to(`chat:${repairRequestId}`).emit('chat:typing', {
+          repairRequestId,
+          userId,
+          fullName,
+        });
+      }
+    });
+
+    // Stop typing indicator
+    socket.on('chat:stop-typing', ({ repairRequestId, userId }) => {
+      if (repairRequestId) {
+        socket.to(`chat:${repairRequestId}`).emit('chat:stop-typing', {
+          repairRequestId,
+          userId,
+        });
+      }
+    });
+
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${socket.id}`);
     });

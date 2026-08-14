@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   Menu, X, Bell, User, LogOut, ChevronDown, Wrench, Home,
-  Package, ClipboardList, Users, LayoutDashboard, Heart, Settings, Cog
+  Package, ClipboardList, Users, LayoutDashboard, Heart, Settings, Cog,
+  MessageCircle
 } from 'lucide-react';
 
 const roleNavItems = {
@@ -11,12 +12,14 @@ const roleNavItems = {
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'My Items', path: '/items', icon: Package },
     { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
+    { label: 'Messages', path: '/messages', icon: MessageCircle },
     { label: 'Donations', path: '/donations', icon: Heart },
   ],
   technician: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'Repair Requests', path: '/repair-requests', icon: ClipboardList },
     { label: 'My Jobs', path: '/repair-jobs', icon: Wrench },
+    { label: 'Messages', path: '/messages', icon: MessageCircle },
   ],
   organization: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },

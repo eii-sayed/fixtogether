@@ -4,7 +4,8 @@ import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { PageLoader, ErrorState, StatusBadge } from '../../components/ui';
 import { toast } from 'sonner';
-import { ArrowLeft, Zap, Shield, AlertTriangle, Send, Eye, CheckCircle, XCircle, Users, Star, Calendar, DollarSign } from 'lucide-react';
+import { ArrowLeft, Zap, Shield, AlertTriangle, Send, Eye, CheckCircle, XCircle, Users, Star, Calendar, DollarSign, MessageCircle } from 'lucide-react';
+import ChatPanel from '../../components/chat/ChatPanel';
 
 export default function RepairRequestDetailPage() {
   const { id } = useParams();
@@ -265,6 +266,11 @@ export default function RepairRequestDetailPage() {
               {rr?.publishedAt && <TimelineItem label="Published" date={rr.publishedAt} />}
             </div>
           </div>
+
+          {/* Chat Panel */}
+          {rr && !['draft', 'awaiting_ai_analysis'].includes(rr.requestStatus) && (
+            <ChatPanel repairRequestId={id} />
+          )}
         </div>
       </div>
     </div>
@@ -306,12 +312,12 @@ function QuotationsSection({ requestId, selectedQuotation }) {
         {data.quotations.map((q) => (
           <div key={q._id} className="p-5">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
+              <Link to={`/technicians/${q.technician?._id}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                 <div className="w-8 h-8 bg-secondary-100 rounded-full flex items-center justify-center">
                   <Star className="w-4 h-4 text-secondary-600" />
                 </div>
-                <span className="text-sm font-medium text-gray-900">{q.technician?.fullName}</span>
-              </div>
+                <span className="text-sm font-medium text-primary-600 hover:text-primary-700 underline underline-offset-2">{q.technician?.fullName}</span>
+              </Link>
               <StatusBadge status={q.status} />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">

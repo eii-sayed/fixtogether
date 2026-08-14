@@ -22,6 +22,7 @@ const Warranty = require('./Warranty');
 const Notification = require('./Notification');
 const SafetyRule = require('./SafetyRule');
 const AuditLog = require('./AuditLog');
+const Message = require('./Message');
 const ImpactRecord = require('./ImpactRecord');
 
 module.exports = {
@@ -50,4 +51,5 @@ module.exports = {
   SafetyRule,
   AuditLog,
   ImpactRecord,
+  Message,
 };

@@ -128,6 +128,7 @@ const markAllAsRead = async (userId) => {
 
 module.exports = {
   setSocketIO,
+  getIO: () => io,
   createNotification,
   createBulkNotifications,
   getUnreadCount,

@@ -326,6 +326,7 @@ const NOTIFICATION_TYPES = {
   REVIEW_RECEIVED: 'review_received',
   DISPUTE_OPENED: 'dispute_opened',
   DISPUTE_RESOLVED: 'dispute_resolved',
+  NEW_MESSAGE: 'new_message',
 };
 
 const MODERATION_STATUS = {
