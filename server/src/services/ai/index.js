@@ -151,6 +151,20 @@ const analyzeRepairRequest = async (params) => {
     };
   } catch (error) {
     logger.error('AI analysis failed:', error.message);
+    // If external provider fails (e.g. 429 quota exhausted or network error), fallback gracefully to Mock provider
+    if (provider.name !== 'mock') {
+      logger.warn('Falling back to Mock AI Provider due to provider error.');
+      const fallbackProvider = new MockAIProvider();
+      const rawResponse = await fallbackProvider.analyzeRepairRequest(params);
+      const { valid, errors, sanitized } = validateAnalysisResponse(rawResponse);
+      return {
+        analysis: sanitized,
+        provider: 'mock (fallback)',
+        model: fallbackProvider.model,
+        processingTime: Date.now() - startTime,
+        validationErrors: errors,
+      };
+    }
     throw error;
   }
 };
