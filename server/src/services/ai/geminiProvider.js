@@ -156,60 +156,73 @@ ${existingSummaries}`;
   // ---- Private API caller ----
 
   async _callAPI(userPrompt) {
+    const modelsToTry = [this.model];
+    if (!modelsToTry.includes('gemini-3.6-flash')) {
+      modelsToTry.push('gemini-3.6-flash');
+    }
+
     let lastError;
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    for (const currentModel of modelsToTry) {
+      for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: this.systemInstruction }],
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            contents: [
-              {
-                parts: [{ text: userPrompt }],
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: this.systemInstruction }],
               },
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.2,
-            },
-          }),
-          signal: controller.signal,
-        });
+              contents: [
+                {
+                  parts: [{ text: userPrompt }],
+                },
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: 0.2,
+              },
+            }),
+            signal: controller.signal,
+          });
 
-        clearTimeout(timeout);
+          clearTimeout(timeout);
 
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(`Gemini API error ${response.status}: ${errorBody}`);
-        }
+          if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`Gemini API error ${response.status}: ${errorBody}`);
+          }
 
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-        if (!text) {
-          throw new Error('Empty response from Gemini API');
-        }
+          if (!text) {
+            throw new Error('Empty response from Gemini API');
+          }
 
-        // Parse and return JSON
-        const parsed = JSON.parse(text);
-        return parsed;
-      } catch (error) {
-        lastError = error;
-        logger.warn(`Gemini attempt ${attempt + 1} failed: ${error.message}`);
+          // Parse and return JSON
+          const parsed = JSON.parse(text);
+          this.model = currentModel;
+          return parsed;
+        } catch (error) {
+          lastError = error;
+          logger.warn(`Gemini (${currentModel}) attempt ${attempt + 1} failed: ${error.message}`);
 
-        if (attempt < this.maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+          // If quota exceeded or model not found on Pro, break inner loop to try flash model immediately
+          if (error.message.includes('429') || error.message.includes('404')) {
+            break;
+          }
+
+          if (attempt < this.maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+          }
         }
       }
     }
