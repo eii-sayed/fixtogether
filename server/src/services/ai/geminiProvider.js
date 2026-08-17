@@ -141,6 +141,35 @@ ${existingSummaries}`;
   }
 
   /**
+   * Conversational Assistant Chat
+   */
+  async chat({ message, history = [] }) {
+    const userPrompt = `You are Fixie, the smart AI repair & circular economy assistant for FixTogether platform.
+Help the user with practical preliminary troubleshooting guidance, platform navigation, safety warnings, and how to create effective repair requests.
+Always prioritize safety (warn against high-voltage capacitors, microwaves, CRT displays, power supply units, swollen Li-ion batteries).
+Keep responses friendly, helpful, and concise.
+
+Conversation history:
+${history.slice(-6).map((h) => `${h.sender === 'user' ? 'User' : 'Fixie'}: ${h.text}`).join('\n')}
+
+User message: ${message}
+
+Return ONLY a JSON object with this exact structure:
+{
+  "reply": "your response in clean markdown format",
+  "suggestedActions": ["short suggestion 1", "short suggestion 2", "short suggestion 3"]
+}`;
+
+    const res = await this._callAPI(userPrompt);
+    if (typeof res === 'object' && res.reply) return res;
+    if (typeof res === 'string') return { reply: res, suggestedActions: [] };
+    return {
+      reply: 'I am here to help you with device troubleshooting, safety checks, and repair advice. What item are you having issues with?',
+      suggestedActions: ['Help diagnose my device', 'Is it safe to repair?', 'How do quotations work?'],
+    };
+  }
+
+  /**
    * Health check
    */
   async healthCheck() {

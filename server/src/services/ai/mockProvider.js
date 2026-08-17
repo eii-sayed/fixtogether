@@ -318,6 +318,32 @@ class MockAIProvider {
     if (symptoms.length > 1) confidence += 10;
     return Math.min(confidence, 85); // Mock never exceeds 85% confidence
   }
+
+  /**
+   * Conversational Assistant Chat
+   */
+  async chat({ message }) {
+    const lower = (message || '').toLowerCase();
+
+    if (lower.includes('safe') || lower.includes('microwave') || lower.includes('battery')) {
+      return {
+        reply: '⚠️ **Safety First!** High-voltage devices like microwaves, CRT monitors, and swollen lithium-ion batteries carry significant risks of electric shock or fire. We strongly recommend having a certified FixTogether technician inspect these items rather than attempting self-disassembly.',
+        suggestedActions: ['Find a certified technician', 'Post a repair request', 'Battery safety tips'],
+      };
+    }
+
+    if (lower.includes('quote') || lower.includes('price') || lower.includes('cost')) {
+      return {
+        reply: '💰 **How Quotations Work:** Once you publish a repair request, matched technicians review your issue and submit itemized quotations (labor, parts estimate, expected duration, and warranty). You can compare quotes and message technicians directly before accepting!',
+        suggestedActions: ['Create a repair request', 'View technician profiles', 'How long does repair take?'],
+      };
+    }
+
+    return {
+      reply: `👋 Hello! I am **Fixie**, your FixTogether AI repair assistant. I can help you diagnose broken electronics, verify safety precautions, prepare detailed repair requests, or connect with verified technicians. How can I assist you today?`,
+      suggestedActions: ['Help diagnose my item', 'Is it safe to repair?', 'How do quotations work?'],
+    };
+  }
 }
 
 module.exports = MockAIProvider;

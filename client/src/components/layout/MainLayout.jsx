@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import MobileBottomNav from './MobileBottomNav';
+import FloatingAIHead from '../ai/FloatingAIHead';
 import { useAuth } from '../../context/AuthContext';
 
 export default function MainLayout() {
@@ -14,6 +15,7 @@ export default function MainLayout() {
         <Outlet />
       </main>
       <Footer />
+      <FloatingAIHead />
       <MobileBottomNav />
     </div>
   );

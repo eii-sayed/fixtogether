@@ -239,6 +239,24 @@ const getProviderInfo = () => {
   return { name: provider.name, model: provider.model };
 };
 
+/**
+ * Chat with AI Assistant
+ */
+const chatWithAI = async (params) => {
+  const provider = getProvider();
+  try {
+    if (typeof provider.chat === 'function') {
+      return await provider.chat(params);
+    }
+    const mock = new MockAIProvider();
+    return await mock.chat(params);
+  } catch (error) {
+    logger.warn('AI chat error, falling back to mock provider:', error.message);
+    const mock = new MockAIProvider();
+    return await mock.chat(params);
+  }
+};
+
 module.exports = {
   analyzeRepairRequest,
   generateClarificationQuestions,
@@ -249,4 +267,5 @@ module.exports = {
   healthCheck,
   getProviderInfo,
   validateAnalysisResponse,
+  chatWithAI,
 };
