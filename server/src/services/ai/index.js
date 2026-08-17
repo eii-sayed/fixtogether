@@ -1,6 +1,7 @@
 const config = require('../../config');
 const MockAIProvider = require('./mockProvider');
 const OpenAIProvider = require('./openaiProvider');
+const GeminiProvider = require('./geminiProvider');
 const logger = require('../../utils/logger');
 
 /**
@@ -14,14 +15,24 @@ let providerInstance = null;
 
 /**
  * Get the configured AI provider instance
- * @returns {MockAIProvider|OpenAIProvider}
+ * @returns {MockAIProvider|OpenAIProvider|GeminiProvider}
  */
 const getProvider = () => {
   if (providerInstance) return providerInstance;
 
-  const providerName = config.ai.provider;
+  const providerName = (config.ai.provider || 'gemini').toLowerCase();
 
   switch (providerName) {
+    case 'gemini':
+    case 'google':
+      if (!config.ai.gemini.apiKey) {
+        logger.warn('Gemini API key not configured. Falling back to mock provider.');
+        providerInstance = new MockAIProvider();
+      } else {
+        providerInstance = new GeminiProvider();
+        logger.info(`AI provider: Gemini (${config.ai.gemini.model || 'gemini-3.6-flash'})`);
+      }
+      break;
     case 'openai':
       if (!config.ai.openai.apiKey) {
         logger.warn('OpenAI API key not configured. Falling back to mock provider.');

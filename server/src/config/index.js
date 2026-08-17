@@ -31,7 +31,11 @@ const config = {
 
   // AI
   ai: {
-    provider: process.env.AI_PROVIDER || 'mock',
+    provider: process.env.AI_PROVIDER || 'gemini',
+    gemini: {
+      apiKey: process.env.GEMINI_API_KEY || '',
+      model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+    },
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
       model: process.env.OPENAI_MODEL || 'gpt-4o',
