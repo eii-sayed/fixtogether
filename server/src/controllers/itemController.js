@@ -44,7 +44,7 @@ const updateItem = asyncHandler(async (req, res) => {
   if (!item) return errorResponse(res, 'Item not found.', 404);
 
   const fields = ['title', 'category', 'subcategory', 'brand', 'model', 'approximateAge',
-    'condition', 'serialNumberPrivate', 'ownershipDeclaration', 'approximateLocation', 'currentPathway', 'status'];
+    'condition', 'serialNumberPrivate', 'ownershipDeclaration', 'approximateLocation', 'currentPathway', 'status', 'images'];
   fields.forEach((f) => { if (req.body[f] !== undefined) item[f] = req.body[f]; });
   await item.save();
 

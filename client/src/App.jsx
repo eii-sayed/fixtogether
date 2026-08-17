@@ -9,6 +9,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ItemsPage from './pages/items/ItemsPage';
 import NewItemPage from './pages/items/NewItemPage';
+import EditItemPage from './pages/items/EditItemPage';
 import RepairRequestsPage from './pages/repairs/RepairRequestsPage';
 import RepairRequestDetailPage from './pages/repairs/RepairRequestDetailPage';
 import NewRepairRequestPage from './pages/repairs/NewRepairRequestPage';
@@ -41,6 +42,7 @@ export default function App() {
         {/* Items */}
         <Route path="/items" element={<ProtectedRoute roles={['owner']}><ItemsPage /></ProtectedRoute>} />
         <Route path="/items/new" element={<ProtectedRoute roles={['owner']}><NewItemPage /></ProtectedRoute>} />
+        <Route path="/items/:id/edit" element={<ProtectedRoute roles={['owner']}><EditItemPage /></ProtectedRoute>} />
 
         {/* Repair Requests */}
         <Route path="/repair-requests" element={<ProtectedRoute><RepairRequestsPage /></ProtectedRoute>} />

@@ -80,9 +80,12 @@ export default function ItemsPage() {
                   )}
                   <div className="mt-4 flex items-center gap-2">
                     <Link to={`/repair-requests/new?item=${item._id}`} className="btn-primary btn-sm flex-1">
-                      <Wrench className="w-3.5 h-3.5" /> Request Repair
+                      <Wrench className="w-3.5 h-3.5" /> Repair
                     </Link>
-                    <button onClick={() => setDeleteId(item._id)} className="btn-ghost btn-sm text-gray-400 hover:text-danger-600">
+                    <Link to={`/items/${item._id}/edit`} className="btn-ghost btn-sm text-gray-500 hover:text-primary-700 hover:bg-primary-50" title="Edit item">
+                      <Edit className="w-3.5 h-3.5" />
+                    </Link>
+                    <button onClick={() => setDeleteId(item._id)} className="btn-ghost btn-sm text-gray-400 hover:text-danger-600" title="Remove item">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
