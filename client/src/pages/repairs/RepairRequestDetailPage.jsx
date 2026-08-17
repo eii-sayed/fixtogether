@@ -267,8 +267,8 @@ export default function RepairRequestDetailPage() {
             </div>
           </div>
 
-          {/* Chat Panel */}
-          {rr && !['draft', 'awaiting_ai_analysis'].includes(rr.requestStatus) && (
+          {/* Chat Panel — show once technicians are involved */}
+          {rr && !['draft', 'awaiting_ai_analysis', 'awaiting_owner_review', 'awaiting_clarification', 'published', 'matching_technicians'].includes(rr.requestStatus) && (
             <ChatPanel repairRequestId={id} />
           )}
         </div>

@@ -25,13 +25,13 @@ export default function ChatPanel({ repairRequestId }) {
   const [input, setInput] = useState('');
   const [typingUser, setTypingUser] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
 
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
   const cursorRef = useRef(null);
-  const hasMoreRef = useRef(true);
 
   // Fetch initial messages
   const { data, isLoading } = useQuery({
@@ -39,10 +39,6 @@ export default function ChatPanel({ repairRequestId }) {
     queryFn: () =>
       api.get(`/messages/${repairRequestId}?limit=30`).then((r) => r.data.data),
     enabled: !!repairRequestId,
-    onSuccess: (data) => {
-      if (data.cursor) cursorRef.current = data.cursor;
-      hasMoreRef.current = data.hasMore;
-    },
   });
 
   const messages = data?.messages || [];
@@ -75,7 +71,7 @@ export default function ChatPanel({ repairRequestId }) {
 
   // Load older messages
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMoreRef.current || !cursorRef.current) return;
+    if (loadingMore || !hasMore || !cursorRef.current) return;
     setLoadingMore(true);
 
     try {
@@ -85,7 +81,7 @@ export default function ChatPanel({ repairRequestId }) {
       const olderData = res.data.data;
 
       if (olderData.cursor) cursorRef.current = olderData.cursor;
-      hasMoreRef.current = olderData.hasMore;
+      setHasMore(olderData.hasMore);
 
       queryClient.setQueryData(['messages', repairRequestId], (old) => {
         if (!old) return olderData;
@@ -101,7 +97,7 @@ export default function ChatPanel({ repairRequestId }) {
     } finally {
       setLoadingMore(false);
     }
-  }, [repairRequestId, loadingMore, queryClient]);
+  }, [repairRequestId, loadingMore, hasMore, queryClient]);
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -200,11 +196,11 @@ export default function ChatPanel({ repairRequestId }) {
     }
   }, [isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update cursor from query data
+  // Update cursor and hasMore from query data
   useEffect(() => {
     if (data) {
       if (data.cursor) cursorRef.current = data.cursor;
-      hasMoreRef.current = data.hasMore;
+      setHasMore(!!data.hasMore);
     }
   }, [data]);
 
@@ -297,7 +293,7 @@ export default function ChatPanel({ repairRequestId }) {
         ) : (
           <>
             {/* Load more button */}
-            {hasMoreRef.current && (
+            {hasMore && (
               <div className="flex justify-center mb-3">
                 <button
                   onClick={loadMore}

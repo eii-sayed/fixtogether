@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 
 /**
  * Check if a user is a participant in a repair request conversation.
- * A participant is the request owner, a technician with a quotation, or an admin.
+ * A participant is the request owner, an invited/quoted/assigned technician, or an admin.
  */
 const isParticipant = async (userId, userRole, repairRequest) => {
   if (userRole === 'admin') return true;
@@ -13,6 +13,14 @@ const isParticipant = async (userId, userRole, repairRequest) => {
   // Owner of the repair request
   const ownerId = repairRequest.owner?._id || repairRequest.owner;
   if (ownerId.toString() === userId.toString()) return true;
+
+  // Technician invited via selectedTechnicians
+  if (repairRequest.selectedTechnicians?.length > 0) {
+    const isInvited = repairRequest.selectedTechnicians.some(
+      (t) => (t.technician?._id || t.technician)?.toString() === userId.toString()
+    );
+    if (isInvited) return true;
+  }
 
   // Technician who submitted a quotation on this request
   const hasQuotation = await Quotation.exists({
@@ -40,7 +48,7 @@ const getRecipient = async (senderId, repairRequest) => {
   const ownerId = (repairRequest.owner?._id || repairRequest.owner).toString();
 
   if (senderId.toString() === ownerId) {
-    // Sender is owner → find the technician (from accepted quotation or job)
+    // Sender is owner → find the technician (from job → quotation → invited)
     const job = await RepairJob.findOne({ repairRequest: repairRequest._id })
       .select('technician')
       .lean();
@@ -63,6 +71,16 @@ const getRecipient = async (senderId, repairRequest) => {
       .select('technician')
       .lean();
     if (latestQuotation) return latestQuotation.technician.toString();
+
+    // Fall back to the most recently invited technician
+    if (repairRequest.selectedTechnicians?.length > 0) {
+      const invited = repairRequest.selectedTechnicians
+        .filter((t) => t.status !== 'declined')
+        .sort((a, b) => new Date(b.invitedAt) - new Date(a.invitedAt));
+      if (invited.length > 0) {
+        return (invited[0].technician?._id || invited[0].technician).toString();
+      }
+    }
 
     return null;
   }
@@ -198,7 +216,7 @@ const getMessages = async (req, res) => {
 
     // Verify repair request exists
     const repairRequest = await RepairRequest.findById(repairRequestId)
-      .select('owner')
+      .select('owner selectedTechnicians')
       .lean();
 
     if (!repairRequest) {
@@ -252,7 +270,7 @@ const sendMessage = async (req, res) => {
 
     // Verify repair request exists
     const repairRequest = await RepairRequest.findById(repairRequestId)
-      .select('owner selectedQuotation requestStatus')
+      .select('owner selectedQuotation requestStatus selectedTechnicians')
       .lean();
 
     if (!repairRequest) {

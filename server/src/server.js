@@ -25,15 +25,39 @@ const startServer = async () => {
   // Register Socket.IO with notification service
   setSocketIO(io);
 
+  // Socket.IO authentication middleware
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication token required'));
+    }
+
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(token, config.jwt.accessSecret);
+      socket.userId = decoded.userId;
+      socket.userRole = decoded.role;
+      next();
+    } catch (err) {
+      logger.debug(`Socket auth failed: ${err.message}`);
+      return next(new Error('Invalid or expired token'));
+    }
+  });
+
   // Socket.IO connection handling
   io.on('connection', (socket) => {
-    logger.debug(`Socket connected: ${socket.id}`);
+    logger.debug(`Socket connected: ${socket.id} (user: ${socket.userId})`);
 
-    // Join user-specific room for notifications
+    // Automatically join user's notification room using verified identity
+    if (socket.userId) {
+      socket.join(`user:${socket.userId}`);
+      logger.debug(`User ${socket.userId} joined notification room`);
+    }
+
+    // Legacy join handler — only allow joining own room
     socket.on('join', (userId) => {
-      if (userId) {
+      if (userId && userId === socket.userId) {
         socket.join(`user:${userId}`);
-        logger.debug(`User ${userId} joined notification room`);
       }
     });
 

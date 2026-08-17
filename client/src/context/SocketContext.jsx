@@ -22,10 +22,14 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    // Create socket connection
+    // Create socket connection with auth token
+    const token = localStorage.getItem('accessToken');
     const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
+      auth: {
+        token,
+      },
     });
 
     socketRef.current = socket;
