@@ -10,15 +10,24 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(true);
 
+  // Sync freshest user data from backend on startup or token availability
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
-    if (token && !user) {
-      api.get('/auth/me')
+    if (token) {
+      api
+        .get('/auth/me')
         .then(({ data }) => {
-          setUser(data.data.user);
-          localStorage.setItem('user', JSON.stringify(data.data.user));
+          if (data?.data?.user) {
+            setUser(data.data.user);
+            localStorage.setItem('user', JSON.stringify(data.data.user));
+          }
         })
-        .catch(() => { localStorage.clear(); setUser(null); })
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            localStorage.clear();
+            setUser(null);
+          }
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -46,19 +55,39 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try { await api.post('/auth/logout'); } catch {}
+    try {
+      await api.post('/auth/logout');
+    } catch {}
     localStorage.clear();
     setUser(null);
   }, []);
 
   const updateUser = useCallback((updates) => {
-    const updated = { ...user, ...updates };
-    setUser(updated);
-    localStorage.setItem('user', JSON.stringify(updated));
-  }, [user]);
+    setUser((prev) => {
+      const updated = { ...(prev || {}), ...updates };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      if (data?.data?.user) {
+        setUser(data.data.user);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+      }
+    } catch {}
+  }, []);
 
   const value = {
-    user, loading, login, register, logout, updateUser,
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    updateUser,
+    refreshUser,
     isAuthenticated: !!user,
     isOwner: user?.role === 'owner',
     isTechnician: user?.role === 'technician',

@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -100,10 +100,13 @@ export default function ProfilePage() {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      await api.post('/users/me/avatar', formData, {
+      const res = await api.post('/users/me/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success('Avatar updated successfully!');
+      if (res.data?.data?.profileImage) {
+        updateUser({ profileImage: res.data.data.profileImage });
+      }
       queryClient.invalidateQueries(['my-profile']);
       queryClient.invalidateQueries(['auth-me']);
     } catch (err) {

@@ -113,11 +113,29 @@ export default function MobileBottomNav() {
               } active:scale-95`}
             >
               <div className="relative">
-                <Icon
-                  className={`w-5 h-5 transition-transform ${
-                    isActive ? 'scale-110 text-primary-600 stroke-[2.2]' : ''
-                  }`}
-                />
+                {tab.label === 'Profile' && user?.profileImage?.url ? (
+                  <div
+                    className={`w-6 h-6 rounded-full overflow-hidden border ${
+                      isActive ? 'border-primary-600 ring-2 ring-primary-600/30' : 'border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={user.profileImage.url}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <Icon
+                    className={`w-5 h-5 transition-transform ${
+                      isActive ? 'scale-110 text-primary-600 stroke-[2.2]' : ''
+                    }`}
+                  />
+                )}
                 {tab.badge > 0 && (
                   <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 bg-danger-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border border-white shadow-sm">
                     {tab.badge > 99 ? '99+' : tab.badge}

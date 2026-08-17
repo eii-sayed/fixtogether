@@ -166,11 +166,19 @@ export default function Navbar() {
                     }}
                     aria-haspopup="menu"
                     aria-expanded={profileOpen}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 active:scale-95 transition-all"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 active:scale-95 transition-all shadow-xs"
                   >
-                    <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-xs overflow-hidden border border-primary-200 shadow-inner shrink-0">
                       {user?.profileImage?.url ? (
-                        <img src={user.profileImage.url} alt={user.fullName} className="w-full h-full object-cover" />
+                        <img
+                          src={user.profileImage.url}
+                          alt={user.fullName || 'User'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                          }}
+                        />
                       ) : (
                         user?.fullName?.charAt(0) || 'U'
                       )}
@@ -186,14 +194,32 @@ export default function Navbar() {
                       <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
                       <div
                         role="menu"
-                        className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 py-2 z-20 animate-in fade-in zoom-in-95 duration-100 divide-y divide-gray-100"
+                        className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl ring-1 border border-gray-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-100 divide-y divide-gray-100"
                       >
-                        <div className="px-4 py-3">
-                          <p className="text-sm font-bold text-gray-900 truncate">{user?.fullName}</p>
-                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                          <span className="inline-block px-2 py-0.5 mt-1.5 text-[10px] font-bold uppercase rounded-full bg-primary-100 text-primary-800">
-                            {user?.role}
-                          </span>
+                        {/* Dropdown Header Card with Avatar */}
+                        <div className="px-4 py-3 flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-sm overflow-hidden border-2 border-primary-200 shadow-inner shrink-0">
+                            {user?.profileImage?.url ? (
+                              <img
+                                src={user.profileImage.url}
+                                alt={user.fullName || 'User'}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              user?.fullName?.charAt(0) || 'U'
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-gray-900 truncate">{user?.fullName}</p>
+                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                            <span className="inline-block px-2 py-0.5 mt-1 text-[10px] font-bold uppercase rounded-md bg-primary-100 text-primary-800">
+                              {user?.role}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="py-1">
@@ -276,8 +302,20 @@ export default function Navbar() {
               </button>
 
               <div className="flex items-center gap-3 mt-2">
-                <div className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center font-bold text-lg text-white shadow-inner">
-                  {user?.fullName?.charAt(0) || 'U'}
+                <div className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center font-bold text-lg text-white shadow-inner overflow-hidden shrink-0">
+                  {user?.profileImage?.url ? (
+                    <img
+                      src={user.profileImage.url}
+                      alt={user.fullName || 'User'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    user?.fullName?.charAt(0) || 'U'
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-bold text-white truncate">{user?.fullName}</p>

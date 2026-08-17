@@ -44,7 +44,10 @@ const profileSchema = z.object({
   dropoffAvailable: z.boolean().optional(),
 });
 
+import { useAuth } from '../../context/AuthContext';
+
 export default function EditProfileModal({ user, roleProfile, onClose }) {
+  const { updateUser, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('general');
   const [avatarPreview, setAvatarPreview] = useState(user?.profileImage?.url || '');
@@ -106,13 +109,17 @@ export default function EditProfileModal({ user, roleProfile, onClose }) {
 
   const onSubmit = async (data) => {
     try {
+      let newProfileImage = null;
       // 1. Upload Avatar if selected
       if (selectedAvatarFile) {
         const formData = new FormData();
         formData.append('image', selectedAvatarFile);
-        await api.post('/users/me/avatar', formData, {
+        const avatarRes = await api.post('/users/me/avatar', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        if (avatarRes.data?.data?.profileImage) {
+          newProfileImage = avatarRes.data.data.profileImage;
+        }
       }
 
       // 2. Update Shared User Profile
@@ -125,7 +132,13 @@ export default function EditProfileModal({ user, roleProfile, onClose }) {
         preferredLanguage: data.preferredLanguage,
         preferredContactMethod: data.preferredContactMethod,
       };
-      await api.patch('/users/me', userPayload);
+      const userRes = await api.patch('/users/me', userPayload);
+      if (userRes.data?.data?.user) {
+        updateUser({
+          ...userRes.data.data.user,
+          ...(newProfileImage ? { profileImage: newProfileImage } : {}),
+        });
+      }
 
       // 3. Role-specific profile updates
       if (user?.role === 'technician') {
@@ -150,6 +163,7 @@ export default function EditProfileModal({ user, roleProfile, onClose }) {
         await api.put('/organizations/me/profile', orgPayload);
       }
 
+      await refreshUser();
       toast.success('Profile updated successfully!');
       queryClient.invalidateQueries(['my-profile']);
       queryClient.invalidateQueries(['auth-me']);
