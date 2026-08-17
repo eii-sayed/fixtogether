@@ -30,6 +30,11 @@ export default function MobileBottomNav() {
 
   if (!isAuthenticated) return null;
 
+  // Hide bottom nav in dedicated full-screen messaging view to prevent composer clash
+  if (location.pathname.startsWith('/repair-requests/') && location.pathname.endsWith('/messages')) {
+    return null;
+  }
+
   const unreadCount = unreadData?.unreadCount || 0;
 
   // Role-specific bottom navigation tabs

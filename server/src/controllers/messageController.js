@@ -1,10 +1,19 @@
-const { Message, RepairRequest, RepairJob, Quotation } = require('../models');
+const mongoose = require('mongoose');
+const {
+  Message,
+  RepairRequest,
+  RepairJob,
+  Quotation,
+  User,
+  TechnicianProfile,
+  OrganizationProfile,
+} = require('../models');
 const { NOTIFICATION_TYPES } = require('../constants');
 const { createNotification } = require('../services/notificationService');
 const logger = require('../utils/logger');
 
 /**
- * Check if a user is a participant in a repair request conversation.
+ * Check if a user is an authorized participant in a repair request conversation.
  * A participant is the request owner, an invited/quoted/assigned technician, or an admin.
  */
 const isParticipant = async (userId, userRole, repairRequest) => {
@@ -12,7 +21,7 @@ const isParticipant = async (userId, userRole, repairRequest) => {
 
   // Owner of the repair request
   const ownerId = repairRequest.owner?._id || repairRequest.owner;
-  if (ownerId.toString() === userId.toString()) return true;
+  if (ownerId && ownerId.toString() === userId.toString()) return true;
 
   // Technician invited via selectedTechnicians
   if (repairRequest.selectedTechnicians?.length > 0) {
@@ -48,7 +57,7 @@ const getRecipient = async (senderId, repairRequest) => {
   const ownerId = (repairRequest.owner?._id || repairRequest.owner).toString();
 
   if (senderId.toString() === ownerId) {
-    // Sender is owner → find the technician (from job → quotation → invited)
+    // Sender is owner -> find the technician (from job -> quotation -> invited)
     const job = await RepairJob.findOne({ repairRequest: repairRequest._id })
       .select('technician')
       .lean();
@@ -85,8 +94,78 @@ const getRecipient = async (senderId, repairRequest) => {
     return null;
   }
 
-  // Sender is technician → recipient is the owner
+  // Sender is technician -> recipient is the owner
   return ownerId;
+};
+
+/**
+ * Helper to fetch detailed metadata of the other participant
+ */
+const getOtherParticipantInfo = async (currentUserId, repairRequest) => {
+  const ownerId = (repairRequest.owner?._id || repairRequest.owner).toString();
+  const isCurrentOwner = currentUserId.toString() === ownerId;
+
+  let targetUserId = null;
+  if (isCurrentOwner) {
+    targetUserId = await getRecipient(currentUserId, repairRequest);
+  } else {
+    targetUserId = ownerId;
+  }
+
+  if (!targetUserId) {
+    return {
+      _id: null,
+      fullName: 'Participant',
+      role: isCurrentOwner ? 'technician' : 'owner',
+      profileImage: null,
+      verificationStatus: null,
+    };
+  }
+
+  const targetUser = await User.findById(targetUserId)
+    .select('fullName email phone role profileImage city serviceArea')
+    .lean();
+
+  if (!targetUser) {
+    return {
+      _id: targetUserId,
+      fullName: 'User',
+      role: 'user',
+      profileImage: null,
+      verificationStatus: null,
+    };
+  }
+
+  let professionalName = targetUser.fullName;
+  let verificationStatus = null;
+
+  if (targetUser.role === 'technician') {
+    const techProfile = await TechnicianProfile.findOne({ user: targetUser._id })
+      .select('professionalName verificationStatus averageRating reviewCount')
+      .lean();
+    if (techProfile) {
+      if (techProfile.professionalName) professionalName = techProfile.professionalName;
+      verificationStatus = techProfile.verificationStatus;
+    }
+  } else if (targetUser.role === 'organization') {
+    const orgProfile = await OrganizationProfile.findOne({ user: targetUser._id })
+      .select('organizationName verificationStatus')
+      .lean();
+    if (orgProfile) {
+      if (orgProfile.organizationName) professionalName = orgProfile.organizationName;
+      verificationStatus = orgProfile.verificationStatus;
+    }
+  }
+
+  return {
+    _id: targetUser._id,
+    fullName: targetUser.fullName,
+    professionalName,
+    role: targetUser.role,
+    profileImage: targetUser.profileImage,
+    city: targetUser.city,
+    verificationStatus,
+  };
 };
 
 /**
@@ -112,8 +191,7 @@ const getUnreadCount = async (req, res) => {
 
 /**
  * GET /messages/conversations
- * Returns list of repair requests the user has active conversations for,
- * with the last message and unread count per conversation.
+ * Returns list of repair requests the user has active conversations for.
  */
 const getConversations = async (req, res) => {
   try {
@@ -131,13 +209,13 @@ const getConversations = async (req, res) => {
       });
     }
 
-    // For each repair request, get last message and unread count
+    // For each repair request, fetch last message, unread count, and metadata
     const conversations = await Promise.all(
       repairRequestIds.map(async (rrId) => {
         const [lastMessage, unreadCount, repairRequest] = await Promise.all([
           Message.findOne({ repairRequest: rrId })
             .sort({ createdAt: -1 })
-            .populate('sender', 'fullName')
+            .populate('sender', 'fullName profileImage role')
             .lean(),
           Message.countDocuments({
             repairRequest: rrId,
@@ -145,45 +223,31 @@ const getConversations = async (req, res) => {
             readAt: null,
           }),
           RepairRequest.findById(rrId)
-            .select('item owner requestStatus')
-            .populate('item', 'title')
-            .populate('owner', 'fullName')
+            .select('item owner requestStatus selectedTechnicians selectedQuotation')
+            .populate('item', 'title images')
+            .populate('owner', 'fullName profileImage role')
             .lean(),
         ]);
 
         if (!repairRequest || !lastMessage) return null;
 
-        // Figure out the other participant
-        const ownerId = repairRequest.owner?._id?.toString();
-        const isOwner = ownerId === userId.toString();
-
-        let otherParticipant;
-        if (isOwner) {
-          // Find technician from the last message
-          const techId = lastMessage.sender._id?.toString() === userId.toString()
-            ? lastMessage.recipient
-            : lastMessage.sender._id;
-          const { User } = require('../models');
-          const tech = await User.findById(techId).select('fullName').lean();
-          otherParticipant = tech || { fullName: 'Technician' };
-        } else {
-          otherParticipant = repairRequest.owner;
-        }
+        const otherParticipant = await getOtherParticipantInfo(userId, repairRequest);
 
         return {
           repairRequestId: rrId,
           itemTitle: repairRequest.item?.title || 'Repair Request',
+          itemThumbnail: repairRequest.item?.images?.[0]?.url || '',
           requestStatus: repairRequest.requestStatus,
-          otherParticipant: {
-            _id: otherParticipant?._id,
-            fullName: otherParticipant?.fullName || 'User',
-          },
+          otherParticipant,
           lastMessage: {
+            _id: lastMessage._id,
             content: lastMessage.content,
             sender: lastMessage.sender?.fullName,
-            senderId: lastMessage.sender?._id,
+            senderId: lastMessage.sender?._id || lastMessage.sender,
+            senderProfileImage: lastMessage.sender?.profileImage,
             createdAt: lastMessage.createdAt,
             messageType: lastMessage.messageType,
+            readAt: lastMessage.readAt,
           },
           unreadCount,
         };
@@ -214,9 +278,14 @@ const getMessages = async (req, res) => {
     const { repairRequestId } = req.params;
     const { before, limit = 30 } = req.query;
 
+    if (!mongoose.Types.ObjectId.isValid(repairRequestId)) {
+      return res.status(400).json({ success: false, message: 'Invalid repair request ID format' });
+    }
+
     // Verify repair request exists
     const repairRequest = await RepairRequest.findById(repairRequestId)
-      .select('owner selectedTechnicians')
+      .select('owner selectedTechnicians selectedQuotation requestStatus item problemDescription')
+      .populate('item', 'title images')
       .lean();
 
     if (!repairRequest) {
@@ -226,30 +295,49 @@ const getMessages = async (req, res) => {
     // Check authorization
     const authorized = await isParticipant(req.user.userId, req.user.role, repairRequest);
     if (!authorized) {
-      return res.status(403).json({ success: false, message: 'You are not a participant in this conversation' });
+      return res.status(403).json({
+        success: false,
+        message: 'You are not an authorized participant in this conversation',
+      });
     }
 
     // Build query
     const query = { repairRequest: repairRequestId };
-    if (before) {
+    if (before && mongoose.Types.ObjectId.isValid(before)) {
       query._id = { $lt: before };
     }
 
     const messages = await Message.find(query)
       .sort({ createdAt: -1 })
       .limit(parseInt(limit, 10))
-      .populate('sender', 'fullName role')
+      .populate('sender', 'fullName profileImage role')
       .lean();
 
     // Check if there are more messages
     const hasMore = messages.length === parseInt(limit, 10);
+    const cursor = messages.length > 0 ? messages[messages.length - 1]._id : null;
+
+    // Get other participant and repair context
+    const [otherParticipant] = await Promise.all([
+      getOtherParticipantInfo(req.user.userId, repairRequest),
+    ]);
+
+    const repairContext = {
+      repairRequestId: repairRequest._id,
+      itemTitle: repairRequest.item?.title || 'Repair Request',
+      itemThumbnail: repairRequest.item?.images?.[0]?.url || '',
+      requestStatus: repairRequest.requestStatus,
+      problemDescription: repairRequest.problemDescription,
+    };
 
     res.json({
       success: true,
       data: {
         messages: messages.reverse(), // Return in chronological order
         hasMore,
-        cursor: messages.length > 0 ? messages[0]._id : null,
+        cursor,
+        otherParticipant,
+        repairContext,
       },
     });
   } catch (error) {
@@ -265,12 +353,25 @@ const getMessages = async (req, res) => {
 const sendMessage = async (req, res) => {
   try {
     const { repairRequestId } = req.params;
-    const { content } = req.body;
+    const { content, clientTempId } = req.body;
     const senderId = req.user.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(repairRequestId)) {
+      return res.status(400).json({ success: false, message: 'Invalid repair request ID format' });
+    }
+
+    const trimmedContent = (content || '').trim();
+    if (!trimmedContent) {
+      return res.status(400).json({ success: false, message: 'Message content cannot be empty' });
+    }
+    if (trimmedContent.length > 2000) {
+      return res.status(400).json({ success: false, message: 'Message cannot exceed 2000 characters' });
+    }
 
     // Verify repair request exists
     const repairRequest = await RepairRequest.findById(repairRequestId)
-      .select('owner selectedQuotation requestStatus selectedTechnicians')
+      .select('owner selectedQuotation requestStatus selectedTechnicians item')
+      .populate('item', 'title images')
       .lean();
 
     if (!repairRequest) {
@@ -280,10 +381,13 @@ const sendMessage = async (req, res) => {
     // Check authorization
     const authorized = await isParticipant(senderId, req.user.role, repairRequest);
     if (!authorized) {
-      return res.status(403).json({ success: false, message: 'You are not a participant in this conversation' });
+      return res.status(403).json({
+        success: false,
+        message: 'You are not an authorized participant in this conversation',
+      });
     }
 
-    // Determine recipient
+    // Determine recipient securely
     const recipientId = await getRecipient(senderId, repairRequest);
     if (!recipientId) {
       return res.status(400).json({
@@ -292,20 +396,21 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // Create message
+    // Create message in database
     const message = await Message.create({
       repairRequest: repairRequestId,
       sender: senderId,
       recipient: recipientId,
-      content,
+      content: trimmedContent,
       messageType: 'text',
     });
 
     // Populate sender info for the response
-    await message.populate('sender', 'fullName role');
+    await message.populate('sender', 'fullName profileImage role');
 
     const messageData = {
       _id: message._id,
+      clientTempId: clientTempId || undefined,
       repairRequest: message.repairRequest,
       sender: message.sender,
       recipient: message.recipient,
@@ -315,25 +420,27 @@ const sendMessage = async (req, res) => {
       createdAt: message.createdAt,
     };
 
-    // Emit via Socket.IO (if available via notification service)
+    // Emit via Socket.IO to the room and recipient
     const { getIO } = require('../services/notificationService');
     const io = getIO();
     if (io) {
-      // Emit to the chat room
+      // Emit to the authorized chat room
       io.to(`chat:${repairRequestId}`).emit('chat:message', messageData);
-      // Also emit to the recipient's personal room for unread badge updates
+      // Emit to recipient's personal room for badge and notification updates
       io.to(`user:${recipientId}`).emit('chat:unread', {
         repairRequestId,
         message: messageData,
       });
     }
 
-    // Create a notification for the recipient
+    // Create a real-time notification for recipient
     await createNotification({
       userId: recipientId,
       type: NOTIFICATION_TYPES.NEW_MESSAGE,
       title: 'New Message',
-      message: `${req.user.fullName}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`,
+      message: `${req.user.fullName}: ${trimmedContent.substring(0, 100)}${
+        trimmedContent.length > 100 ? '...' : ''
+      }`,
       relatedEntityType: 'RepairRequest',
       relatedEntityId: repairRequestId,
     });
@@ -350,12 +457,16 @@ const sendMessage = async (req, res) => {
 
 /**
  * PATCH /messages/:repairRequestId/read
- * Mark all messages from the other party as read.
+ * Mark all unread messages from the other party as read.
  */
 const markAsRead = async (req, res) => {
   try {
     const { repairRequestId } = req.params;
     const userId = req.user.userId;
+
+    if (!mongoose.Types.ObjectId.isValid(repairRequestId)) {
+      return res.status(400).json({ success: false, message: 'Invalid repair request ID format' });
+    }
 
     const result = await Message.updateMany(
       {
@@ -375,6 +486,9 @@ const markAsRead = async (req, res) => {
         readBy: userId,
         readAt: new Date(),
       });
+      // Also update user's own unread badge
+      const unreadCount = await Message.countDocuments({ recipient: userId, readAt: null });
+      io.to(`user:${userId}`).emit('chat:unread-count', { unreadCount });
     }
 
     res.json({
@@ -388,6 +502,8 @@ const markAsRead = async (req, res) => {
 };
 
 module.exports = {
+  isParticipant,
+  getRecipient,
   getUnreadCount,
   getConversations,
   getMessages,

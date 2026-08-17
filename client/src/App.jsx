@@ -23,6 +23,7 @@ import NotificationsPage from './pages/notifications/NotificationsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
 import AdminSafetyPage from './pages/admin/AdminSafetyPage';
+import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage';
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/repair-requests" element={<ProtectedRoute><RepairRequestsPage /></ProtectedRoute>} />
         <Route path="/repair-requests/new" element={<ProtectedRoute roles={['owner']}><NewRepairRequestPage /></ProtectedRoute>} />
         <Route path="/repair-requests/:id" element={<ProtectedRoute><RepairRequestDetailPage /></ProtectedRoute>} />
+        <Route path="/repair-requests/:id/messages" element={<ProtectedRoute><RepairRequestMessagesPage /></ProtectedRoute>} />
 
         {/* Repair Jobs */}
         <Route path="/repair-jobs" element={<ProtectedRoute><RepairJobsPage /></ProtectedRoute>} />

@@ -54,18 +54,34 @@ const startServer = async () => {
       logger.debug(`User ${socket.userId} joined notification room`);
     }
 
-    // Legacy join handler — only allow joining own room
-    socket.on('join', (userId) => {
-      if (userId && userId === socket.userId) {
-        socket.join(`user:${userId}`);
-      }
-    });
+    // Join a repair-request-specific chat room with participant authorization
+    socket.on('chat:join', async (repairRequestId) => {
+      if (!repairRequestId || !socket.userId) return;
 
-    // Join a repair-request-specific chat room
-    socket.on('chat:join', (repairRequestId) => {
-      if (repairRequestId) {
+      try {
+        const { RepairRequest } = require('./models');
+        const { isParticipant } = require('./controllers/messageController');
+
+        const repairRequest = await RepairRequest.findById(repairRequestId)
+          .select('owner selectedTechnicians selectedQuotation')
+          .lean();
+
+        if (!repairRequest) {
+          socket.emit('chat:error', { message: 'Repair request not found' });
+          return;
+        }
+
+        const authorized = await isParticipant(socket.userId, socket.userRole, repairRequest);
+        if (!authorized) {
+          socket.emit('chat:error', { message: 'Unauthorized room access' });
+          logger.warn(`Unauthorized socket room join attempt: user ${socket.userId} on ${repairRequestId}`);
+          return;
+        }
+
         socket.join(`chat:${repairRequestId}`);
-        logger.debug(`Socket ${socket.id} joined chat room: ${repairRequestId}`);
+        logger.debug(`Socket ${socket.id} (user ${socket.userId}) joined chat room: ${repairRequestId}`);
+      } catch (err) {
+        logger.error('Socket chat:join error:', err.message);
       }
     });
 
@@ -77,25 +93,25 @@ const startServer = async () => {
       }
     });
 
-    // Typing indicator — relay to other participants in the room
-    socket.on('chat:typing', ({ repairRequestId, userId, fullName }) => {
-      if (repairRequestId) {
-        socket.to(`chat:${repairRequestId}`).emit('chat:typing', {
-          repairRequestId,
-          userId,
-          fullName,
-        });
-      }
+    // Typing indicator — verified identity relay to other participants in the room
+    socket.on('chat:typing', async ({ repairRequestId, fullName }) => {
+      if (!repairRequestId || !socket.userId) return;
+
+      socket.to(`chat:${repairRequestId}`).emit('chat:typing', {
+        repairRequestId,
+        userId: socket.userId,
+        fullName: fullName || 'User',
+      });
     });
 
     // Stop typing indicator
-    socket.on('chat:stop-typing', ({ repairRequestId, userId }) => {
-      if (repairRequestId) {
-        socket.to(`chat:${repairRequestId}`).emit('chat:stop-typing', {
-          repairRequestId,
-          userId,
-        });
-      }
+    socket.on('chat:stop-typing', ({ repairRequestId }) => {
+      if (!repairRequestId || !socket.userId) return;
+
+      socket.to(`chat:${repairRequestId}`).emit('chat:stop-typing', {
+        repairRequestId,
+        userId: socket.userId,
+      });
     });
 
     socket.on('disconnect', () => {
