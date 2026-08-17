@@ -7,10 +7,14 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import App from './App';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
 
+// Automatically unregister old service workers to ensure fresh deployments are loaded
 if ('serviceWorker' in navigator) {
-  registerSW({ immediate: true });
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
 }
 
 const queryClient = new QueryClient({
