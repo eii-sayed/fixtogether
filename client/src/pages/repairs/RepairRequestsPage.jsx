@@ -44,16 +44,28 @@ export default function RepairRequestsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="input pl-10" placeholder="Search requests..." />
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="input pl-10"
+            placeholder="Search requests..."
+          />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
           {statuses.map((s) => (
-            <button key={s.value} onClick={() => { setStatusFilter(s.value); setPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${statusFilter === s.value ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button
+              key={s.value}
+              onClick={() => { setStatusFilter(s.value); setPage(1); }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shrink-0 active:scale-95 ${
+                statusFilter === s.value
+                  ? 'bg-primary-600 text-white shadow-sm shadow-primary-500/20'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
               {s.label}
             </button>
           ))}

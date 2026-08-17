@@ -70,6 +70,34 @@ export default function RepairRequestDetailPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Item Photos */}
+          {rr?.item?.images?.length > 0 && (
+            <div className="card card-body">
+              <h2 className="section-title">Item Photos ({rr.item.images.length})</h2>
+              <div className="flex gap-2.5 overflow-x-auto no-scrollbar py-1">
+                {rr.item.images.map((img, idx) => (
+                  <a
+                    key={idx}
+                    href={img.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden shrink-0 border border-gray-200 block shadow-sm hover:opacity-95 transition-opacity"
+                    title="Click to view full size photo"
+                  >
+                    <img
+                      src={img.url}
+                      alt="Item photo"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Problem Description */}
           <div className="card card-body">
             <h2 className="section-title">Problem Description</h2>
