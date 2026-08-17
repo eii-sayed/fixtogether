@@ -24,6 +24,45 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: '',
+    },
+    city: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    serviceArea: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    preferredLanguage: {
+      type: String,
+      enum: ['en', 'bn'],
+      default: 'en',
+    },
+    preferredContactMethod: {
+      type: String,
+      enum: ['in_app', 'email', 'phone'],
+      default: 'in_app',
+    },
+    privacySettings: {
+      showPhonePublicly: { type: Boolean, default: false },
+      showEmailPublicly: { type: Boolean, default: false },
+      showLocationPublicly: { type: Boolean, default: true },
+      showActivityPublicly: { type: Boolean, default: false },
+      showAvailabilityPublicly: { type: Boolean, default: true },
+    },
+    notificationPreferences: {
+      emailAlerts: { type: Boolean, default: true },
+      inAppAlerts: { type: Boolean, default: true },
+      smsAlerts: { type: Boolean, default: false },
+      marketingUpdates: { type: Boolean, default: false },
+    },
     passwordHash: {
       type: String,
       required: [true, 'Password is required'],

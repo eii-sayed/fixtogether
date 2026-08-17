@@ -47,6 +47,6 @@
     "testMatch": ["**/tests/**/*.test.js"],
     "collectCoverageFrom": ["src/**/*.js", "!src/server.js", "!src/scripts/**"],
     "coverageDirectory": "coverage",
-    "setupFilesAfterSetup": ["./tests/setup.js"]
+    "setupFilesAfterEnv": ["./tests/setup.js"]
   }
 }

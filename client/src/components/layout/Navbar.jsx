@@ -157,44 +157,76 @@ export default function Navbar() {
                 </Link>
 
                 {/* Desktop Profile Dropdown */}
+                {/* Desktop Profile Dropdown with Full Accessibility */}
                 <div className="relative hidden md:block">
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 transition-colors"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setProfileOpen(false);
+                    }}
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200/80 hover:bg-gray-50 active:scale-95 transition-all"
                   >
-                    <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs">
-                      {user?.fullName?.charAt(0) || 'U'}
+                    <div className="w-7 h-7 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs overflow-hidden">
+                      {user?.profileImage?.url ? (
+                        <img src={user.profileImage.url} alt={user.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        user?.fullName?.charAt(0) || 'U'
+                      )}
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 max-w-[100px] truncate">
+                    <span className="text-sm font-semibold text-gray-700 max-w-[110px] truncate">
                       {user?.fullName?.split(' ')[0]}
                     </span>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
                   </button>
 
                   {profileOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 py-2 z-20 animate-in fade-in zoom-in-95 duration-100">
-                        <div className="px-4 py-3 border-b border-gray-100">
+                      <div
+                        role="menu"
+                        className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl ring-1 ring-black/5 py-2 z-20 animate-in fade-in zoom-in-95 duration-100 divide-y divide-gray-100"
+                      >
+                        <div className="px-4 py-3">
                           <p className="text-sm font-bold text-gray-900 truncate">{user?.fullName}</p>
                           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                           <span className="inline-block px-2 py-0.5 mt-1.5 text-[10px] font-bold uppercase rounded-full bg-primary-100 text-primary-800">
                             {user?.role}
                           </span>
                         </div>
-                        <Link
-                          to="/profile"
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          <User className="w-4 h-4 text-gray-400" /> Profile & Account
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-danger-600 hover:bg-danger-50 w-full text-left"
-                        >
-                          <LogOut className="w-4 h-4" /> Log out
-                        </button>
+
+                        <div className="py-1">
+                          <Link
+                            to="/profile"
+                            role="menuitem"
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <User className="w-4 h-4 text-gray-400" /> My Profile & Dashboard
+                          </Link>
+
+                          {(user?.role === 'technician' || user?.role === 'organization') && (
+                            <Link
+                              to={user.role === 'technician' ? `/technicians/${user.userId || user._id}` : `/organizations/${user.userId || user._id}`}
+                              role="menuitem"
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <ShieldCheck className="w-4 h-4 text-primary-600" /> View Public Page
+                            </Link>
+                          )}
+                        </div>
+
+                        <div className="py-1">
+                          <button
+                            role="menuitem"
+                            onClick={handleLogout}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-danger-600 hover:bg-danger-50 w-full text-left"
+                          >
+                            <LogOut className="w-4 h-4" /> Sign out
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}

@@ -81,10 +81,41 @@ const organizationProfileSchema = new mongoose.Schema(
         ref: 'ItemCategory',
       },
     ],
+    rejectedCategories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ItemCategory',
+      },
+    ],
     pickupAvailable: {
       type: Boolean,
       default: false,
     },
+    dropoffAvailable: {
+      type: Boolean,
+      default: true,
+    },
+    donationInstructions: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    recyclingInstructions: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    locations: [
+      {
+        name: { type: String, trim: true, required: true },
+        address: { type: String, trim: true, default: '' },
+        city: { type: String, trim: true, default: '' },
+        phone: { type: String, trim: true, default: '' },
+        operatingHours: { type: String, trim: true, default: '' },
+        pickupSupported: { type: Boolean, default: false },
+        dropoffSupported: { type: Boolean, default: true },
+      },
+    ],
     operatingHours: {
       monday: { start: String, end: String, available: { type: Boolean, default: true } },
       tuesday: { start: String, end: String, available: { type: Boolean, default: true } },

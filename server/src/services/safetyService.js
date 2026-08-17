@@ -18,7 +18,7 @@ const DEFAULT_SAFETY_KEYWORDS = {
     warningMessage: 'This issue may involve fire safety risks. Stop using the item immediately and ensure it is unplugged or disconnected. Contact a qualified technician.',
   },
   battery: {
-    keywords: ['swollen battery', 'bloated battery', 'leaking battery', 'battery leak', 'lithium battery damage', 'damaged battery', 'puffed battery', 'bulging battery'],
+    keywords: ['swollen battery', 'battery is swollen', 'bloated battery', 'battery is bloated', 'leaking battery', 'battery leak', 'lithium battery damage', 'damaged battery', 'puffed battery', 'bulging battery', 'battery is bulging'],
     riskType: 'battery',
     severity: 'critical',
     warningMessage: 'This issue may involve a damaged battery which can be hazardous. Do not puncture, heat, or continue using the item. Contact a qualified technician for safe handling.',

@@ -10,6 +10,48 @@ const technicianProfileSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    professionalName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    availabilityStatus: {
+      type: String,
+      enum: ['available', 'busy', 'unavailable'],
+      default: 'available',
+    },
+    warrantyPolicy: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    minimumServiceCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    languages: [
+      {
+        type: String,
+        default: 'English',
+      },
+    ],
+    portfolio: [
+      {
+        title: { type: String, required: true, trim: true },
+        description: { type: String, trim: true, default: '' },
+        category: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemCategory' },
+        beforeImage: {
+          url: { type: String, default: '' },
+          publicId: { type: String, default: '' },
+        },
+        afterImage: {
+          url: { type: String, default: '' },
+          publicId: { type: String, default: '' },
+        },
+        completedAt: { type: Date, default: Date.now },
+      },
+    ],
     biography: {
       type: String,
       trim: true,

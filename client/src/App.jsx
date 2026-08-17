@@ -18,6 +18,7 @@ import DonationsPage from './pages/donations/DonationsPage';
 import ConversationsPage from './pages/messages/ConversationsPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import TechnicianProfilePage from './pages/profile/TechnicianProfilePage';
+import OrganizationProfilePage from './pages/profile/OrganizationProfilePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/technicians/:id" element={<ProtectedRoute><TechnicianProfilePage /></ProtectedRoute>} />
+        <Route path="/organizations/:id" element={<ProtectedRoute><OrganizationProfilePage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
         {/* Items */}
