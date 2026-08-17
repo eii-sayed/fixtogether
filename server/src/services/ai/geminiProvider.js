@@ -141,26 +141,50 @@ ${existingSummaries}`;
   }
 
   /**
-   * Conversational Assistant Chat
+   * Conversational Assistant Chat (Supports Text & Multimodal Image Inspection)
    */
-  async chat({ message, history = [] }) {
-    const userPrompt = `You are Fixie, the smart AI repair & circular economy assistant for FixTogether platform.
-Help the user with practical preliminary troubleshooting guidance, platform navigation, safety warnings, and how to create effective repair requests.
-Always prioritize safety (warn against high-voltage capacitors, microwaves, CRT displays, power supply units, swollen Li-ion batteries).
-Keep responses friendly, helpful, and concise.
+  async chat({ message, imageBase64, imageMimeType = 'image/jpeg', history = [] }) {
+    const parts = [];
+
+    if (imageBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: imageMimeType,
+          data: imageBase64,
+        },
+      });
+    }
+
+    const userPrompt = `You are Fixie, the smart AI repair & circular economy assistant for the FixTogether platform.
+${imageBase64 ? 'The user has provided an image of their broken or damaged item for visual inspection.' : ''}
+
+Your tasks:
+${
+  imageBase64
+    ? `1. Visual Inspection: Carefully examine the image. Identify the item/device, visible defects (cracked screens, burn marks, capacitor swelling, water damage, port debris, broken hinges, loose cables, error codes on display).
+2. Preliminary Directions: Provide step-by-step safe troubleshooting advice or next steps.
+3. Safety Assessment: Check for hazardous elements (swollen lithium-ion batteries, high-voltage CRT/microwave components, exposed wiring).
+4. Category & Skills Extraction: Identify the item category (e.g., Laptops, Smartphones, Electronics, Appliances, Audio, Other) and key repair skills needed (e.g., Screen replacement, Soldering, Component diagnostics, Micro-soldering).`
+    : `1. Provide practical preliminary troubleshooting guidance, platform navigation, safety warnings, and how to create effective repair requests.
+2. If relevant, detect item category and recommended skills.`
+}
 
 Conversation history:
 ${history.slice(-6).map((h) => `${h.sender === 'user' ? 'User' : 'Fixie'}: ${h.text}`).join('\n')}
 
-User message: ${message}
+User message: ${message || (imageBase64 ? 'Please analyze this photo of my item and suggest what to do and what technician skills I need.' : 'Hello')}
 
 Return ONLY a JSON object with this exact structure:
 {
-  "reply": "your response in clean markdown format",
+  "reply": "your detailed response in clean markdown format (use bullet points, bold text for key terms, and safety tips)",
+  "category": "detected category name (e.g., Laptops, Smartphones, Electronics, Appliances, Audio, Other)",
+  "skills": ["skill 1", "skill 2"],
   "suggestedActions": ["short suggestion 1", "short suggestion 2", "short suggestion 3"]
 }`;
 
-    const res = await this._callAPI(userPrompt);
+    parts.push({ text: userPrompt });
+
+    const res = await this._callAPI(parts);
     if (typeof res === 'object' && res.reply) return res;
     if (typeof res === 'string') return { reply: res, suggestedActions: [] };
     return {
@@ -184,7 +208,11 @@ Return ONLY a JSON object with this exact structure:
 
   // ---- Private API caller ----
 
-  async _callAPI(userPrompt) {
+  async _callAPI(userPromptOrParts) {
+    const parts = typeof userPromptOrParts === 'string'
+      ? [{ text: userPromptOrParts }]
+      : userPromptOrParts;
+
     const modelsToTry = [this.model];
     if (!modelsToTry.includes('gemini-3.6-flash')) {
       modelsToTry.push('gemini-3.6-flash');
@@ -211,7 +239,7 @@ Return ONLY a JSON object with this exact structure:
               },
               contents: [
                 {
-                  parts: [{ text: userPrompt }],
+                  parts,
                 },
               ],
               generationConfig: {
