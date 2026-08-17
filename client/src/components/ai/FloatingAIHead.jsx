@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import api from '../../api/axios';
+import { useAuth } from '../../context/AuthContext';
 import {
   Sparkles,
   X,
@@ -10,34 +11,51 @@ import {
   RotateCcw,
   ShieldAlert,
   ChevronDown,
-  MessageSquare,
   Wrench,
   Zap,
+  Lock,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
-
-const INITIAL_MESSAGES = [
-  {
-    id: 'init-1',
-    sender: 'bot',
-    text: "👋 Hi there! I'm **Fixie**, your FixTogether AI assistant powered by Google Gemini.\n\nAsk me anything about diagnosing broken devices, safety precautions, or finding the right technician!",
-    suggestedActions: [
-      '🔍 Diagnose a broken device',
-      '⚡ Is it safe to repair myself?',
-      '📝 How do repair requests work?',
-    ],
-  },
-];
 
 export default function FloatingAIHead() {
   const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Initialize greeting based on auth state
+  useEffect(() => {
+    if (isAuthenticated) {
+      setMessages([
+        {
+          id: 'init-1',
+          sender: 'bot',
+          text: `👋 Hi **${user?.fullName || 'there'}**! I'm **Fixie**, your FixTogether AI assistant powered by Google Gemini.\n\nAsk me anything about diagnosing broken devices, safety checks, or creating effective repair requests!`,
+          suggestedActions: [
+            '🔍 Diagnose a broken device',
+            '⚡ Is it safe to repair myself?',
+            '📝 How do repair requests work?',
+          ],
+        },
+      ]);
+    } else {
+      setMessages([
+        {
+          id: 'init-anon',
+          sender: 'bot',
+          text: "👋 Welcome to FixTogether! I'm **Fixie**, your AI repair assistant.\n\nPlease log in or create an account to start a live AI diagnostic chat!",
+          suggestedActions: [],
+        },
+      ]);
+    }
+  }, [isAuthenticated, user?.fullName]);
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -47,9 +65,11 @@ export default function FloatingAIHead() {
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
-      setTimeout(() => inputRef.current?.focus(), 150);
+      if (isAuthenticated) {
+        setTimeout(() => inputRef.current?.focus(), 150);
+      }
     }
-  }, [isOpen, messages]);
+  }, [isOpen, messages, isAuthenticated]);
 
   // Hide floating head on dedicated full-screen mobile chat
   if (
@@ -60,6 +80,11 @@ export default function FloatingAIHead() {
   }
 
   const handleSendMessage = async (textToSend) => {
+    if (!isAuthenticated) {
+      setIsOpen(true);
+      return;
+    }
+
     const text = (textToSend || input).trim();
     if (!text || isTyping) return;
 
@@ -93,7 +118,7 @@ export default function FloatingAIHead() {
       const errorMsg = {
         id: `err-${Date.now()}`,
         sender: 'bot',
-        text: '⚠️ I encountered a temporary connection issue. Please make sure your server is connected or try again in a moment.',
+        text: '⚠️ I encountered a temporary connection issue. Please make sure your server is running or try again.',
         suggestedActions: ['Try again', 'How do repair requests work?'],
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -110,14 +135,26 @@ export default function FloatingAIHead() {
   };
 
   const handleClearChat = () => {
-    setMessages(INITIAL_MESSAGES);
+    if (isAuthenticated) {
+      setMessages([
+        {
+          id: `init-${Date.now()}`,
+          sender: 'bot',
+          text: `👋 Chat reset! How can I help you today, **${user?.fullName || 'friend'}**?`,
+          suggestedActions: [
+            '🔍 Diagnose a broken device',
+            '⚡ Is it safe to repair myself?',
+            '📝 How do repair requests work?',
+          ],
+        },
+      ]);
+    }
   };
 
-  // Helper to format basic markdown (bold, bullets)
+  // Helper to format basic markdown (bold)
   const formatBotText = (content) => {
     if (!content) return null;
     return content.split('\n').map((line, idx) => {
-      // Bold syntax **text**
       const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
       return (
         <span
@@ -166,7 +203,6 @@ export default function FloatingAIHead() {
             <X className="w-6 h-6" />
           ) : (
             <div className="relative flex items-center justify-center">
-              {/* Cute Robot / AI Face */}
               <Bot className="w-7 h-7 stroke-[2.2] group-hover:rotate-6 transition-transform" />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-xs">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
@@ -203,13 +239,15 @@ export default function FloatingAIHead() {
 
             {/* Header Actions */}
             <div className="flex items-center gap-1">
-              <button
-                onClick={handleClearChat}
-                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors active:scale-95"
-                title="Reset Conversation"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+              {isAuthenticated && (
+                <button
+                  onClick={handleClearChat}
+                  className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors active:scale-95"
+                  title="Reset Conversation"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors active:scale-95"
@@ -220,114 +258,148 @@ export default function FloatingAIHead() {
             </div>
           </div>
 
-          {/* Messages Stream */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5 bg-gray-50/50">
-            {messages.map((m) => {
-              const isUser = m.sender === 'user';
-              return (
-                <div
-                  key={m.id}
-                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
-                >
-                  <div
-                    className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
-                      isUser
-                        ? 'bg-emerald-600 text-white rounded-tr-xs'
-                        : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
-                    }`}
-                  >
-                    {isUser ? m.text : formatBotText(m.text)}
-                  </div>
-
-                  {/* Suggested Action Chips */}
-                  {!isUser && m.suggestedActions?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2 max-w-[95%]">
-                      {m.suggestedActions.map((action, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleSendMessage(action)}
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-full text-[11px] font-medium transition-all active:scale-95 text-left flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>{action}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Typing Indicator */}
-            {isTyping && (
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-white border border-gray-200/80 rounded-2xl rounded-tl-xs px-3.5 py-2 w-fit shadow-2xs">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]" />
-                <span className="text-[11px] text-emerald-700 font-semibold ml-1">
-                  Fixie is thinking…
-                </span>
+          {/* ========================================================================= */}
+          {/* BODY: Authenticated Chat OR Login Gate */}
+          {/* ========================================================================= */}
+          {!isAuthenticated ? (
+            <div className="flex-1 p-6 flex flex-col items-center justify-center text-center bg-gray-50/50">
+              <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-100 shadow-sm">
+                <Lock className="w-8 h-8" />
               </div>
-            )}
+              <h4 className="font-bold text-gray-900 text-base">Login Required</h4>
+              <p className="text-xs text-gray-600 mt-2 max-w-xs leading-relaxed">
+                Please sign in to FixTogether to access personalized diagnostic guidance, instant safety advice, and repair estimates from Fixie AI.
+              </p>
 
-            <div ref={messagesEndRef} className="h-px" />
-          </div>
-
-          {/* Quick Starter Topics */}
-          {messages.length === 1 && (
-            <div className="px-4 py-2 bg-white border-t border-gray-100 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-              <button
-                onClick={() => handleSendMessage('Is it safe to repair my microwave?')}
-                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
-              >
-                <ShieldAlert className="w-3 h-3 text-amber-500" />
-                <span>Safety Check</span>
-              </button>
-              <button
-                onClick={() => handleSendMessage('How do I submit a repair request?')}
-                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
-              >
-                <Wrench className="w-3 h-3 text-primary-500" />
-                <span>Post Request</span>
-              </button>
-              <button
-                onClick={() => handleSendMessage('My laptop won’t turn on, what can I do?')}
-                className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
-              >
-                <Zap className="w-3 h-3 text-purple-500" />
-                <span>Diagnose</span>
-              </button>
+              <div className="w-full space-y-2.5 mt-6">
+                <Link
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="btn-primary w-full justify-center text-xs py-2.5 shadow-sm"
+                >
+                  <LogIn className="w-4 h-4" /> Log In
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setIsOpen(false)}
+                  className="btn-secondary w-full justify-center text-xs py-2.5"
+                >
+                  <UserPlus className="w-4 h-4" /> Create Free Account
+                </Link>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Messages Stream */}
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5 bg-gray-50/50">
+                {messages.map((m) => {
+                  const isUser = m.sender === 'user';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
+                          isUser
+                            ? 'bg-emerald-600 text-white rounded-tr-xs'
+                            : 'bg-white text-gray-800 border border-gray-200/80 rounded-tl-xs'
+                        }`}
+                      >
+                        {isUser ? m.text : formatBotText(m.text)}
+                      </div>
 
-          {/* Input Composer */}
-          <div className="p-3 bg-white border-t border-gray-100 shrink-0">
-            <div className="flex items-center gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask Fixie about repairs, safety, or quotes…"
-                className="flex-1 px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-              />
-              <button
-                onClick={() => handleSendMessage()}
-                disabled={!input.trim() || isTyping}
-                className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl shadow-xs transition-all active:scale-95 shrink-0"
-                aria-label="Send to AI"
-              >
-                {isTyping ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
+                      {/* Suggested Action Chips */}
+                      {!isUser && m.suggestedActions?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-w-[95%]">
+                          {m.suggestedActions.map((action, i) => (
+                            <button
+                              key={i}
+                              onClick={() => handleSendMessage(action)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-full text-[11px] font-medium transition-all active:scale-95 text-left flex items-center gap-1 shadow-2xs"
+                            >
+                              <span>{action}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-white border border-gray-200/80 rounded-2xl rounded-tl-xs px-3.5 py-2 w-fit shadow-2xs">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" />
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+                    <span className="text-[11px] text-emerald-700 font-semibold ml-1">
+                      Fixie is thinking…
+                    </span>
+                  </div>
                 )}
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-400 text-center mt-1.5">
-              Preliminary guidance only. Always follow technician safety advice.
-            </p>
-          </div>
+
+                <div ref={messagesEndRef} className="h-px" />
+              </div>
+
+              {/* Quick Starter Topics */}
+              {messages.length === 1 && (
+                <div className="px-4 py-2 bg-white border-t border-gray-100 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                  <button
+                    onClick={() => handleSendMessage('Is it safe to repair my microwave?')}
+                    className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
+                  >
+                    <ShieldAlert className="w-3 h-3 text-amber-500" />
+                    <span>Safety Check</span>
+                  </button>
+                  <button
+                    onClick={() => handleSendMessage('How do I submit a repair request?')}
+                    className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
+                  >
+                    <Wrench className="w-3 h-3 text-primary-500" />
+                    <span>Post Request</span>
+                  </button>
+                  <button
+                    onClick={() => handleSendMessage('My laptop won’t turn on, what can I do?')}
+                    className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[11px] text-gray-700 shrink-0 flex items-center gap-1"
+                  >
+                    <Zap className="w-3 h-3 text-purple-500" />
+                    <span>Diagnose</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Input Composer */}
+              <div className="p-3 bg-white border-t border-gray-100 shrink-0">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask Fixie about repairs, safety, or quotes…"
+                    className="flex-1 px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                  <button
+                    onClick={() => handleSendMessage()}
+                    disabled={!input.trim() || isTyping}
+                    className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl shadow-xs transition-all active:scale-95 shrink-0"
+                    aria-label="Send to AI"
+                  >
+                    {isTyping ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                  Preliminary guidance only. Always follow technician safety advice.
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>
