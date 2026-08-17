@@ -14,11 +14,12 @@ import {
   ImagePlus,
   Package,
   Wrench,
+  Camera,
 } from 'lucide-react';
 
 const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
 
 const schema = z.object({
   title: z.string().min(3, 'Item title must be at least 3 characters').max(200),
@@ -104,8 +105,8 @@ export default function NewItemPage() {
 
     const validFiles = [];
     for (const file of newFiles.slice(0, remaining)) {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        toast.error(`${file.name}: Only JPEG, PNG, and WebP images are allowed`);
+      if (file.type && !file.type.startsWith('image/')) {
+        toast.error(`${file.name}: Only image files are allowed`);
         continue;
       }
       if (file.size > MAX_FILE_SIZE) {
@@ -172,7 +173,7 @@ export default function NewItemPage() {
 
       // 2. Upload images to Cloudinary
       if (selectedImages.length > 0) {
-        setStatusMessage(`Uploading ${selectedImages.length} photo(s) to Cloudinary...`);
+        setStatusMessage(`Uploading ${selectedImages.length} photo(s)...`);
         const formData = new FormData();
         selectedImages.forEach((img) => formData.append('images', img.file));
 
@@ -214,7 +215,7 @@ export default function NewItemPage() {
   const parentCategories = categories?.filter((c) => !c.parent) || [];
 
   return (
-    <div className="page-container max-w-2xl">
+    <div className="page-container max-w-2xl px-4 sm:px-6">
       <button onClick={() => navigate(-1)} className="btn-ghost mb-4">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
@@ -225,7 +226,7 @@ export default function NewItemPage() {
           Add New Item
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Register your item, upload photos, and optionally request a repair in one simple step.
+          Register your item, upload photos from mobile or PC, and optionally request a repair.
         </p>
       </div>
 
@@ -343,36 +344,37 @@ export default function NewItemPage() {
             </div>
           </div>
 
-          {/* PHOTO UPLOAD SECTION */}
-          <div>
+          {/* PHOTO UPLOAD SECTION (Fully mobile-optimized) */}
+          <div className="pt-2">
             <div className="flex items-center justify-between mb-1">
-              <label className="label !mb-0 font-semibold text-gray-900">
+              <label className="label !mb-0 font-semibold text-gray-900 flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary-600" />
                 Item Photos / Images
               </label>
-              <span className="text-xs text-gray-400">
-                {selectedImages.length} of {MAX_IMAGES} photos
+              <span className="text-xs text-gray-500 font-medium">
+                {selectedImages.length} / {MAX_IMAGES} photos
               </span>
             </div>
             <p className="text-xs text-gray-500 mb-3">
-              Upload photos of the item showing any damage or the general condition. (JPEG, PNG, WebP up to 5MB)
+              Add clear photos of your item showing any damage. (Max 5MB each)
             </p>
 
-            {/* Drop Zone */}
+            {/* Drop & Mobile Tap Zone */}
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+              className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all bg-white hover:bg-gray-50 active:bg-primary-50 ${
                 dragOver
                   ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+                  : 'border-primary-300 hover:border-primary-500'
               } ${selectedImages.length >= MAX_IMAGES ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 multiple
                 className="hidden"
                 onChange={(e) => {
@@ -381,25 +383,38 @@ export default function NewItemPage() {
                 }}
               />
               <div className="flex flex-col items-center gap-2">
-                {dragOver ? (
-                  <Upload className="w-8 h-8 text-primary-500 animate-bounce" />
-                ) : (
-                  <ImagePlus className="w-8 h-8 text-primary-500" />
-                )}
+                <div className="w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center text-primary-600">
+                  {dragOver ? (
+                    <Upload className="w-6 h-6 animate-bounce" />
+                  ) : (
+                    <ImagePlus className="w-6 h-6" />
+                  )}
+                </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {dragOver ? 'Drop photos now' : 'Click to select photos or drag & drop here'}
+                  <p className="text-sm font-bold text-gray-800">
+                    Tap to Choose Photos or Take Picture
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Supports JPG, PNG, WebP up to 5MB each (Max {MAX_IMAGES} photos)
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select from Camera, Gallery, or Drag & Drop (Max {MAX_IMAGES} photos)
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="btn-secondary btn-sm mt-1 flex items-center gap-1.5"
+                >
+                  <Camera className="w-4 h-4" />
+                  Browse / Camera
+                </button>
               </div>
             </div>
 
             {/* Live Previews */}
             {selectedImages.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mt-3">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3 mt-4">
                 {selectedImages.map((img) => (
                   <div
                     key={img.id}
@@ -413,10 +428,10 @@ export default function NewItemPage() {
                     <button
                       type="button"
                       onClick={() => removeImage(img.id)}
-                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-all"
+                      className="absolute top-1 right-1 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-all active:scale-95"
                       title="Remove image"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                     <div className="absolute bottom-0 inset-x-0 bg-black/50 py-0.5 px-1">
                       <p className="text-[9px] text-white truncate text-center font-medium">
@@ -443,7 +458,7 @@ export default function NewItemPage() {
                   Request Repair for this item now
                 </span>
                 <p className="text-xs text-primary-700 mt-0.5">
-                  Check this to describe the issue and start getting technician quotes immediately.
+                  Describe the issue and start receiving technician quotations.
                 </p>
               </div>
             </label>

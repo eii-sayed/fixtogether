@@ -8,13 +8,22 @@ import { SocketProvider } from './context/SocketContext';
 import App from './App';
 import './index.css';
 
-// Automatically unregister old service workers to ensure fresh deployments are loaded
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister();
-    }
-  });
+// Aggressively unregister all old service workers and clear cache storage on mobile/desktop
+if (typeof window !== 'undefined') {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
+  if ('caches' in window) {
+    caches.keys().then((names) => {
+      for (const name of names) {
+        caches.delete(name);
+      }
+    });
+  }
 }
 
 const queryClient = new QueryClient({
