@@ -10,7 +10,7 @@ const config = require('../../config');
 class GeminiProvider {
   constructor() {
     this.name = 'gemini';
-    this.model = config.ai.gemini.model || 'gemini-3.6-flash';
+    this.model = config.ai.gemini.model || 'gemini-3.1-pro-preview';
     this.apiKey = config.ai.gemini.apiKey;
     this.timeoutMs = config.ai.timeoutMs;
     this.maxRetries = config.ai.maxRetries;

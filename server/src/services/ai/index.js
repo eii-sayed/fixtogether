@@ -30,7 +30,7 @@ const getProvider = () => {
         providerInstance = new MockAIProvider();
       } else {
         providerInstance = new GeminiProvider();
-        logger.info(`AI provider: Gemini (${config.ai.gemini.model || 'gemini-3.6-flash'})`);
+        logger.info(`AI provider: Gemini (${config.ai.gemini.model || 'gemini-3.1-pro-preview'})`);
       }
       break;
     case 'openai':
