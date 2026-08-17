@@ -53,7 +53,7 @@ const uploadFile = async (filePath, options = {}) => {
 
   // Local storage fallback - file is already saved by multer
   const relativePath = filePath.replace(/\\/g, '/');
-  const serverUrl = `http://localhost:${config.port}`;
+  const serverUrl = process.env.BACKEND_URL || (process.env.RENDER_EXTERNAL_URL ? `https://${process.env.RENDER_EXTERNAL_URL}` : `http://localhost:${config.port}`);
   const urlPath = relativePath.includes('uploads/')
     ? relativePath.substring(relativePath.indexOf('uploads/'))
     : `uploads/${path.basename(filePath)}`;
