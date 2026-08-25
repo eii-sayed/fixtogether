@@ -6,6 +6,9 @@ const {
   RepairRequest,
   DonationOffer,
   Quotation,
+  Appointment,
+  RepairJob,
+  Review,
 } = require('../models');
 const {
   asyncHandler,
@@ -17,6 +20,170 @@ const {
 const { createAuditLog } = require('../middleware/auditLog');
 const uploadService = require('../services/uploadService');
 const { ROLES } = require('../constants');
+
+/**
+ * GET /users/me/activity
+ * Aggregates all 10 recent activity events for Owner with deep links
+ */
+const getMyActivity = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+
+  const [
+    recentItems,
+    recentRequests,
+    recentDonations,
+    recentAppointments,
+    recentJobs,
+    recentReviews,
+  ] = await Promise.all([
+    Item.find({ owner: userId }).sort({ createdAt: -1 }).limit(5).select('title condition createdAt'),
+    RepairRequest.find({ owner: userId })
+      .sort({ updatedAt: -1 })
+      .limit(6)
+      .populate('item', 'title')
+      .select('item requestStatus updatedAt createdAt publishedAt problemDescription selectedQuotation'),
+    DonationOffer.find({ owner: userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('item', 'title')
+      .select('item status createdAt completedAt'),
+    Appointment.find({ owner: userId })
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .populate({ path: 'repairRequest', populate: { path: 'item', select: 'title' } })
+      .populate('technician', 'fullName')
+      .select('repairRequest technician status scheduledStart createdAt'),
+    RepairJob.find({ owner: userId })
+      .sort({ updatedAt: -1 })
+      .limit(5)
+      .populate({ path: 'repairRequest', populate: { path: 'item', select: 'title' } })
+      .populate('technician', 'fullName')
+      .select('repairRequest technician currentStatus completedAt createdAt'),
+    Review.find({ reviewer: userId })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate({ path: 'repairJob', populate: { path: 'repairRequest', populate: { path: 'item', select: 'title' } } })
+      .select('repairJob rating createdAt reviewText'),
+  ]);
+
+  const activities = [];
+
+  // 1. ITEM_REGISTERED
+  recentItems.forEach((item) => {
+    activities.push({
+      id: `item-${item._id}`,
+      type: 'ITEM_REGISTERED',
+      title: `Registered item: ${item.title}`,
+      timestamp: item.createdAt,
+      link: '/items',
+      badge: item.condition,
+    });
+  });
+
+  // 2. REPAIR_REQUEST_CREATED, REPAIR_REQUEST_PUBLISHED, COST_APPROVAL_REQUESTED
+  recentRequests.forEach((rr) => {
+    if (rr.publishedAt) {
+      activities.push({
+        id: `rr-pub-${rr._id}`,
+        type: 'REPAIR_REQUEST_PUBLISHED',
+        title: `Published repair request: ${rr.item?.title || 'Item'}`,
+        timestamp: rr.publishedAt,
+        link: `/repair-requests/${rr._id}`,
+        badge: 'published',
+      });
+    }
+
+    if (rr.requestStatus === 'awaiting_owner_approval') {
+      activities.push({
+        id: `rr-appr-${rr._id}`,
+        type: 'COST_APPROVAL_REQUESTED',
+        title: `Cost revision approval required for ${rr.item?.title || 'Item'}`,
+        timestamp: rr.updatedAt,
+        link: `/repair-requests/${rr._id}`,
+        badge: 'approval required',
+      });
+    }
+
+    activities.push({
+      id: `rr-created-${rr._id}`,
+      type: 'REPAIR_REQUEST_CREATED',
+      title: `Created repair request: ${rr.item?.title || 'Item'}`,
+      timestamp: rr.createdAt,
+      link: `/repair-requests/${rr._id}`,
+      badge: rr.requestStatus,
+    });
+  });
+
+  // 3. APPOINTMENT_CONFIRMED
+  recentAppointments.forEach((apt) => {
+    const itemTitle = apt.repairRequest?.item?.title || 'Repair';
+    activities.push({
+      id: `apt-${apt._id}`,
+      type: 'APPOINTMENT_CONFIRMED',
+      title: `Appointment scheduled with ${apt.technician?.fullName || 'technician'} for ${itemTitle}`,
+      timestamp: apt.scheduledStart || apt.createdAt,
+      link: apt.repairRequest?._id ? `/repair-requests/${apt.repairRequest._id}` : '/appointments',
+      badge: apt.status,
+    });
+  });
+
+  // 4. REPAIR_COMPLETED
+  recentJobs.forEach((job) => {
+    if (job.currentStatus === 'completed' || job.completedAt) {
+      const itemTitle = job.repairRequest?.item?.title || 'Item';
+      activities.push({
+        id: `job-comp-${job._id}`,
+        type: 'REPAIR_COMPLETED',
+        title: `Repair completed: ${itemTitle} by ${job.technician?.fullName || 'technician'}`,
+        timestamp: job.completedAt || job.createdAt,
+        link: job.repairRequest?._id ? `/repair-requests/${job.repairRequest._id}` : '/dashboard',
+        badge: 'completed',
+      });
+    }
+  });
+
+  // 5. REVIEW_POSTED
+  recentReviews.forEach((rev) => {
+    const reqId = rev.repairJob?.repairRequest?._id;
+    activities.push({
+      id: `rev-${rev._id}`,
+      type: 'REVIEW_POSTED',
+      title: `Submitted a ${rev.rating}★ review for completed repair`,
+      timestamp: rev.createdAt,
+      link: reqId ? `/repair-requests/${reqId}` : '/dashboard',
+      badge: `${rev.rating}★`,
+    });
+  });
+
+  // 6. DONATION_COMPLETED
+  recentDonations.forEach((d) => {
+    if (d.status === 'completed') {
+      activities.push({
+        id: `don-comp-${d._id}`,
+        type: 'DONATION_COMPLETED',
+        title: `Completed donation of ${d.item?.title || 'item'}`,
+        timestamp: d.completedAt || d.createdAt,
+        link: '/donations',
+        badge: 'completed',
+      });
+    }
+  });
+
+  // Deduplicate and sort chronologically
+  const uniqueMap = new Map();
+  activities.forEach((act) => {
+    if (!uniqueMap.has(act.id)) {
+      uniqueMap.set(act.id, act);
+    }
+  });
+
+  const sortedActivities = Array.from(uniqueMap.values()).sort(
+    (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+  );
+
+  return successResponse(res, { activities: sortedActivities.slice(0, 15) });
+});
+
 
 /**
  * Helper to calculate real profile completion percentage
@@ -276,66 +443,7 @@ const getMyStats = asyncHandler(async (req, res) => {
   return successResponse(res, { stats: {} });
 });
 
-/**
- * GET /users/me/activity
- * Aggregates recent activity events for Owner
- */
-const getMyActivity = asyncHandler(async (req, res) => {
-  const userId = req.user.userId;
 
-  const [recentItems, recentRequests, recentDonations] = await Promise.all([
-    Item.find({ owner: userId }).sort({ createdAt: -1 }).limit(5).select('title condition createdAt'),
-    RepairRequest.find({ owner: userId })
-      .sort({ updatedAt: -1 })
-      .limit(5)
-      .populate('item', 'title')
-      .select('item requestStatus updatedAt createdAt problemDescription'),
-    DonationOffer.find({ donor: userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('item', 'title')
-      .select('item status createdAt'),
-  ]);
-
-  const activities = [];
-
-  recentItems.forEach((item) => {
-    activities.push({
-      id: `item-${item._id}`,
-      type: 'ITEM_REGISTERED',
-      title: `Registered item: ${item.title}`,
-      timestamp: item.createdAt,
-      link: '/items',
-      badge: item.condition,
-    });
-  });
-
-  recentRequests.forEach((rr) => {
-    activities.push({
-      id: `request-${rr._id}`,
-      type: 'REPAIR_REQUEST',
-      title: `Repair Request: ${rr.item?.title || 'Item'} (${rr.requestStatus.replace('_', ' ')})`,
-      timestamp: rr.updatedAt || rr.createdAt,
-      link: `/repair-requests/${rr._id}`,
-      badge: rr.requestStatus,
-    });
-  });
-
-  recentDonations.forEach((d) => {
-    activities.push({
-      id: `donation-${d._id}`,
-      type: 'DONATION',
-      title: `Donation Offer: ${d.item?.title || 'Item'} (${d.status})`,
-      timestamp: d.createdAt,
-      link: '/donations',
-      badge: d.status,
-    });
-  });
-
-  activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-  return successResponse(res, { activities: activities.slice(0, 10) });
-});
 
 /**
  * PATCH /users/me/password
@@ -401,11 +509,31 @@ const updateUserStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { accountStatus, suspensionReason } = req.body;
 
+  // Self-action check
+  if (id.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot suspend or modify your own administrator account.', 403);
+  }
+
   const user = await User.findById(id);
   if (!user) return errorResponse(res, 'User not found.', 404);
 
+  // Last-admin protection check
+  if (user.role === ROLES.ADMIN && accountStatus === 'suspended') {
+    const activeAdminCount = await User.countDocuments({
+      role: ROLES.ADMIN,
+      accountStatus: 'active',
+      _id: { $ne: user._id },
+    });
+    if (activeAdminCount === 0) {
+      return errorResponse(res, 'Cannot suspend the final active administrator on the platform.', 403);
+    }
+  }
+
   user.accountStatus = accountStatus;
   if (suspensionReason) user.suspensionReason = suspensionReason;
+  if (accountStatus === 'suspended') {
+    user.refreshTokens = []; // Revoke active sessions
+  }
   await user.save();
 
   await createAuditLog(
@@ -422,6 +550,113 @@ const updateUserStatus = asyncHandler(async (req, res) => {
   return successResponse(res, { user }, `User account ${accountStatus}`);
 });
 
+/**
+ * POST /admin/users/:id/moderate
+ * Comprehensive user moderation with impact assessment and safeguards
+ */
+const moderateUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const {
+    action, // 'warn', 'temporary_suspension', 'permanent_suspension', 'reactivate', 'invalidate_sessions', 'forced_password_reset', 'revoke_verification'
+    reason,
+    internalExplanation,
+    durationDays,
+    affectedServices,
+  } = req.body;
+
+  // Self-action check
+  if (id.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot moderate your own account.', 403);
+  }
+
+  const targetUser = await User.findById(id);
+  if (!targetUser) return errorResponse(res, 'Target user not found.', 404);
+
+  // Last-admin protection check
+  if (targetUser.role === ROLES.ADMIN && ['temporary_suspension', 'permanent_suspension'].includes(action)) {
+    const activeAdmins = await User.countDocuments({
+      role: ROLES.ADMIN,
+      accountStatus: 'active',
+      _id: { $ne: targetUser._id },
+    });
+    if (activeAdmins === 0) {
+      return errorResponse(res, 'Cannot suspend the final active administrator on the platform.', 403);
+    }
+  }
+
+  // Active-work impact assessment
+  const [activeRequests, activeJobs] = await Promise.all([
+    RepairRequest.countDocuments({ owner: targetUser._id, requestStatus: { $nin: ['completed', 'cancelled', 'draft'] } }),
+    RepairJob.countDocuments({
+      $or: [{ owner: targetUser._id }, { technician: targetUser._id }],
+      currentStatus: { $nin: ['completed', 'cancelled'] },
+    }),
+  ]);
+
+  const now = new Date();
+  let expiresAt = null;
+
+  if (action === 'temporary_suspension') {
+    const days = Number(durationDays) || 7;
+    expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    targetUser.accountStatus = 'suspended';
+    targetUser.suspensionReason = reason || 'Temporary suspension due to community guidelines violation';
+    targetUser.refreshTokens = [];
+  } else if (action === 'permanent_suspension') {
+    targetUser.accountStatus = 'suspended';
+    targetUser.suspensionReason = reason || 'Permanent suspension';
+    targetUser.refreshTokens = [];
+  } else if (action === 'reactivate') {
+    targetUser.accountStatus = 'active';
+    targetUser.suspensionReason = '';
+  } else if (action === 'invalidate_sessions') {
+    targetUser.refreshTokens = [];
+  } else if (action === 'forced_password_reset') {
+    targetUser.reauthRequiredAt = now;
+    targetUser.refreshTokens = [];
+  } else if (action === 'revoke_verification') {
+    if (targetUser.role === ROLES.TECHNICIAN) {
+      await TechnicianProfile.findOneAndUpdate({ user: targetUser._id }, { verificationStatus: 'rejected' });
+    } else if (targetUser.role === ROLES.ORGANIZATION) {
+      await OrganizationProfile.findOneAndUpdate({ user: targetUser._id }, { verificationStatus: 'rejected' });
+    }
+  }
+
+  // Record in moderationHistory array
+  targetUser.moderationHistory.push({
+    action,
+    admin: req.user.userId,
+    reason: reason || 'Moderation intervention',
+    internalNote: internalExplanation || '',
+    affectedServices: affectedServices || ['all'],
+    durationDays: durationDays || 0,
+    expiresAt,
+    createdAt: now,
+  });
+
+  await targetUser.save();
+
+  await createAuditLog(
+    {
+      actor: req.user.userId,
+      action: `USER_MODERATION_${action.toUpperCase()}`,
+      targetType: 'User',
+      targetId: targetUser._id,
+      metadata: { action, reason, activeWorkImpact: { activeRequests, activeJobs } },
+    },
+    req
+  );
+
+  return successResponse(
+    res,
+    {
+      user: targetUser,
+      impact: { activeRequests, activeJobs },
+    },
+    `Moderation action "${action}" applied successfully.`
+  );
+});
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
@@ -434,4 +669,6 @@ module.exports = {
   changePassword,
   getAllUsers,
   updateUserStatus,
+  moderateUser,
 };
+

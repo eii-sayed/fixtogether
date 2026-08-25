@@ -13,14 +13,16 @@ const setSocketIO = (socketIO) => {
 };
 
 /**
- * Create and send a notification
+ * Create and send a persistent notification with deduplication
  * @param {Object} params
  * @param {string} params.userId - Recipient user ID
  * @param {string} params.type - Notification type from constants
  * @param {string} params.title - Notification title
  * @param {string} params.message - Notification message
- * @param {string} params.relatedEntityType - Type of related entity
- * @param {string} params.relatedEntityId - ID of related entity
+ * @param {string} [params.relatedEntityType] - Type of related entity
+ * @param {string} [params.relatedEntityId] - ID of related entity
+ * @param {string} [params.link] - Deep link URL
+ * @param {string} [params.deduplicationKey] - Deterministic deduplication key
  */
 const createNotification = async ({
   userId,
@@ -29,6 +31,8 @@ const createNotification = async ({
   message,
   relatedEntityType = '',
   relatedEntityId = null,
+  link = '',
+  deduplicationKey = null,
 }) => {
   try {
     const notification = await Notification.create({
@@ -38,6 +42,8 @@ const createNotification = async ({
       message,
       relatedEntityType,
       relatedEntityId,
+      link,
+      deduplicationKey: deduplicationKey || `${type}:${relatedEntityId || 'global'}:${userId}:${Date.now()}`,
     });
 
     // Send real-time notification via Socket.IO if available
@@ -49,6 +55,7 @@ const createNotification = async ({
         message: notification.message,
         relatedEntityType: notification.relatedEntityType,
         relatedEntityId: notification.relatedEntityId,
+        link: notification.link,
         read: false,
         createdAt: notification.createdAt,
       });
@@ -56,6 +63,10 @@ const createNotification = async ({
 
     return notification;
   } catch (error) {
+    if (error.code === 11000) {
+      // Duplicate notification suppressed
+      return Notification.findOne({ deduplicationKey });
+    }
     logger.error('Failed to create notification:', error.message);
   }
 };
@@ -63,16 +74,17 @@ const createNotification = async ({
 /**
  * Create notifications for multiple users
  * @param {Array<string>} userIds
- * @param {Object} notificationData - Same as createNotification params (minus userId)
+ * @param {Object} notificationData
  */
 const createBulkNotifications = async (userIds, notificationData) => {
   const notifications = userIds.map((userId) => ({
     user: userId,
     ...notificationData,
+    deduplicationKey: `${notificationData.type}:${notificationData.relatedEntityId || 'global'}:${userId}:${Date.now()}`,
   }));
 
   try {
-    const created = await Notification.insertMany(notifications);
+    const created = await Notification.insertMany(notifications, { ordered: false });
 
     // Send real-time notifications
     if (io) {
@@ -82,6 +94,7 @@ const createBulkNotifications = async (userIds, notificationData) => {
           type: notification.type,
           title: notification.title,
           message: notification.message,
+          link: notification.link,
           read: false,
           createdAt: notification.createdAt,
         });

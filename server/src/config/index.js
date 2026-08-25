@@ -59,14 +59,46 @@ const config = {
     geocodingApiKey: process.env.GEOCODING_API_KEY || '',
   },
 
-  // Rate limiting
+  // Rate limiting (all configurable via env)
   rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit per windowMs
+    windowMs: parseInt(process.env.RATE_LIMIT_GENERAL_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_GENERAL_MAX, 10) || 300,
   },
-  loginRateLimit: {
-    windowMs: 15 * 60 * 1000,
-    max: 10,
+  publicRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX, 10) || 200,
+  },
+  authReadRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_READ_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_AUTH_READ_MAX, 10) || 600,
+  },
+  authRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10,
+  },
+  writeRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_WRITE_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_WRITE_MAX, 10) || 60,
+  },
+  publishRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_PUBLISH_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_PUBLISH_MAX, 10) || 15,
+  },
+  aiRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_AI_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_AI_MAX, 10) || 10,
+  },
+  messageRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_MESSAGE_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_MESSAGE_MAX, 10) || 120,
+  },
+  uploadRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_UPLOAD_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_UPLOAD_MAX, 10) || 30,
+  },
+  securityRateLimit: {
+    windowMs: parseInt(process.env.RATE_LIMIT_SECURITY_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_SECURITY_MAX, 10) || 5,
   },
 
   // Upload

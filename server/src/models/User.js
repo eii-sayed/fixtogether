@@ -74,6 +74,12 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(ROLES),
       default: ROLES.OWNER,
     },
+    adminPermissions: [
+      {
+        type: String,
+        default: 'super_admin',
+      },
+    ],
     profileImage: {
       url: { type: String, default: '' },
       publicId: { type: String, default: '' },
@@ -94,6 +100,30 @@ const userSchema = new mongoose.Schema(
     suspensionReason: {
       type: String,
       default: '',
+    },
+    moderationHistory: [
+      {
+        action: { type: String, required: true },
+        admin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reason: { type: String, default: '' },
+        internalNote: { type: String, default: '' },
+        affectedServices: [{ type: String }],
+        durationDays: { type: Number, default: 0 },
+        expiresAt: { type: Date },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    securityLock: {
+      lockedUntil: { type: Date, default: null },
+      reason: { type: String, default: '' },
+    },
+    lastPasswordChangeAt: {
+      type: Date,
+      default: Date.now,
+    },
+    reauthRequiredAt: {
+      type: Date,
+      default: null,
     },
     refreshTokens: [
       {

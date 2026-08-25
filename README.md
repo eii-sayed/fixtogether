@@ -1,375 +1,238 @@
-# FixTogether: AI-Assisted Community Repair & Donation Platform
+# FixTogether: AI-Assisted Community Repair, Reuse, Donation & Governance Platform
 
 [![Live Demo](https://img.shields.io/badge/Live-fixtogether.vercel.app-0ea5e9?style=for-the-badge&logo=vercel)](https://fixtogether.vercel.app/)
-[![API](https://img.shields.io/badge/API-fixtogether--api.onrender.com-10b981?style=for-the-badge&logo=render)](https://fixtogether-api.onrender.com/api/health)
+[![API Status](https://img.shields.io/badge/API-fixtogether--api.onrender.com-10b981?style=for-the-badge&logo=render)](https://fixtogether-api.onrender.com/api/health)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--Time-010101?style=for-the-badge&logo=socket.io)](https://socket.io/)
 
-FixTogether is a full-stack community platform that helps people **repair, reuse, donate, and responsibly recycle** damaged or unwanted items.
+FixTogether is a full-stack, enterprise-grade community platform designed to bridge circular economy workflows: **repairing, reusing, donating, refurbishing, and responsibly recycling** electronics, appliances, and home goods.
 
-Built with the MERN stack, FixTogether connects item owners with verified technicians, donation organizations, and recycling facilities.
+Built on the MERN stack (MongoDB, Express, React 18, Node.js) with real-time Socket.IO communication, deterministic safety governance, transactional outbox processing, and fine-grained role-based access control.
 
-A core feature is the **AI-Powered Diagnosis & Safety Engine**, which analyzes problem descriptions, suggests repair pathways, identifies required technical skills, flags potential safety hazards, and matches users with appropriate technicians.
+---
 
-## 🌐 Live Demo
+## 🌐 Live Demo & Endpoints
 
-| Service | URL |
-|---|---|
-| **Frontend** | [fixtogether.vercel.app](https://fixtogether.vercel.app/) |
-| **Backend API** | https://fixtogether-api.onrender.com/api/health |
+| Service | URL | Notes |
+|---|---|---|
+| **Frontend Web App** | [fixtogether.vercel.app](https://fixtogether.vercel.app/) | Single Page Application deployed on Vercel |
+| **Backend API** | [fixtogether-api.onrender.com/api/v1](https://fixtogether-api.onrender.com/api/health) | REST API & Socket.IO server deployed on Render |
+| **Health Check** | `/api/health` | Unthrottled uptime & heartbeat endpoint |
 
-### Demo Accounts
+### Demo Accounts & Quick Login
 
-Demo accounts are created when the database seed script is executed:
+Pre-configured demo accounts for all primary roles can be seeded into the database with one command:
 
 ```bash
 npm run seed
 ```
 
-Check the seed command output for the available demo email addresses and passwords.
+| Role | Demo Email | Default Password | Primary Workspace / Capabilities |
+|---|---|---|---|
+| **Administrator** | `admin@fixtogether.com` | `Admin@123456` | Platform Command Center, Review Queue, Safety Engine, Disputes, User Moderation |
+| **Technician** | `sumon@electronics.com` | `Tech@123456` | Quotation Engine, Diagnostic Inspections, Active Repair Jobs, Milestones |
+| **Organization** | `contact@greenearth.org` | `Org@123456` | Donation Offers, Community Needs, Collections, Refurbishment, Impact Reports |
+| **Item Owner** | `rahim@example.com` | `Owner@123456` | Digital Garage, AI Repair Diagnostic Assistant, Request Lifecycle, Direct Chat |
 
-> **Security note:** Do not publish unrestricted administrator credentials. If a public administrator demo account is provided, sensitive and destructive operations should be disabled for that account.
->
-> **Hosting note:** The Render free tier may take approximately 30 seconds to start after the backend has been idle.
+*Quick login buttons are also available on the `/login` screen for immediate one-click evaluation.*
 
-## ✨ Features
+---
 
-- **Multi-Role System:** Dedicated workflows for item owners, technicians, organizations, and administrators
-- **AI Diagnosis:** Analyzes repair requests to extract symptoms, recommend repair pathways, and identify required skills
-- **Safety First Engine:** Runs deterministic hazard checks before AI analysis and blocks unsafe automated repair advice
-- **Smart Matching:** Connects owners with technicians based on skills, categories, and availability
-- **Quotation System:** Provides labor, parts, warranty, and estimated total cost breakdowns
-- **End-to-End Tracking:** Tracks requests from draft and publication through quotation, repair, and completion
-- **Image Upload:** Supports drag-and-drop multi-image upload with up to five images per item
-- **Cloudinary Storage:** Stores uploaded media in Cloudinary with a local development fallback
-- **Owner and Technician Messaging:** Provides repair-request-scoped messaging with typing indicators, read receipts, and message history
-- **Donations and Recycling:** Connects owners of unrepairable or unwanted items with organizations and recycling facilities
-- **Real-Time Notifications:** Uses authenticated Socket.IO connections for notifications and messaging updates
+## 🌟 Core Feature Matrix
 
-## 🛠 Technology Stack
+### 1. 🛡️ Administrator Command Center & Governance Hub
+- **Unified Admin Sidebar**: Responsive, collapsible left navigation panel with live urgent badge counts, quick search (`Ctrl+K`), and mobile drawer.
+- **Unified Review Queue**: Real-time triage bench for critical safety hazards, license verifications, disputes, and stalled requests with optimistic concurrency locking.
+- **Dispute Arbitration**: Formal mediation workspace supporting evidence review, requesting missing info, private notes, and binding dispute resolution.
+- **User Governance**: Role filtering, instant search, compliance warnings, temporary/permanent suspensions, session revocation, with last-admin safeguards.
+- **Verification Bench**: Dual-tab review for Technician Trade Licenses and NGO Certifications with document preview.
+- **Deterministic Safety Engine**: Keyword and regular expression safety rules with live Regex Sandbox simulation and version rollback.
+- **Taxonomy & Skills**: Category tree editor, skill manager, and synonym merger with technician profile impact analysis.
+- **Audit & AI Ledger**: Immutable audit log tracing, correlation ID tracking, AI provider metrics, and background CSV export jobs.
 
-### Frontend
+### 2. 🤝 Organization & Donation Operations
+- **Unified Workspace**: Multi-stage donation triage, collection scheduler, and refurbishment processing pipeline.
+- **Donation Needs**: Publish community requirements with target quantities and urgency levels.
+- **Refurbishment Lifecycle**: Step-by-step diagnostic triage, sanitization, testing, and redistribution tracking.
+- **Impact Metrics**: Automatic calculation of e-waste diverted (kg) and community economic value generated.
 
-- React 18
-- Vite
-- Tailwind CSS
-- TanStack Query
-- React Hook Form
-- Zod
-- React Router
-- Sonner
-- Lucide React
-- Leaflet
+### 3. 🔧 Technician Workspace
+- **Quotation System**: Granular breakdowns for labor, parts, estimated completion time, and warranty terms.
+- **Active Repair Jobs**: Milestones tracker (received, diagnosing, awaiting parts, repairing, ready for collection).
+- **Direct Messaging**: Request-scoped real-time messaging with typing indicators, read receipts, and status templates.
 
-### Backend
+### 4. 📦 Owner & Digital Garage
+- **Digital Garage**: Catalog personal devices, condition history, and maintenance records.
+- **AI Diagnostic Assistant**: Extracts hardware symptoms, identifies required repair skills, and assesses feasibility.
+- **Deterministic Safety Interceptor**: Automatically blocks AI advice and flags high-voltage, battery swell, or gas hazards.
+- **Quotation Comparison**: Compare bids, inspect technician credentials, and accept quotes.
+- **Financial Transparency**: Clear disclaimers that repair fees are settled directly between owner and technician.
 
-- Node.js
-- Express.js
-- MongoDB
-- Mongoose
-- JSON Web Tokens
-- Socket.IO
-- Winston
-- Joi
-- Multer
-- Helmet
-- CORS
-- express-rate-limit
+---
 
-### Infrastructure
+## 🛠️ Technology Stack
 
-- **Frontend Hosting:** Vercel
-- **Backend Hosting:** Render
-- **Database:** MongoDB Atlas
-- **File Storage:** Cloudinary with a local development fallback
-- **AI Provider:** OpenAI API with a mock provider for development
+```
+Frontend:
+├── React 18 & Vite (Ultra-fast SPA bundle)
+├── Tailwind CSS (Vanilla design system with dark & light tokens)
+├── TanStack Query (v5 Centralized query keys, caching, and optimistic updates)
+├── React Hook Form & Zod (Client-side schema validation)
+├── React Router DOM (v6 Nested route architecture)
+├── Socket.IO Client (Authenticated real-time bi-directional events)
+├── Lucide React & Leaflet (Icons & interactive geo-mapping)
+└── Sonner (Accessible toast notifications)
 
-## 🚀 Quick Start
+Backend:
+├── Node.js & Express.js (REST API & WebSockets)
+├── MongoDB & Mongoose (Document store with schema indexing)
+├── JWT (Short-lived access tokens + HTTP-only rotating refresh tokens)
+├── Socket.IO (Authenticated room-based pub/sub with JWT handshake)
+├── Winston & Morgan (Structured JSON logging & correlation tracking)
+├── Joi (Server-side schema validation)
+├── Multer & Cloudinary (Multipart media upload with local fallback)
+├── Helmet & CORS (Defense-in-depth HTTP headers)
+└── express-rate-limit (Segregated auth, API, and AI rate limiting)
+```
+
+---
+
+## 🏗️ Architecture & Engineering Highlights
+
+```
+                          ┌──────────────────────────┐
+                          │   React 18 SPA (Vite)    │
+                          └─────────────┬────────────┘
+                                        │ HTTPS / WSS
+                                        ▼
+                          ┌──────────────────────────┐
+                          │     Express.js API       │
+                          ├──────────────────────────┤
+                          │ • Helmet / CORS / Limiter│
+                          │ • JWT & Refresh Cookies  │
+                          │ • Central RBAC Matrix    │
+                          │ • Field DTO Serializers  │
+                          └───────┬───────────┬──────┘
+                                  │           │
+                     Database I/O │           │ Transactional Outbox
+                                  ▼           ▼
+                         ┌─────────────┐  ┌──────────────────┐
+                         │   MongoDB   │  │ Outbox Worker    │
+                         │   Atlas     │  │ (At-Least-Once)  │
+                         └─────────────┘  └─────────┬────────┘
+                                                    │
+                                                    ▼
+                                          ┌──────────────────┐
+                                          │ Socket.IO Server │
+                                          │ (Real-Time Push) │
+                                          └──────────────────┘
+```
+
+### 1. Centralized Authorization Matrix (`permissionService.js`)
+Fine-grained canonical permissions (`repair_request.*`, `quotation.*`, `repair_job.*`, `donation_offer.*`, `admin.*`) decoupling UI actions from hardcoded roles.
+
+### 2. Field-Level DTO Serialization (`serializers.js`)
+Projection layer preventing accidental exposure of sensitive fields (owner physical coordinates, donor phone numbers, internal administrative notes).
+
+### 3. Transactional Outbox Pattern (`outboxService.js`)
+Guarantees reliable, at-least-once socket event and notification delivery across all state transitions even under transient network interruptions.
+
+### 4. Global Search Modal (`Ctrl+K`)
+Keyboard-driven modal searching repair requests, donations, technicians, and admin modules with real-time navigation.
+
+---
+
+## 🚀 Quick Start & Local Setup
 
 ### Prerequisites
-
-Install the following software before running the project:
-
-- Node.js 18 or later
-- npm
-- MongoDB locally or a MongoDB Atlas connection URI
-- Git
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+- **MongoDB**: Local MongoDB instance or MongoDB Atlas connection URI
 
 ### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/eii-sayed/fixtogether.git
 cd fixtogether
 ```
 
 ### 2. Install Dependencies
-
-Install the root, frontend, and backend dependencies:
-
 ```bash
+# Install root, client, and server dependencies
 npm run install:all
 ```
 
 ### 3. Configure Environment Variables
-
-Copy the example environment files:
-
 ```bash
+# Copy example environment files
 cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Configure `server/.env` with the required values, including:
+Edit `server/.env` with your credentials:
+```env
+PORT=5000
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
+MONGODB_URI=mongodb://127.0.0.1:27017/fixtogether
+JWT_ACCESS_SECRET=your_super_secret_access_key_min_32_chars
+JWT_REFRESH_SECRET=your_super_secret_refresh_key_min_32_chars
+AI_PROVIDER=mock
+```
 
-- MongoDB connection URI
-- Access-token secret
-- Refresh-token secret
-- Allowed frontend origin
-- Cloudinary credentials
-- OpenAI API key, if the OpenAI provider is enabled
+Edit `client/.env`:
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+VITE_SOCKET_URL=http://localhost:5000
+```
 
-Configure `client/.env` with the backend API URL and other public frontend settings.
-
-> Never commit `.env` files or production secrets to the repository.
-
-### 4. Seed the Database
-
+### 4. Seed Demonstration Data
 ```bash
 npm run seed
 ```
 
-The seed script creates demonstration data and prints the available demo credentials.
-
-### 5. Start the Development Environment
-
+### 5. Start Development Servers
 ```bash
 npm run dev
 ```
+- **Frontend App**: `http://localhost:5173`
+- **Backend API**: `http://localhost:5000/api/v1`
 
-Development services:
+---
 
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:5000/api/v1
+## 🧪 Automated Testing
 
-## 🐳 Docker
-
-As an alternative to installing and running the services individually:
-
+### Backend Test Suite (8 Suites / 82 Tests)
 ```bash
-docker compose up
+npm run test:server
+```
+Runs integration tests covering authentication, rate limiting, repair requests, technician workflows, organization donations, messaging, and administrative governance.
+
+### Frontend Test Suite (13 Tests)
+```bash
+npm run test:client
+```
+Runs Vitest and React Testing Library tests for component rendering, user interactions, and role filters.
+
+### Production Build Check
+```bash
+npm run build:client
 ```
 
-To rebuild the containers:
+---
+
+## 🐳 Docker Deployment
+
+To run FixTogether using Docker Compose:
 
 ```bash
 docker compose up --build
 ```
 
-## 🧪 Testing
+---
 
-Run the backend test suite:
+## 📄 License & Attribution
 
-```bash
-npm run test:server
-```
-
-Run the frontend test suite:
-
-```bash
-npm run test:client
-```
-
-Run both suites before opening a pull request or deploying major changes.
-
-## 📁 Project Structure
-
-```text
-fixtogether/
-├── client/
-│   ├── src/
-│   │   ├── api/             # Axios API client
-│   │   ├── components/      # Reusable UI, chat, layout, and auth components
-│   │   ├── context/         # Authentication and Socket.IO contexts
-│   │   └── pages/           # Route-level pages
-│   └── vercel.json          # Vercel SPA routing configuration
-├── server/
-│   ├── src/
-│   │   ├── config/          # Application configuration
-│   │   ├── controllers/     # HTTP route handlers
-│   │   ├── middleware/      # Authentication, validation, and error handling
-│   │   ├── models/          # Mongoose schemas
-│   │   ├── routes/          # API route definitions
-│   │   ├── services/        # AI, matching, safety, and business logic
-│   │   ├── validators/      # Joi validation schemas
-│   │   └── scripts/         # Database seed scripts
-│   └── tests/               # Backend test suites
-├── docker-compose.yml       # Docker development configuration
-└── package.json             # Root workspace scripts
-```
-
-## 🔑 API Endpoints
-
-The following table presents the primary API endpoints. Some endpoints require authentication and role-specific authorization.
-
-### Authentication
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/auth/register` | Register a user |
-| `POST` | `/api/v1/auth/login` | Authenticate a user |
-| `GET` | `/api/v1/auth/me` | Return the authenticated user |
-
-### Items
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/items` | List accessible items |
-| `POST` | `/api/v1/items` | Create an item |
-| `POST` | `/api/v1/items/:id/images` | Upload item images using multipart form data |
-
-### Repair Requests
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/repair-requests` | List accessible repair requests |
-| `POST` | `/api/v1/repair-requests` | Create a repair request |
-| `POST` | `/api/v1/repair-requests/:id/analyze` | Run safety checks and AI analysis |
-| `POST` | `/api/v1/repair-requests/:id/publish` | Publish a repair request |
-
-### Messaging
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/messages/conversations` | List the authenticated user's conversations |
-| `GET` | `/api/v1/messages/:repairRequestId` | Get messages for an authorized repair request |
-| `POST` | `/api/v1/messages/:repairRequestId` | Send a repair-request-scoped message |
-| `PATCH` | `/api/v1/messages/:repairRequestId/read` | Mark messages as read |
-| `GET` | `/api/v1/messages/unread-count` | Get the unread-message count |
-
-### Platform Resources
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/technicians` | List technicians |
-| `GET` | `/api/v1/donations` | List donations |
-| `GET` | `/api/v1/categories` | List item categories |
-| `GET` | `/api/v1/notifications` | List notifications |
-| `GET` | `/api/v1/admin/dashboard` | Return administrator dashboard statistics |
-
-## 🏗 Architecture and Design Decisions
-
-### 1. AI Provider Abstraction
-
-The AI service uses a factory-based provider abstraction with `mock` and `openai` providers.
-
-The mock provider allows developers to run the diagnosis workflow without external API costs. The OpenAI provider can be enabled through environment configuration.
-
-### 2. Deterministic Safety Engine
-
-Safety checks run before AI analysis.
-
-The server checks descriptions for high-risk conditions such as:
-
-- Sparks or exposed electrical wiring
-- Electric shock
-- Smoke or burning smells
-- Swollen or overheating batteries
-- Suspected gas leaks
-- Water near live electrical components
-
-When a critical hazard is detected, FixTogether blocks unsafe automated repair instructions and displays an appropriate safety warning.
-
-The AI provider must not be allowed to override a deterministic safety block.
-
-### 3. JWT Authentication
-
-Authentication uses:
-
-- Short-lived access tokens
-- Rotating refresh tokens
-- HTTP-only refresh-token cookies
-- Secure production cookie settings
-- Cross-origin cookie support when required by the deployed architecture
-
-The documented default lifetimes are:
-
-- **Access token:** 15 minutes
-- **Refresh token:** 7 days
-
-### 4. Messaging Architecture
-
-Messages are scoped to repair requests and are exchanged between authorized owners and technicians.
-
-The recipient is resolved from the repair-request context instead of being trusted directly from arbitrary client input.
-
-Socket.IO connections require authentication before clients can receive messaging and notification events.
-
-### 5. File Upload Architecture
-
-Item images can be uploaded using multipart form data.
-
-Production media is stored in Cloudinary. Local storage is intended only as a development fallback and should not be treated as durable production storage.
-
-### 6. Payments
-
-The platform currently tracks quotation and repair costs internally.
-
-External payment processing through services such as Stripe or PayPal is outside the current implementation scope and may be added in a future phase.
-
-### 7. JavaScript and Runtime Validation
-
-The project uses standard JavaScript rather than TypeScript.
-
-Runtime validation is provided by:
-
-- Joi on the backend
-- Zod on the frontend
-
-## 🔐 Security Considerations
-
-FixTogether includes the following security controls:
-
-- HTTP security headers through Helmet
-- CORS configuration
-- Request rate limiting
-- Server-side Joi validation
-- Frontend Zod validation
-- Role-based access control
-- Resource ownership checks
-- HTTP-only refresh-token cookies
-- Refresh-token rotation
-- Server-side AI safety checks
-- Authenticated Socket.IO connections
-- Restricted image uploads
-- Structured server logging
-
-Security-sensitive configuration must be supplied through environment variables.
-
-Never commit:
-
-```text
-.env
-.env.local
-node_modules/
-dist/
-build/
-.vercel/
-```
-
-## ⚠️ Known Limitations
-
-- The Render free tier may introduce a cold-start delay.
-- The local upload fallback is intended for development only.
-- Payment gateway integration is not included.
-- The deterministic safety engine cannot replace evaluation by a qualified professional.
-- AI-generated analysis may be incomplete or inaccurate and should not be treated as professional repair or safety advice.
-- Public demonstration data may be reset periodically.
-- Real-time communication depends on the availability of the backend Socket.IO service.
-
-## 📄 License
-
-No license has been specified yet.
-
-Before accepting external contributions or allowing reuse, add an appropriate `LICENSE` file and update this section.
-
-## 👤 Author
-
-University Software Engineering Project by [Abu Sayed](https://github.com/eii-sayed).
+University Software Engineering Capstone Project authored by [Abu Sayed](https://github.com/eii-sayed).
+Licensed under the [MIT License](LICENSE).

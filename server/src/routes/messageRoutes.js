@@ -4,6 +4,7 @@ const messageController = require('../controllers/messageController');
 const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { sendMessageSchema, getMessagesQuerySchema } = require('../validators/messageValidators');
+const { messageLimiter } = require('../middleware/rateLimiter');
 
 // All routes require authentication
 router.use(authenticate);
@@ -17,8 +18,8 @@ router.get('/conversations', messageController.getConversations);
 // Messages for a specific repair request
 router.get('/:repairRequestId', validate(getMessagesQuerySchema, 'query'), messageController.getMessages);
 
-// Send a message
-router.post('/:repairRequestId', validate(sendMessageSchema), messageController.sendMessage);
+// Send a message (message-rate-limited)
+router.post('/:repairRequestId', messageLimiter, validate(sendMessageSchema), messageController.sendMessage);
 
 // Mark messages as read
 router.patch('/:repairRequestId/read', messageController.markAsRead);

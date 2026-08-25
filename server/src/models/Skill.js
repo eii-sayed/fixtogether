@@ -22,6 +22,17 @@ const skillSchema = new mongoose.Schema(
       maxlength: 500,
       default: '',
     },
+    alternativeTerms: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    verificationRequirement: {
+      type: String,
+      enum: ['none', 'license_required', 'certification_required'],
+      default: 'none',
+    },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ItemCategory',
@@ -30,6 +41,19 @@ const skillSchema = new mongoose.Schema(
     active: {
       type: Boolean,
       default: true,
+    },
+    mergeTarget: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Skill',
+      default: null,
+    },
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
+    version: {
+      type: Number,
+      default: 1,
     },
   },
   { timestamps: true }

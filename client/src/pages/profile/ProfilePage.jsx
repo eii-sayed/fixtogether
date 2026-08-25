@@ -345,45 +345,139 @@ export default function ProfilePage() {
           )}
 
           {userData?.role === 'technician' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="card card-body text-center">
-                <Star className="w-6 h-6 text-amber-500 fill-amber-500 mx-auto mb-1" />
-                <p className="text-2xl font-extrabold text-gray-900">
-                  {roleProfile?.averageRating > 0 ? roleProfile.averageRating.toFixed(1) : '5.0'}
-                </p>
-                <p className="text-xs text-gray-500 font-medium">({roleProfile?.reviewCount || 0} reviews)</p>
+            <div className="space-y-6">
+              {/* 4-Stage Verification Roadmap */}
+              <div className="card p-5 bg-gradient-to-r from-gray-50 via-primary-50/20 to-purple-50/20 border border-gray-200">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-primary-600" />
+                    <h3 className="font-bold text-sm text-gray-900">Verification & Certification Roadmap</h3>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                      roleProfile?.verificationStatus === 'approved'
+                        ? 'bg-green-100 text-green-800'
+                        : roleProfile?.verificationStatus === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    {roleProfile?.verificationStatus === 'approved'
+                      ? 'Verified Professional'
+                      : roleProfile?.verificationStatus === 'pending'
+                      ? 'Documents Under Review'
+                      : 'Verification Incomplete'}
+                  </span>
+                </div>
+
+                {/* 4 Steps */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3">
+                  <div className="p-3 bg-white rounded-xl border border-green-200 shadow-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">1. Profile Setup</p>
+                      <p className="text-[10px] text-green-700">Completed</p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-xs flex items-center gap-2">
+                    {roleProfile?.verificationDocuments?.length > 0 ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">2. National ID</p>
+                      <p className="text-[10px] text-gray-500">
+                        {roleProfile?.verificationDocuments?.length > 0 ? 'Submitted' : 'Required'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-xs flex items-center gap-2">
+                    {roleProfile?.tradeLicenseNumber ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">3. Trade License</p>
+                      <p className="text-[10px] text-gray-500">
+                        {roleProfile?.tradeLicenseNumber ? 'Attached' : 'Recommended'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-gray-200 shadow-xs flex items-center gap-2">
+                    {roleProfile?.verificationStatus === 'approved' ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                    ) : (
+                      <Shield className="w-4 h-4 text-gray-400 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">4. Pro Badge</p>
+                      <p className="text-[10px] text-gray-500">
+                        {roleProfile?.verificationStatus === 'approved' ? 'Active' : 'Pending Audit'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {roleProfile?.rejectionReason && (
+                  <div className="mt-3 p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700">
+                    <span className="font-bold">Verification Note from Moderator:</span> {roleProfile.rejectionReason}
+                  </div>
+                )}
               </div>
 
-              <div className="card card-body text-center">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
-                <p className="text-2xl font-extrabold text-gray-900">
-                  {roleProfile?.completedRepairCount || 0}
-                </p>
-                <p className="text-xs text-gray-500 font-medium">Completed Repairs</p>
-              </div>
+              {/* Stats & Workload Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="card card-body text-center">
+                  <Star className="w-6 h-6 text-amber-500 fill-amber-500 mx-auto mb-1" />
+                  <p className="text-2xl font-extrabold text-gray-900">
+                    {roleProfile?.averageRating > 0 ? roleProfile.averageRating.toFixed(1) : '5.0'}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">({roleProfile?.reviewCount || 0} reviews)</p>
+                </div>
 
-              <div className="card card-body text-center">
-                <Clock className="w-6 h-6 text-sky-600 mx-auto mb-1" />
-                <p className="text-2xl font-extrabold text-gray-900">
-                  {roleProfile?.yearsOfExperience || 1} yrs
-                </p>
-                <p className="text-xs text-gray-500 font-medium">Experience</p>
-              </div>
+                <div className="card card-body text-center">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto mb-1" />
+                  <p className="text-2xl font-extrabold text-gray-900">
+                    {roleProfile?.completedRepairCount || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">Completed Repairs</p>
+                </div>
 
-              {/* Quick Availability Status Selector */}
-              <div className="card card-body flex flex-col justify-center">
-                <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-                  Availability
-                </label>
-                <select
-                  value={roleProfile?.availabilityStatus || 'available'}
-                  onChange={(e) => handleAvailabilityChange(e.target.value)}
-                  className="input !py-1.5 !text-xs font-semibold"
-                >
-                  <option value="available">🟢 Available for Work</option>
-                  <option value="busy">🟡 Busy / Low Capacity</option>
-                  <option value="unavailable">🔴 Away / Unavailable</option>
-                </select>
+                {/* Live Availability Status */}
+                <div className="card card-body flex flex-col justify-center">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Live Status
+                  </label>
+                  <select
+                    value={roleProfile?.availabilityStatus || 'available'}
+                    onChange={(e) => handleAvailabilityChange(e.target.value)}
+                    className="input !py-1.5 !text-xs font-semibold"
+                  >
+                    <option value="available">🟢 Available for Work</option>
+                    <option value="busy">🟡 Busy / Low Capacity</option>
+                    <option value="unavailable">🔴 Away / Unavailable</option>
+                  </select>
+                </div>
+
+                {/* Capacity & Vacation info */}
+                <div className="card card-body flex flex-col justify-center">
+                  <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Capacity Limit
+                  </label>
+                  <div className="text-sm font-extrabold text-gray-900">
+                    Max {roleProfile?.maxConcurrentJobs || 5} Concurrent Jobs
+                  </div>
+                  {roleProfile?.vacationMode && (
+                    <span className="text-[10px] text-purple-700 font-bold mt-0.5">
+                      Vacation until {roleProfile?.vacationUntil ? new Date(roleProfile.vacationUntil).toLocaleDateString() : 'TBD'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}

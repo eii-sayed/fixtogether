@@ -13,36 +13,49 @@ const createInspection = asyncHandler(async (req, res) => {
   if (!job) return errorResponse(res, 'Repair job not found.', 404);
   if (job.technician.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
 
+  let images = [];
+  if (req.files && req.files.length > 0) {
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/inspections' });
+    images = uploaded.map((u) => ({ url: u.url, publicId: u.publicId }));
+  }
+
   const inspection = await Inspection.create({
-    repairRequest: job.repairRequest, technician: req.user.userId, ...req.body,
+    repairRequest: job.repairRequest,
+    technician: req.user.userId,
+    ...req.body,
+    images: images.length > 0 ? images : req.body.images || [],
   });
+
   job.inspection = inspection._id;
-  job.currentStatus = REPAIR_JOB_STATUS.INSPECTING;
   await job.save();
 
-  // Update repair request status
-  await RepairRequest.findByIdAndUpdate(job.repairRequest, { requestStatus: REPAIR_REQUEST_STATUS.UNDER_INSPECTION });
-
-  await RepairStatusHistory.create({
-    repairJob: job._id, previousStatus: REPAIR_JOB_STATUS.PENDING_INSPECTION,
-    newStatus: REPAIR_JOB_STATUS.INSPECTING, changedBy: req.user.userId,
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.INSPECTING, req.user, {
+    note: `Diagnostic inspection completed. Repairability: ${inspection.repairability || 'evaluated'}`,
+    req,
   });
 
-  if (inspection.repairFeasible === 'no') {
+  if (inspection.repairFeasible === 'no' || inspection.repairability === 'unfeasible') {
     await createNotification({
-      userId: job.owner.toString(), type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
-      title: 'Inspection Complete', message: 'Technician assessment: repair may not be feasible.',
-      relatedEntityType: 'RepairJob', relatedEntityId: job._id,
+      userId: job.owner.toString(),
+      type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
+      title: 'Inspection Complete: Not Feasible',
+      message: 'Technician assessment: repair is not economically feasible. Alternative options available.',
+      relatedEntityType: 'RepairJob',
+      relatedEntityId: job._id,
     });
   } else {
     await createNotification({
-      userId: job.owner.toString(), type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
-      title: 'Inspection Complete', message: 'Technician has completed the inspection.',
-      relatedEntityType: 'RepairJob', relatedEntityId: job._id,
+      userId: job.owner.toString(),
+      type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
+      title: 'Inspection Complete',
+      message: 'Technician has completed the hardware diagnostic inspection.',
+      relatedEntityType: 'RepairJob',
+      relatedEntityId: job._id,
     });
   }
 
-  return successResponse(res, { inspection }, 'Inspection recorded', 201);
+  return successResponse(res, { inspection, job }, 'Inspection recorded', 201);
 });
 
 const getInspection = asyncHandler(async (req, res) => {
@@ -64,12 +77,120 @@ const ownerInspectionDecision = asyncHandler(async (req, res) => {
 
   const job = await RepairJob.findOne({ inspection: inspection._id });
   if (job && decision === 'approved') {
-    job.currentStatus = REPAIR_JOB_STATUS.IN_PROGRESS;
-    await job.save();
-    await RepairRequest.findByIdAndUpdate(job.repairRequest, { requestStatus: REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS });
+    const { transitionRepairJob } = require('../services/stateTransitionService');
+    await transitionRepairJob(job._id, REPAIR_JOB_STATUS.IN_PROGRESS, req.user, {
+      note: `Owner approved inspection findings: ${note || ''}`,
+      req,
+    });
   }
 
   return successResponse(res, { inspection }, 'Decision recorded');
+});
+
+// ===== COST APPROVAL =====
+const requestCostApproval = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.technician.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
+
+  const {
+    originalTotal, revisedTotal, additionalLabor, additionalParts, additionalDays,
+    newlyDiscoveredIssue, reason, explanation,
+  } = req.body;
+
+  let images = [];
+  if (req.files?.length > 0) {
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/cost_approvals' });
+    images = uploaded.map((u) => ({ url: u.url, publicId: u.publicId }));
+  }
+
+  job.costApprovalRequest = {
+    requestedAt: new Date(),
+    originalTotal: originalTotal || job.finalTotalCost || 0,
+    revisedTotal: revisedTotal || 0,
+    additionalLabor: additionalLabor || 0,
+    additionalParts: additionalParts || 0,
+    additionalDays: additionalDays || 0,
+    newlyDiscoveredIssue: newlyDiscoveredIssue || '',
+    reason: reason || '',
+    explanation: explanation || '',
+    images,
+    status: 'pending',
+    decisionAt: null,
+    ownerNote: '',
+  };
+
+  await job.save();
+
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.AWAITING_APPROVAL, req.user, {
+    note: `Cost approval requested: revised total ৳${revisedTotal}`,
+    req,
+  });
+
+  await createNotification({
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.OWNER_APPROVAL_REQUIRED,
+    title: 'Cost Revision Requires Approval',
+    message: `Technician requested approval for additional work (৳${revisedTotal}). Please review and respond.`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
+  });
+
+  return successResponse(res, { job }, 'Cost approval request submitted to owner');
+});
+
+const ownerCostApprovalDecision = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.owner.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
+
+  const { decision, note } = req.body; // 'approved' | 'rejected'
+  if (!job.costApprovalRequest || job.costApprovalRequest.status === 'none') {
+    return errorResponse(res, 'No pending cost approval request found for this job.', 400);
+  }
+
+  job.costApprovalRequest.status = decision;
+  job.costApprovalRequest.decisionAt = new Date();
+  job.costApprovalRequest.ownerNote = note || '';
+
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+
+  if (decision === 'approved') {
+    if (job.costApprovalRequest.revisedTotal) {
+      job.finalTotalCost = job.costApprovalRequest.revisedTotal;
+    }
+    await job.save();
+
+    const hasUnreceivedParts = job.requiredParts.some((p) => ['required', 'searching', 'ordered'].includes(p.status));
+    const nextState = hasUnreceivedParts ? REPAIR_JOB_STATUS.WAITING_FOR_PARTS : REPAIR_JOB_STATUS.IN_PROGRESS;
+
+    await transitionRepairJob(job._id, nextState, req.user, {
+      note: `Owner approved revised cost (৳${job.costApprovalRequest.revisedTotal}). ${note || ''}`,
+      req,
+    });
+
+    await createNotification({
+      userId: job.technician.toString(),
+      type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
+      title: 'Cost Revision Approved',
+      message: 'The owner has approved your revised cost. You can now proceed with the repair.',
+      relatedEntityType: 'RepairJob',
+      relatedEntityId: job._id,
+    });
+  } else {
+    await job.save();
+    await createNotification({
+      userId: job.technician.toString(),
+      type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
+      title: 'Cost Revision Declined',
+      message: `The owner declined the revised cost: "${note || 'No reason provided'}". Please discuss options in chat.`,
+      relatedEntityType: 'RepairJob',
+      relatedEntityId: job._id,
+    });
+  }
+
+  return successResponse(res, { job }, `Cost revision ${decision}`);
 });
 
 // ===== REPAIR JOB =====
@@ -81,9 +202,14 @@ const getRepairJobs = asyncHandler(async (req, res) => {
   if (req.query.status) query.currentStatus = req.query.status;
 
   const [jobs, total] = await Promise.all([
-    RepairJob.find(query).populate('repairRequest', 'item problemDescription')
-      .populate('owner', 'fullName').populate('technician', 'fullName')
-      .sort({ createdAt: -1 }).skip(skip).limit(limit),
+    RepairJob.find(query)
+      .populate('repairRequest', 'item problemDescription preferredServiceMethod')
+      .populate('owner', 'fullName email')
+      .populate('technician', 'fullName email')
+      .populate('acceptedQuotation')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
     RepairJob.countDocuments(query),
   ]);
   return successResponse(res, { repairJobs: jobs, pagination: paginationMeta(total, page, limit) });
@@ -92,8 +218,10 @@ const getRepairJobs = asyncHandler(async (req, res) => {
 const getRepairJobById = asyncHandler(async (req, res) => {
   const job = await RepairJob.findById(req.params.id)
     .populate({ path: 'repairRequest', populate: { path: 'item', populate: { path: 'category' } } })
-    .populate('owner', 'fullName email').populate('technician', 'fullName email')
-    .populate('acceptedQuotation').populate('inspection');
+    .populate('owner', 'fullName email phone')
+    .populate('technician', 'fullName email phone')
+    .populate('acceptedQuotation')
+    .populate('inspection');
   if (!job) return errorResponse(res, 'Not found.', 404);
 
   const history = await RepairStatusHistory.find({ repairJob: job._id })
@@ -109,33 +237,19 @@ const updateRepairJobStatus = asyncHandler(async (req, res) => {
   }
 
   const { status, note } = req.body;
-  const prevStatus = job.currentStatus;
-  job.currentStatus = status;
-  await job.save();
-
-  await RepairStatusHistory.create({
-    repairJob: job._id, previousStatus: prevStatus, newStatus: status,
-    changedBy: req.user.userId, note: note || '',
-  });
-
-  // Map repair job status to request status
-  const statusMap = {
-    [REPAIR_JOB_STATUS.WAITING_FOR_PARTS]: REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
-    [REPAIR_JOB_STATUS.IN_PROGRESS]: REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
-    [REPAIR_JOB_STATUS.QUALITY_CHECK]: REPAIR_REQUEST_STATUS.QUALITY_CHECK,
-    [REPAIR_JOB_STATUS.COMPLETED]: REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION,
-    [REPAIR_JOB_STATUS.UNSUCCESSFUL]: REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
-  };
-  if (statusMap[status]) {
-    await RepairRequest.findByIdAndUpdate(job.repairRequest, { requestStatus: statusMap[status] });
-  }
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  const result = await transitionRepairJob(job._id, status, req.user, { note, req });
 
   await createNotification({
-    userId: job.owner.toString(), type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
-    title: 'Repair Status Updated', message: `Status changed to: ${status.replace(/_/g, ' ')}`,
-    relatedEntityType: 'RepairJob', relatedEntityId: job._id,
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.REPAIR_STATUS_UPDATED,
+    title: 'Repair Status Updated',
+    message: `Status changed to: ${status.replace(/_/g, ' ')}`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
   });
-  return successResponse(res, { repairJob: job }, 'Status updated');
+
+  return successResponse(res, { repairJob: result.job }, 'Status updated');
 });
 
 const addParts = asyncHandler(async (req, res) => {
@@ -147,18 +261,88 @@ const addParts = asyncHandler(async (req, res) => {
   return successResponse(res, { repairJob: job }, 'Parts added');
 });
 
+const updatePartStatus = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.technician.toString() !== req.user.userId.toString() && req.user.role !== 'admin') {
+    return errorResponse(res, 'Access denied.', 403);
+  }
+
+  const { partIndex } = req.params;
+  const { status, actualCost, expectedArrival, supplier, installationNote, warranty } = req.body;
+
+  if (!job.requiredParts || !job.requiredParts[partIndex]) {
+    return errorResponse(res, 'Part not found in repair job.', 404);
+  }
+
+  const part = job.requiredParts[partIndex];
+  if (status) part.status = status;
+  if (actualCost !== undefined) part.actualCost = actualCost;
+  if (expectedArrival) part.expectedArrival = expectedArrival;
+  if (supplier) part.supplier = supplier;
+  if (installationNote) part.installationNote = installationNote;
+  if (warranty) part.warranty = warranty;
+
+  await job.save();
+
+  const allPartsReceived = job.requiredParts.every((p) => ['received', 'installed', 'unavailable'].includes(p.status));
+
+  return successResponse(res, { part, allPartsReceived, repairJob: job }, 'Part status updated');
+});
+
+const submitQualityCheck = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.technician.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
+
+  const { qualityChecks, completionReport, replacedParts, finalLaborCost, finalPartsCost, paymentMethod } = req.body;
+
+  if (qualityChecks && Array.isArray(qualityChecks)) {
+    job.qualityChecks = qualityChecks;
+  }
+  if (completionReport) job.completionReport = completionReport;
+  if (replacedParts) job.replacedParts = replacedParts;
+  if (finalLaborCost !== undefined) job.finalLaborCost = finalLaborCost;
+  if (finalPartsCost !== undefined) job.finalPartsCost = finalPartsCost;
+  job.finalTotalCost = (job.finalLaborCost || 0) + (job.finalPartsCost || 0);
+  if (paymentMethod) job.paymentMethod = paymentMethod;
+
+  if (req.files?.length > 0) {
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/completions' });
+    job.completionImages = uploaded.map((u) => ({ url: u.url, publicId: u.publicId }));
+  }
+
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.READY_FOR_COLLECTION, req.user, {
+    note: 'Quality checks verified. Item marked ready for collection / return delivery.',
+    req,
+  });
+
+  await createNotification({
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.REPAIR_COMPLETED,
+    title: 'Repair Completed & Verified',
+    message: 'Your item has passed all quality checks and is ready for collection!',
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
+  });
+
+  return successResponse(res, { repairJob: job }, 'Quality checks recorded and item marked ready for collection');
+});
+
 const submitCompletion = asyncHandler(async (req, res) => {
   const job = await RepairJob.findById(req.params.id);
   if (!job) return errorResponse(res, 'Not found.', 404);
   if (job.technician.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
 
-  const { completionReport, finalLaborCost, finalPartsCost, replacedParts, paymentMethod } = req.body;
-  job.completionReport = completionReport || '';
-  job.finalLaborCost = finalLaborCost || 0;
-  job.finalPartsCost = finalPartsCost || 0;
-  job.finalTotalCost = (finalLaborCost || 0) + (finalPartsCost || 0);
+  const { completionReport, finalLaborCost, finalPartsCost, replacedParts, paymentMethod, handoverDetails } = req.body;
+  job.completionReport = completionReport || job.completionReport || '';
+  if (finalLaborCost !== undefined) job.finalLaborCost = finalLaborCost;
+  if (finalPartsCost !== undefined) job.finalPartsCost = finalPartsCost;
+  job.finalTotalCost = (job.finalLaborCost || 0) + (job.finalPartsCost || 0);
   if (replacedParts) job.replacedParts = replacedParts;
   if (paymentMethod) job.paymentMethod = paymentMethod;
+  if (handoverDetails) job.handoverDetails = { ...job.handoverDetails, ...handoverDetails, handedOverAt: new Date() };
   job.technicianConfirmedCompletion = true;
 
   if (req.files?.length > 0) {
@@ -166,14 +350,21 @@ const submitCompletion = asyncHandler(async (req, res) => {
     job.completionImages = uploaded.map((u) => ({ url: u.url, publicId: u.publicId }));
   }
 
-  job.currentStatus = REPAIR_JOB_STATUS.COMPLETED;
-  await job.save();
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.READY_FOR_COLLECTION, req.user, {
+    note: 'Technician submitted completion report. Ready for owner confirmation.',
+    req,
+  });
 
   await createNotification({
-    userId: job.owner.toString(), type: NOTIFICATION_TYPES.REPAIR_COMPLETED,
-    title: 'Repair Completed', message: 'The technician has marked your repair as complete. Please confirm.',
-    relatedEntityType: 'RepairJob', relatedEntityId: job._id,
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.REPAIR_COMPLETED,
+    title: 'Repair Completed',
+    message: 'The technician has marked your repair as complete. Please confirm handover and receipt.',
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
   });
+
   return successResponse(res, { repairJob: job }, 'Completion submitted');
 });
 
@@ -185,34 +376,57 @@ const ownerConfirmCompletion = asyncHandler(async (req, res) => {
   job.ownerAcceptedCompletion = true;
   job.completedAt = new Date();
   job.paymentStatus = req.body.paymentStatus || 'paid';
+  if (job.handoverDetails) {
+    job.handoverDetails.ownerConfirmedAt = new Date();
+  }
   await job.save();
 
-  await RepairRequest.findByIdAndUpdate(job.repairRequest, { requestStatus: REPAIR_REQUEST_STATUS.COMPLETED });
-
-  // Create warranty
-  const quotation = await Quotation.findById(job.acceptedQuotation);
-  const warrantyDays = quotation?.warrantyDays || 30;
-  await Warranty.create({
-    repairJob: job._id, technician: job.technician, owner: job.owner,
-    startDate: new Date(), endDate: new Date(Date.now() + warrantyDays * 86400000),
-    coveredProblem: job.completionReport, status: WARRANTY_STATUS.ACTIVE,
+  const { transitionRepairJob } = require('../services/stateTransitionService');
+  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.COMPLETED, req.user, {
+    note: 'Owner confirmed completion and received item.',
+    req,
   });
+
+  // Idempotent Warranty creation: only create if warranty does not exist
+  let warranty = await Warranty.findOne({ repairJob: job._id });
+  if (!warranty) {
+    const quotation = await Quotation.findById(job.acceptedQuotation);
+    const warrantyDays = quotation?.warrantyDays || 30;
+    warranty = await Warranty.create({
+      repairJob: job._id,
+      technician: job.technician,
+      owner: job.owner,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + warrantyDays * 86400000),
+      coveredProblem: job.completionReport || 'Standard repair coverage',
+      status: WARRANTY_STATUS.ACTIVE,
+    });
+  }
 
   // Create impact record
   const request = await RepairRequest.findById(job.repairRequest).populate('item');
   if (request?.item) {
-    await ImpactRecord.create({
-      item: request.item._id, outcome: 'repaired',
-      repairCost: job.finalTotalCost, verified: true,
-    });
+    const existingImpact = await ImpactRecord.findOne({ item: request.item._id, outcome: 'repaired' });
+    if (!existingImpact) {
+      await ImpactRecord.create({
+        item: request.item._id,
+        outcome: 'repaired',
+        repairCost: job.finalTotalCost,
+        verified: true,
+      });
+    }
   }
 
   await createNotification({
-    userId: job.technician.toString(), type: NOTIFICATION_TYPES.WARRANTY_CREATED,
-    title: 'Repair Confirmed', message: 'Owner confirmed completion. Warranty created.',
-    relatedEntityType: 'RepairJob', relatedEntityId: job._id,
+    userId: job.technician.toString(),
+    type: NOTIFICATION_TYPES.WARRANTY_CREATED,
+    title: 'Repair Confirmed',
+    message: 'Owner confirmed completion. Warranty activated.',
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
   });
-  return successResponse(res, { repairJob: job }, 'Completion confirmed');
+
+  return successResponse(res, { repairJob: job, warranty }, 'Completion confirmed');
 });
 
 // ===== REVIEWS =====
@@ -340,25 +554,110 @@ const addDisputeResponse = asyncHandler(async (req, res) => {
   return successResponse(res, { dispute }, 'Response added');
 });
 
-const resolveDispute = asyncHandler(async (req, res) => {
+const requestMissingDisputeInfo = asyncHandler(async (req, res) => {
   const dispute = await Dispute.findById(req.params.id);
-  if (!dispute) return errorResponse(res, 'Not found.', 404);
-  dispute.status = 'resolved';
-  dispute.resolution = { decision: req.body.decision, notes: req.body.notes, resolvedBy: req.user.userId };
-  dispute.resolvedAt = new Date();
+  if (!dispute) return errorResponse(res, 'Dispute not found.', 404);
+
+  const { targetUserId, requestText } = req.body;
+  if (!requestText?.trim()) return errorResponse(res, 'Request text is required.', 400);
+
+  dispute.missingInfoRequests.push({
+    requestedFrom: targetUserId || dispute.againstUser,
+    requestText: requestText.trim(),
+    requestedAt: new Date(),
+  });
+  dispute.status = 'awaiting_response';
   await dispute.save();
 
   await createNotification({
-    userId: dispute.openedBy.toString(), type: NOTIFICATION_TYPES.DISPUTE_RESOLVED,
-    title: 'Dispute Resolved', message: `Your dispute has been resolved.`,
-    relatedEntityType: 'Dispute', relatedEntityId: dispute._id,
+    userId: (targetUserId || dispute.againstUser).toString(),
+    type: NOTIFICATION_TYPES.DISPUTE_OPENED,
+    title: 'Dispute Mediation: Action Required',
+    message: `Administrator requested additional information: "${requestText.substring(0, 100)}..."`,
+    relatedEntityType: 'Dispute',
+    relatedEntityId: dispute._id,
+  });
+
+  return successResponse(res, { dispute }, 'Missing information requested');
+});
+
+const addDisputeInternalNote = asyncHandler(async (req, res) => {
+  const dispute = await Dispute.findById(req.params.id);
+  if (!dispute) return errorResponse(res, 'Dispute not found.', 404);
+
+  const { note } = req.body;
+  if (!note?.trim()) return errorResponse(res, 'Note is required.', 400);
+
+  dispute.internalNotes.push({
+    admin: req.user.userId,
+    note: note.trim(),
+    createdAt: new Date(),
+  });
+  await dispute.save();
+
+  return successResponse(res, { internalNotes: dispute.internalNotes }, 'Note added');
+});
+
+const resolveDispute = asyncHandler(async (req, res) => {
+  const dispute = await Dispute.findById(req.params.id);
+  if (!dispute) return errorResponse(res, 'Not found.', 404);
+
+  const { decision, notes, internalFindings, consequencePreview, expectedVersion } = req.body;
+
+  // Optimistic concurrency
+  if (expectedVersion !== undefined && dispute.version !== expectedVersion) {
+    return res.status(409).json({
+      success: false,
+      code: 'RESOURCE_VERSION_CONFLICT',
+      message: 'This dispute was updated by another administrator.',
+      latestVersion: dispute.version,
+    });
+  }
+
+  dispute.status = 'resolved';
+  dispute.resolution = {
+    decision,
+    notes,
+    internalFindings: internalFindings || '',
+    consequencePreview: consequencePreview || {},
+    resolvedBy: req.user.userId,
+  };
+  dispute.resolvedAt = new Date();
+  dispute.version += 1;
+  await dispute.save();
+
+  // Mark corresponding review queue item resolved
+  await ReviewQueueItem.findOneAndUpdate(
+    { entityType: 'dispute', entityId: dispute._id },
+    { reviewState: 'resolved' }
+  );
+
+  await createNotification({
+    userId: dispute.openedBy.toString(),
+    type: NOTIFICATION_TYPES.DISPUTE_RESOLVED,
+    title: 'Dispute Resolved',
+    message: `Your dispute has been resolved: ${decision}`,
+    relatedEntityType: 'Dispute',
+    relatedEntityId: dispute._id,
+  });
+
+  await createNotification({
+    userId: dispute.againstUser.toString(),
+    type: NOTIFICATION_TYPES.DISPUTE_RESOLVED,
+    title: 'Dispute Resolved',
+    message: `Dispute decision finalized: ${decision}`,
+    relatedEntityType: 'Dispute',
+    relatedEntityId: dispute._id,
   });
 
   await createAuditLog({
-    actor: req.user.userId, action: 'DISPUTE_RESOLVED',
-    targetType: 'Dispute', targetId: dispute._id,
-    metadata: { decision: req.body.decision },
+    actor: req.user.userId,
+    action: 'DISPUTE_RESOLVED',
+    targetType: 'Dispute',
+    targetId: dispute._id,
+    metadata: { decision, notes },
   }, req);
+
   return successResponse(res, { dispute }, 'Dispute resolved');
 });
 
@@ -598,13 +897,48 @@ const markAllNotificationsRead = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  createInspection, getInspection, ownerInspectionDecision,
-  getRepairJobs, getRepairJobById, updateRepairJobStatus, addParts, submitCompletion, ownerConfirmCompletion,
-  createReview, getTechnicianReviews, updateReview, deleteReview,
-  createDispute, getDisputes, getDisputeById, addDisputeResponse, resolveDispute,
-  getWarranties, getWarrantyById, submitWarrantyClaim, updateWarrantyClaimStatus,
-  createDonation, getDonations, getDonationById, getDonationMatches, acceptDonation, rejectDonation,
-  scheduleDonationPickup, confirmHandover,
-  createPart, getParts, getPartById, updatePart, reservePart,
-  getNotifications, markNotificationRead, markAllNotificationsRead,
+  createInspection,
+  getInspection,
+  ownerInspectionDecision,
+  requestCostApproval,
+  ownerCostApprovalDecision,
+  getRepairJobs,
+  getRepairJobById,
+  updateRepairJobStatus,
+  addParts,
+  updatePartStatus,
+  submitQualityCheck,
+  submitCompletion,
+  ownerConfirmCompletion,
+  createReview,
+  getTechnicianReviews,
+  updateReview,
+  deleteReview,
+  createDispute,
+  getDisputes,
+  getDisputeById,
+  addDisputeResponse,
+  requestMissingDisputeInfo,
+  addDisputeInternalNote,
+  resolveDispute,
+  getWarranties,
+  getWarrantyById,
+  submitWarrantyClaim,
+  updateWarrantyClaimStatus,
+  createDonation,
+  getDonations,
+  getDonationById,
+  getDonationMatches,
+  acceptDonation,
+  rejectDonation,
+  scheduleDonationPickup,
+  confirmHandover,
+  createPart,
+  getParts,
+  getPartById,
+  updatePart,
+  reservePart,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 };

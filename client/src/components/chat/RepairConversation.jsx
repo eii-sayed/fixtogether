@@ -811,9 +811,36 @@ export default function RepairConversation({
       </div>
 
       {/* ========================================================================= */}
-      {/* 5. MESSAGE COMPOSER */}
+      {/* 5. MESSAGE COMPOSER & QUICK TEMPLATES */}
       {/* ========================================================================= */}
-      <div className="p-3 bg-white border-t border-gray-100 shrink-0 pb-[max(12px,env(safe-area-inset-bottom))]">
+      <div className="p-3 bg-white border-t border-gray-100 shrink-0 pb-[max(12px,env(safe-area-inset-bottom))] space-y-2">
+        {/* Quick Technician Status Templates */}
+        {user?.role === 'technician' && (
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-[11px]">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider shrink-0">Quick:</span>
+            {[
+              '🔬 Item received for diagnostic inspection.',
+              '📋 Inspection completed. Awaiting approval on parts.',
+              '📦 Replacement parts received. Repair in progress.',
+              '✨ Passed quality checks! Ready for collection.',
+              '💬 Could you provide details on the issue history?',
+            ].map((tmpl, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  setInput(tmpl);
+                  sessionStorage.setItem(draftKey, tmpl);
+                  textareaRef.current?.focus();
+                }}
+                className="px-2.5 py-1 bg-gray-50 hover:bg-primary-50 hover:text-primary-700 border border-gray-200 hover:border-primary-300 rounded-full whitespace-nowrap text-gray-600 transition-all shrink-0 active:scale-95"
+              >
+                {tmpl}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <div className="flex-1 relative bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:bg-white transition-all overflow-hidden">
             <textarea

@@ -18,6 +18,25 @@ const inspectionSchema = new mongoose.Schema(
       maxlength: 3000,
       default: '',
     },
+    rootCause: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+      default: '',
+    },
+    repairability: {
+      type: String,
+      enum: ['economic_repair', 'minor_repair', 'major_overhaul', 'unfeasible', 'parts_only', 'uncertain'],
+      default: 'economic_repair',
+    },
+    checklistResults: [
+      {
+        itemId: { type: String },
+        label: { type: String },
+        passed: { type: Boolean, default: true },
+        notes: { type: String, default: '' },
+      },
+    ],
     diagnosedComponents: [
       {
         name: { type: String },
@@ -35,6 +54,13 @@ const inspectionSchema = new mongoose.Schema(
       enum: ['low', 'medium', 'high', 'critical'],
       default: 'low',
     },
+    safetyFindings: [
+      {
+        riskType: { type: String, default: '' },
+        description: { type: String, default: '' },
+        severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'low' },
+      },
+    ],
     requiredParts: [
       {
         name: { type: String },
@@ -43,6 +69,9 @@ const inspectionSchema = new mongoose.Schema(
         available: { type: Boolean, default: false },
       },
     ],
+    confirmedLaborCost: { type: Number, default: 0 },
+    confirmedPartsCost: { type: Number, default: 0 },
+    revisedTotalCost: { type: Number, default: 0 },
     estimatedCompletionDate: { type: Date, default: null },
     revisedQuotation: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,6 +79,24 @@ const inspectionSchema = new mongoose.Schema(
       default: null,
     },
     technicianNotes: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+      default: '',
+    },
+    ownerVisibleNotes: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+      default: '',
+    },
+    technicianPrivateNotes: {
+      type: String,
+      trim: true,
+      maxlength: 3000,
+      default: '',
+    },
+    adminOnlyNotes: {
       type: String,
       trim: true,
       maxlength: 3000,

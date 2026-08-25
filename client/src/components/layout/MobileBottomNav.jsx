@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
@@ -13,19 +14,23 @@ import {
   ClipboardList,
   Users,
   Settings,
-  ShieldAlert,
+  X,
+  Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function MobileBottomNav() {
   const { user, isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [showAddActionSheet, setShowAddActionSheet] = useState(false);
 
   // Live unread message count query
   const { data: unreadData } = useQuery({
     queryKey: ['unread-messages-count'],
     queryFn: () => api.get('/messages/unread-count').then((r) => r.data.data),
     enabled: !!isAuthenticated,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
 
   if (!isAuthenticated) return null;
@@ -58,17 +63,17 @@ export default function MobileBottomNav() {
       case 'admin':
         return [
           { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+          { label: 'Requests', path: '/repair-requests', icon: ClipboardList },
           { label: 'Users', path: '/admin/users', icon: Users },
           { label: 'Verify', path: '/admin/verifications', icon: Settings },
-          { label: 'Safety', path: '/admin/safety', icon: ShieldAlert },
           { label: 'Profile', path: '/profile', icon: User },
         ];
       case 'owner':
       default:
         return [
           { label: 'Home', path: '/dashboard', icon: LayoutDashboard },
-          { label: 'My Items', path: '/items', icon: Package },
-          { label: 'New', path: '/repair-requests/new', icon: Plus, isPrimaryAction: true },
+          { label: 'Requests', path: '/repair-requests', icon: ClipboardList },
+          { label: 'Add', isPrimaryAction: true },
           { label: 'Messages', path: '/messages', icon: MessageCircle, badge: unreadCount },
           { label: 'Profile', path: '/profile', icon: User },
         ];
@@ -77,90 +82,185 @@ export default function MobileBottomNav() {
 
   const tabs = getNavTabs();
 
-  return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-lg border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
-      <div className="flex items-center justify-around h-16 px-2">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive =
-            location.pathname === tab.path ||
-            (tab.path !== '/dashboard' &&
-              tab.path !== '/' &&
-              location.pathname.startsWith(tab.path));
+  const handleActionSelect = (path) => {
+    setShowAddActionSheet(false);
+    navigate(path);
+  };
 
-          // Center elevated Action button for Owner
-          if (tab.isPrimaryAction) {
+  return (
+    <>
+      {/* Bottom Action Sheet Modal */}
+      {showAddActionSheet && (
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div
+            className="fixed inset-0"
+            onClick={() => setShowAddActionSheet(false)}
+            aria-hidden="true"
+          />
+          <div className="relative bg-white rounded-t-3xl p-6 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary-600" />
+                <h3 className="font-bold text-gray-900 text-base">Quick Add Action</h3>
+              </div>
+              <button
+                onClick={() => setShowAddActionSheet(false)}
+                className="p-2 text-gray-400 hover:text-gray-700 rounded-full"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
+              {/* 1. Register Item */}
+              <button
+                onClick={() => handleActionSelect('/items/new')}
+                className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-primary-50/60 rounded-2xl border border-gray-200 transition-all text-left group min-h-[52px]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                    <Package className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900 group-hover:text-primary-700">
+                      Register an Item
+                    </h4>
+                    <p className="text-xs text-gray-500">Add an item to your digital garage</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              {/* 2. Request Repair */}
+              <button
+                onClick={() => handleActionSelect('/repair-requests/new')}
+                className="w-full flex items-center justify-between p-3.5 bg-gradient-to-r from-primary-50 to-emerald-50 hover:from-primary-100 hover:to-emerald-100 rounded-2xl border border-primary-200 transition-all text-left group min-h-[52px]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center font-bold shadow-md shadow-primary-600/20">
+                    <Wrench className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900 group-hover:text-primary-800">
+                      Request a Repair
+                    </h4>
+                    <p className="text-xs text-primary-700">AI diagnostics & competitive technician quotes</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-primary-600 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+
+              {/* 3. Donate Item */}
+              <button
+                onClick={() => handleActionSelect('/donations/new')}
+                className="w-full flex items-center justify-between p-3.5 bg-gray-50 hover:bg-amber-50/60 rounded-2xl border border-gray-200 transition-all text-left group min-h-[52px]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                    <Heart className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-900 group-hover:text-amber-800">
+                      Donate an Item
+                    </h4>
+                    <p className="text-xs text-gray-500">Give unused items to local organizations</p>
+                  </div>
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Persistent Bottom Bar */}
+      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-lg border-t border-gray-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-center justify-around h-16 px-2">
+          {tabs.map((tab, idx) => {
+            const Icon = tab.icon;
+
+            // Center elevated Action button for Owner
+            if (tab.isPrimaryAction) {
+              return (
+                <button
+                  key="primary-add-button"
+                  type="button"
+                  onClick={() => setShowAddActionSheet(true)}
+                  className="relative -top-3 flex flex-col items-center group active:scale-95 transition-transform min-w-[56px] min-h-[56px] justify-center"
+                  aria-label="Add new item, repair, or donation"
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/30 border-2 border-white">
+                    <Plus className="w-6 h-6 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[10px] font-bold text-primary-700 mt-0.5">
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            }
+
+            const isActive =
+              location.pathname === tab.path ||
+              (tab.path !== '/dashboard' &&
+                tab.path !== '/' &&
+                location.pathname.startsWith(tab.path));
+
             return (
               <Link
-                key={tab.path}
+                key={tab.path || idx}
                 to={tab.path}
-                className="relative -top-3 flex flex-col items-center group active:scale-95 transition-transform"
-                title="New Request"
+                className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all relative min-h-[44px] min-w-[44px] ${
+                  isActive
+                    ? 'text-primary-600 font-semibold'
+                    : 'text-gray-500 hover:text-gray-800'
+                } active:scale-95`}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-primary-600 to-emerald-400 text-white flex items-center justify-center shadow-lg shadow-primary-500/30 border-2 border-white">
-                  <Plus className="w-6 h-6 stroke-[2.5]" />
+                <div className="relative">
+                  {tab.label === 'Profile' && user?.profileImage?.url ? (
+                    <div
+                      className={`w-6 h-6 rounded-full overflow-hidden border ${
+                        isActive ? 'border-primary-600 ring-2 ring-primary-600/30' : 'border-gray-300'
+                      }`}
+                    >
+                      <img
+                        src={user.profileImage.url}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <Icon
+                      className={`w-5 h-5 transition-transform ${
+                        isActive ? 'scale-110 text-primary-600 stroke-[2.2]' : ''
+                      }`}
+                    />
+                  )}
+                  {tab.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 bg-danger-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border border-white shadow-sm">
+                      {tab.badge > 99 ? '99+' : tab.badge}
+                    </span>
+                  )}
                 </div>
-                <span className="text-[10px] font-bold text-primary-700 mt-0.5">
+                <span
+                  className={`text-[10px] mt-1 tracking-tight ${
+                    isActive ? 'text-primary-700 font-bold' : 'text-gray-500'
+                  }`}
+                >
                   {tab.label}
                 </span>
+                {isActive && (
+                  <div className="w-1 h-1 bg-primary-600 rounded-full mt-0.5 animate-pulse" />
+                )}
               </Link>
             );
-          }
-
-          return (
-            <Link
-              key={tab.path}
-              to={tab.path}
-              className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all relative ${
-                isActive
-                  ? 'text-primary-600 font-semibold'
-                  : 'text-gray-500 hover:text-gray-800'
-              } active:scale-95`}
-            >
-              <div className="relative">
-                {tab.label === 'Profile' && user?.profileImage?.url ? (
-                  <div
-                    className={`w-6 h-6 rounded-full overflow-hidden border ${
-                      isActive ? 'border-primary-600 ring-2 ring-primary-600/30' : 'border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={user.profileImage.url}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <Icon
-                    className={`w-5 h-5 transition-transform ${
-                      isActive ? 'scale-110 text-primary-600 stroke-[2.2]' : ''
-                    }`}
-                  />
-                )}
-                {tab.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 bg-danger-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border border-white shadow-sm">
-                    {tab.badge > 99 ? '99+' : tab.badge}
-                  </span>
-                )}
-              </div>
-              <span
-                className={`text-[10px] mt-1 tracking-tight ${
-                  isActive ? 'text-primary-700 font-bold' : 'text-gray-500'
-                }`}
-              >
-                {tab.label}
-              </span>
-              {isActive && (
-                <div className="w-1 h-1 bg-primary-600 rounded-full mt-0.5 animate-pulse" />
-              )}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+          })}
+        </div>
+      </nav>
+    </>
   );
 }

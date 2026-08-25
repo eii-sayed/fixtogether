@@ -33,6 +33,15 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
     },
+    link: {
+      type: String,
+      default: '',
+    },
+    deduplicationKey: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     read: {
       type: Boolean,
       default: false,

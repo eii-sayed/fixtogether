@@ -17,7 +17,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor - handle token refresh
+// Response interceptor - handle token refresh and 429
 let isRefreshing = false;
 let failedQueue = [];
 
@@ -33,6 +33,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Handle 429 Rate Limit — surface error without retry or logout
+    if (error.response?.status === 429) {
+      const retryAfter = error.response?.data?.retryAfter || error.response?.headers?.['retry-after'];
+      const rateLimitError = new Error(
+        error.response?.data?.message || 'Too many requests. Please wait and try again.'
+      );
+      rateLimitError.code = 'RATE_LIMIT_EXCEEDED';
+      rateLimitError.retryAfter = retryAfter;
+      rateLimitError.response = error.response;
+      return Promise.reject(rateLimitError);
+    }
 
     if (error.response?.status === 401 && error.response?.data?.code === 'TOKEN_EXPIRED' && !originalRequest._retry) {
       if (isRefreshing) {

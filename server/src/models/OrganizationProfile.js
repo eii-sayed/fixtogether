@@ -1,5 +1,31 @@
 const mongoose = require('mongoose');
-const { ORGANIZATION_TYPES, VERIFICATION_STATUS } = require('../constants');
+const { ORGANIZATION_TYPES, VERIFICATION_STATUS, HUB_STATUS } = require('../constants');
+
+const collectionHubSchema = new mongoose.Schema({
+  name: { type: String, trim: true, required: true },
+  address: { type: String, trim: true, default: '' },
+  city: { type: String, trim: true, default: '' },
+  phone: { type: String, trim: true, default: '' },
+  coordinates: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: [0, 0] },
+  },
+  operatingHours: { type: String, trim: true, default: 'Mon-Fri 09:00 - 17:00' },
+  instructions: { type: String, trim: true, default: '' },
+  acceptedCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ItemCategory' }],
+  maximumItemSize: { type: String, enum: ['small', 'medium', 'large', 'bulk'], default: 'medium' },
+  accessibility: { type: String, default: 'Wheelchair accessible' },
+  capacityLimit: { type: Number, default: 50 },
+  currentTaskCount: { type: Number, default: 0 },
+  status: {
+    type: String,
+    enum: Object.values(HUB_STATUS),
+    default: HUB_STATUS.ACTIVE,
+  },
+  specialHandlingRules: { type: String, default: '' },
+  pickupSupported: { type: Boolean, default: false },
+  dropoffSupported: { type: Boolean, default: true },
+});
 
 const organizationProfileSchema = new mongoose.Schema(
   {
@@ -36,6 +62,8 @@ const organizationProfileSchema = new mongoose.Schema(
       registrationNumber: { type: String, default: '' },
       registeredAt: { type: String, default: '' },
       website: { type: String, default: '' },
+      taxId: { type: String, default: '' },
+      authorizedRepresentative: { type: String, default: '' },
     },
     verificationDocuments: [
       {
@@ -105,17 +133,7 @@ const organizationProfileSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    locations: [
-      {
-        name: { type: String, trim: true, required: true },
-        address: { type: String, trim: true, default: '' },
-        city: { type: String, trim: true, default: '' },
-        phone: { type: String, trim: true, default: '' },
-        operatingHours: { type: String, trim: true, default: '' },
-        pickupSupported: { type: Boolean, default: false },
-        dropoffSupported: { type: Boolean, default: true },
-      },
-    ],
+    locations: [collectionHubSchema],
     operatingHours: {
       monday: { start: String, end: String, available: { type: Boolean, default: true } },
       tuesday: { start: String, end: String, available: { type: Boolean, default: true } },
@@ -125,6 +143,18 @@ const organizationProfileSchema = new mongoose.Schema(
       saturday: { start: String, end: String, available: { type: Boolean, default: false } },
       sunday: { start: String, end: String, available: { type: Boolean, default: false } },
     },
+    dataPolicy: {
+      certifiedDataDestruction: { type: Boolean, default: false },
+      erasureMethod: { type: String, default: 'NIST 800-88 Compliant' },
+      policyDocUrl: { type: String, default: '' },
+    },
+    recyclingPartners: [
+      {
+        name: { type: String },
+        certificateUrl: { type: String },
+        validUntil: { type: Date },
+      },
+    ],
     activeStatus: {
       type: Boolean,
       default: true,
@@ -133,6 +163,8 @@ const organizationProfileSchema = new mongoose.Schema(
       totalDonationsReceived: { type: Number, default: 0 },
       totalItemsProcessed: { type: Number, default: 0 },
       totalWeightProcessed: { type: Number, default: 0 },
+      totalWasteAvoided: { type: Number, default: 0 },
+      totalBeneficiariesServed: { type: Number, default: 0 },
     },
   },
   { timestamps: true }

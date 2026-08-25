@@ -1,14 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const rjController = require('../controllers/repairJobController');
+const orgController = require('../controllers/organizationController');
 const { authenticate } = require('../middleware/auth');
+const { authorize } = require('../middleware/authorize');
+const { ROLES } = require('../constants');
 
 // Inspections
 router.post('/:id/owner-decision', authenticate, rjController.ownerInspectionDecision);
-
-// Donations
-router.post('/', authenticate, rjController.createDonation);
-router.get('/', authenticate, rjController.getDonations);
 
 // Parts
 const partsRouter = express.Router();
@@ -45,19 +44,76 @@ notificationRouter.get('/', authenticate, rjController.getNotifications);
 notificationRouter.patch('/:id/read', authenticate, rjController.markNotificationRead);
 notificationRouter.patch('/read-all', authenticate, rjController.markAllNotificationsRead);
 
+// Donation Operations Router
+const donationRouter = express.Router();
+
+// Community Needs
+donationRouter.get('/needs', authenticate, orgController.getCommunityNeeds);
+donationRouter.post(
+  '/needs',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.createCommunityNeed
+);
+donationRouter.patch(
+  '/needs/:id',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.updateCommunityNeedStatus
+);
+
+// Donation Offers & Operations
+donationRouter.get('/offers', authenticate, orgController.getDonationOffers);
+donationRouter.get(
+  '/offers/:id/match-explanation',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.getOfferMatchExplanation
+);
+donationRouter.post(
+  '/offers/:id/decision',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.decideDonationOffer
+);
+donationRouter.post(
+  '/offers/:id/schedule-handover',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.scheduleDonationHandover
+);
+donationRouter.post(
+  '/offers/:id/confirm-receipt',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.confirmDonationReceipt
+);
+donationRouter.post(
+  '/offers/:id/inspect',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.submitDonationInspection
+);
+donationRouter.post(
+  '/offers/:id/process-outcome',
+  authenticate,
+  authorize(ROLES.ORGANIZATION, ROLES.ADMIN),
+  orgController.recordProcessingOutcome
+);
+
+// Legacy compatibility routes
+donationRouter.post('/', authenticate, rjController.createDonation);
+donationRouter.get('/', authenticate, orgController.getDonationOffers);
+donationRouter.get('/:id', authenticate, rjController.getDonationById);
+donationRouter.get('/:id/matches', authenticate, rjController.getDonationMatches);
+donationRouter.post('/:id/accept', authenticate, orgController.decideDonationOffer);
+donationRouter.post('/:id/reject', authenticate, orgController.decideDonationOffer);
+donationRouter.post('/:id/schedule', authenticate, orgController.scheduleDonationHandover);
+donationRouter.post('/:id/confirm-handover', authenticate, rjController.confirmHandover);
+
 module.exports = {
   inspectionRoutes: router,
-  donationRoutes: (() => { const r = express.Router();
-    r.post('/', authenticate, rjController.createDonation);
-    r.get('/', authenticate, rjController.getDonations);
-    r.get('/:id', authenticate, rjController.getDonationById);
-    r.get('/:id/matches', authenticate, rjController.getDonationMatches);
-    r.post('/:id/accept', authenticate, rjController.acceptDonation);
-    r.post('/:id/reject', authenticate, rjController.rejectDonation);
-    r.post('/:id/schedule', authenticate, rjController.scheduleDonationPickup);
-    r.post('/:id/confirm-handover', authenticate, rjController.confirmHandover);
-    return r;
-  })(),
+  donationRoutes: donationRouter,
   partsRoutes: partsRouter,
   warrantyRoutes: warrantyRouter,
   warrantyClaimsRoutes: warrantyClaimsRouter,

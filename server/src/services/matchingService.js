@@ -274,7 +274,7 @@ function generateExplanation(scores, tech) {
   else if (scores.skill >= 40) parts.push('Relevant skills');
 
   if (scores.distance >= 70) parts.push('Nearby location');
-  if (scores.rating >= 80) parts.push(`Highly rated (${tech.averageRating.toFixed(1)}/5)`);
+  if (scores.rating >= 80 && tech.averageRating) parts.push(`Highly rated (${tech.averageRating.toFixed(1)}/5)`);
   if (scores.experience >= 70) parts.push('Experienced');
   if (scores.completion >= 70) parts.push('Reliable track record');
 
@@ -301,6 +301,7 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
  * Save match results to database
  */
 const saveMatches = async (repairRequestId, matches) => {
+  const { TechnicianMatch } = require('../models');
   const matchDocs = matches.map((m) => ({
     repairRequest: repairRequestId,
     technician: m.technician,
@@ -322,9 +323,99 @@ const saveMatches = async (repairRequestId, matches) => {
   return TechnicianMatch.insertMany(matchDocs);
 };
 
+/**
+ * Generate structured breakdown for why a technician matches a request
+ */
+function getMatchDetailsForTechnician(repairRequest, tech) {
+  const scores = {};
+  scores.skill = calculateSkillScore(tech, repairRequest);
+  scores.distance = calculateDistanceScore(tech, repairRequest);
+  scores.availability = calculateAvailabilityScore(tech, repairRequest);
+  scores.rating = calculateRatingScore(tech);
+  scores.experience = calculateExperienceScore(tech);
+  scores.completion = calculateCompletionScore(tech);
+
+  const totalScore = Math.round(
+    (scores.skill * DEFAULT_WEIGHTS.skill +
+      scores.distance * DEFAULT_WEIGHTS.distance +
+      scores.availability * DEFAULT_WEIGHTS.availability +
+      scores.rating * DEFAULT_WEIGHTS.rating +
+      scores.experience * DEFAULT_WEIGHTS.experience +
+      scores.completion * DEFAULT_WEIGHTS.completion) / 100
+  );
+
+  const breakdown = [
+    {
+      factor: 'category_and_skills',
+      label: 'Category & Skills Match',
+      score: Math.round(scores.skill),
+      maxScore: 100,
+      match: scores.skill >= 50,
+      description: scores.skill >= 70 ? 'Strong match for this category & required skills' : scores.skill >= 40 ? 'Basic skill match' : 'Category or required skills not in your profile',
+    },
+    {
+      factor: 'distance',
+      label: 'Service Radius & Location',
+      score: Math.round(scores.distance),
+      maxScore: 100,
+      match: scores.distance >= 40,
+      description: scores.distance >= 70 ? 'Within your immediate service radius' : scores.distance >= 40 ? 'Moderate travel distance' : 'Outside preferred service radius',
+    },
+    {
+      factor: 'availability',
+      label: 'Schedule & Availability',
+      score: Math.round(scores.availability),
+      maxScore: 100,
+      match: scores.availability >= 50,
+      description: tech.vacationMode ? 'Currently on vacation' : scores.availability >= 70 ? 'Available for work today / this week' : 'Limited availability in schedule',
+    },
+    {
+      factor: 'reputation',
+      label: 'Reviews & Rating',
+      score: Math.round(scores.rating),
+      maxScore: 100,
+      match: scores.rating >= 60,
+      description: tech.reviewCount > 0 ? `${tech.averageRating.toFixed(1)}/5 average rating across ${tech.reviewCount} reviews` : 'New profile (no ratings yet)',
+    },
+    {
+      factor: 'reliability',
+      label: 'Experience & Completion Rate',
+      score: Math.round(scores.completion),
+      maxScore: 100,
+      match: scores.completion >= 50,
+      description: `${tech.completedRepairCount || 0} completed repairs (${tech.completionRate || 100}% completion rate)`,
+    },
+  ];
+
+  const improvementTips = [];
+  if (scores.skill < 50) {
+    improvementTips.push('Add this item category to your Supported Categories in Profile.');
+  }
+  if (scores.distance === 50 && (!tech.serviceArea?.coordinates || tech.serviceArea.coordinates[0] === 0)) {
+    improvementTips.push('Set your workshop or service area coordinates to calculate accurate distances.');
+  }
+  if (!tech.workingHours || scores.availability < 50) {
+    improvementTips.push('Update your weekly Working Hours to receive priority job matches.');
+  }
+  if (tech.verificationStatus !== VERIFICATION_STATUS.APPROVED) {
+    improvementTips.push('Submit your certification documents to verify your profile and qualify for high-priority jobs.');
+  }
+
+  const explanation = generateExplanation(scores, tech);
+
+  return {
+    totalScore,
+    breakdown,
+    improvementTips,
+    explanation,
+    scores,
+  };
+}
+
 module.exports = {
   matchTechnicians,
   saveMatches,
+  getMatchDetailsForTechnician,
   DEFAULT_WEIGHTS,
   calculateHaversineDistance,
 };

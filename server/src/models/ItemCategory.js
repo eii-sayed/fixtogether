@@ -63,6 +63,23 @@ const itemCategorySchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    inspectionChecklist: [
+      {
+        key: { type: String, required: true },
+        label: { type: String, required: true },
+        required: { type: Boolean, default: false },
+      },
+    ],
+    requiredSkills: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Skill',
+      },
+    ],
+    version: {
+      type: Number,
+      default: 1,
+    },
   },
   { timestamps: true }
 );

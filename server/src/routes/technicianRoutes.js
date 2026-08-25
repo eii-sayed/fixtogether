@@ -19,6 +19,18 @@ router.get('/:id/reviews', require('../controllers/repairJobController').getTech
 
 // Authenticated private technician routes
 router.get(
+  '/me/workspace',
+  authenticate,
+  authorize(ROLES.TECHNICIAN),
+  techController.getMyTechnicianWorkspace
+);
+router.get(
+  '/requests/:requestId/match-details',
+  authenticate,
+  authorize(ROLES.TECHNICIAN),
+  techController.getRepairRequestMatchDetails
+);
+router.get(
   '/me/profile',
   authenticate,
   authorize(ROLES.TECHNICIAN),
@@ -35,7 +47,6 @@ router.patch(
   '/me/availability',
   authenticate,
   authorize(ROLES.TECHNICIAN),
-  validate(updateTechnicianAvailabilitySchema),
   techController.updateAvailability
 );
 

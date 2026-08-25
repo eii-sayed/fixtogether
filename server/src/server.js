@@ -5,6 +5,7 @@ const config = require('./config');
 const connectDB = require('./config/database');
 const logger = require('./utils/logger');
 const { setSocketIO } = require('./services/notificationService');
+const { startOutboxWorker, stopOutboxWorker } = require('./services/outboxService');
 
 const startServer = async () => {
   // Connect to database
@@ -22,8 +23,12 @@ const startServer = async () => {
     },
   });
 
-  // Register Socket.IO with notification service
+  // Register Socket.IO globally and with notification service
+  global.io = io;
   setSocketIO(io);
+
+  // Start background outbox processor
+  startOutboxWorker(5000);
 
   // Socket.IO authentication middleware
   io.use((socket, next) => {
@@ -129,6 +134,7 @@ const startServer = async () => {
   // Graceful shutdown
   const shutdown = async (signal) => {
     logger.info(`${signal} received. Shutting down gracefully...`);
+    stopOutboxWorker();
     server.close(() => {
       logger.info('HTTP server closed');
       process.exit(0);

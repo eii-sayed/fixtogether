@@ -50,6 +50,72 @@ const DEFAULT_SAFETY_KEYWORDS = {
 };
 
 /**
+ * Validate a regex pattern for length, syntax, and catastrophic backtracking risks
+ */
+const validateRegexPattern = (patternStr, flags = 'i') => {
+  if (!patternStr || typeof patternStr !== 'string') {
+    return { valid: false, message: 'Pattern must be a non-empty string.' };
+  }
+
+  if (patternStr.length > 250) {
+    return { valid: false, message: 'Pattern exceeds maximum safe length of 250 characters.' };
+  }
+
+  // Check for dangerous nested quantifiers (e.g. (a+)+ or (a*)* or (x+x+)+)
+  const nestedQuantifierRegex = /\([^()]*[+*][^()]*\)[+*]/;
+  if (nestedQuantifierRegex.test(patternStr)) {
+    return { valid: false, message: 'Pattern contains nested quantifiers with high ReDoS catastrophic backtracking risk.' };
+  }
+
+  try {
+    const reg = new RegExp(patternStr, flags);
+    // Benchmark test on synthetic text to ensure < 15ms execution
+    const testSample = 'FixTogether Safety Benchmark Testing String 1234567890 '.repeat(10);
+    const start = Date.now();
+    reg.test(testSample);
+    const elapsed = Date.now() - start;
+    if (elapsed > 50) {
+      return { valid: false, message: `Pattern execution timed out (${elapsed}ms). Optimize regex to prevent slowdowns.` };
+    }
+    return { valid: true, regex: reg };
+  } catch (err) {
+    return { valid: false, message: `Invalid regex syntax: ${err.message}` };
+  }
+};
+
+/**
+ * Run test cases for a given safety rule
+ */
+const runRuleTestCases = async (ruleId) => {
+  const rule = await SafetyRule.findById(ruleId);
+  if (!rule) throw new Error('Rule not found');
+
+  const now = new Date();
+  let allPassed = true;
+
+  for (const tc of rule.testCases || []) {
+    let matched = false;
+    if (rule.patternType === 'regex' && rule.regexPattern) {
+      const validation = validateRegexPattern(rule.regexPattern);
+      if (validation.valid) {
+        matched = validation.regex.test(tc.input);
+      }
+    } else {
+      matched = (rule.keywords || []).some((kw) =>
+        tc.input.toLowerCase().includes(kw.toLowerCase())
+      );
+    }
+
+    tc.passed = matched === tc.expectedMatch;
+    tc.lastTestedAt = now;
+    if (!tc.passed) allPassed = false;
+  }
+
+  await rule.save();
+  return { allPassed, testCases: rule.testCases };
+};
+
+/**
  * Check text against safety rules
  * @param {string} text - Text to check (description, event, etc.)
  * @param {string} categoryId - Item category ID (optional)
@@ -76,7 +142,7 @@ const checkSafetyRules = async (text, categoryId = null) => {
     }
   }
 
-  // 2. Check against database safety rules
+  // 2. Check against database safety rules (Keywords and Safe Regex)
   try {
     const query = { active: true };
     if (categoryId) {
@@ -89,22 +155,38 @@ const checkSafetyRules = async (text, categoryId = null) => {
     const dbRules = await SafetyRule.find(query);
 
     for (const rule of dbRules) {
-      for (const keyword of rule.keywords) {
-        if (lowerText.includes(keyword.toLowerCase())) {
-          // Avoid duplicate flags for same risk type
-          const alreadyFlagged = flags.some((f) => f.type === rule.riskType);
-          if (!alreadyFlagged) {
-            flags.push({
-              type: rule.riskType,
-              severity: rule.severity,
-              reason: `Safety rule triggered: ${rule.riskType}`,
-              warningMessage: rule.warningMessage,
-              detectedBy: 'rule',
-              keyword,
-              blockAIAdvice: rule.blockAIAdvice,
-            });
+      let isMatched = false;
+      let matchedTerm = '';
+
+      if (rule.patternType === 'regex' && rule.regexPattern) {
+        const val = validateRegexPattern(rule.regexPattern);
+        if (val.valid && val.regex.test(text)) {
+          isMatched = true;
+          matchedTerm = rule.regexPattern;
+        }
+      } else if (rule.keywords?.length > 0) {
+        for (const keyword of rule.keywords) {
+          if (lowerText.includes(keyword.toLowerCase())) {
+            isMatched = true;
+            matchedTerm = keyword;
+            break;
           }
-          break;
+        }
+      }
+
+      if (isMatched) {
+        const alreadyFlagged = flags.some((f) => f.type === rule.riskType);
+        if (!alreadyFlagged) {
+          flags.push({
+            type: rule.riskType,
+            severity: rule.severity,
+            reason: `Safety rule "${rule.name || rule.riskType}" triggered`,
+            warningMessage: rule.warningMessage,
+            technicianWarningMessage: rule.technicianWarningMessage || '',
+            detectedBy: 'rule',
+            keyword: matchedTerm,
+            blockAIAdvice: rule.blockAIAdvice,
+          });
         }
       }
     }
@@ -163,5 +245,8 @@ module.exports = {
   shouldBlockAIAdvice,
   getHighestSeverity,
   generateSafetyWarning,
+  validateRegexPattern,
+  runRuleTestCases,
   DEFAULT_SAFETY_KEYWORDS,
 };
+

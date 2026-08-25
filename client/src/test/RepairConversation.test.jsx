@@ -70,6 +70,7 @@ describe('RepairConversation Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },

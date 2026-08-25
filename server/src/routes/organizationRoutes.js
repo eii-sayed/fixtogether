@@ -14,6 +14,12 @@ router.get('/:id', orgController.getOrganizationById);
 
 // Authenticated organization private routes
 router.get(
+  '/me/workspace',
+  authenticate,
+  authorize(ROLES.ORGANIZATION),
+  orgController.getMyWorkspace
+);
+router.get(
   '/me/profile',
   authenticate,
   authorize(ROLES.ORGANIZATION),
@@ -32,6 +38,34 @@ router.post(
   authorize(ROLES.ORGANIZATION),
   uploadMultipleImages('documents', 5),
   orgController.submitOrgVerification
+);
+
+// Collection Hubs
+router.get(
+  '/me/hubs',
+  authenticate,
+  authorize(ROLES.ORGANIZATION),
+  orgController.getCollectionHubs
+);
+router.post(
+  '/me/hubs',
+  authenticate,
+  authorize(ROLES.ORGANIZATION),
+  orgController.createCollectionHub
+);
+router.patch(
+  '/me/hubs/:hubId/status',
+  authenticate,
+  authorize(ROLES.ORGANIZATION),
+  orgController.updateHubStatus
+);
+
+// Impact Ledger
+router.get(
+  '/me/impact',
+  authenticate,
+  authorize(ROLES.ORGANIZATION),
+  orgController.getOrganizationImpact
 );
 
 module.exports = router;

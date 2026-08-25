@@ -7,15 +7,19 @@ const createQuotation = asyncHandler(async (req, res) => {
   const request = await RepairRequest.findById(req.params.id);
   if (!request) return errorResponse(res, 'Repair request not found.', 404);
 
-  // Check technician is invited or matched
-  const isInvited = request.selectedTechnicians.some(
+  // Check technician is invited or matched or listing is published
+  const isInvited = request.selectedTechnicians?.some(
     (t) => t.technician.toString() === req.user.userId.toString() && t.status !== 'declined'
   );
-  const isPublished = [REPAIR_REQUEST_STATUS.PUBLISHED, REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
-    REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED, REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS].includes(request.requestStatus);
+  const isPublished = [
+    REPAIR_REQUEST_STATUS.PUBLISHED,
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+    REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+  ].includes(request.requestStatus);
 
   if (!isInvited && !isPublished) {
-    return errorResponse(res, 'You are not authorized to submit a quotation.', 403);
+    return errorResponse(res, 'You are not authorized to submit a quotation for this request.', 403);
   }
 
   // Check for existing active quotation from this technician
@@ -24,37 +28,76 @@ const createQuotation = asyncHandler(async (req, res) => {
     technician: req.user.userId,
     status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED] },
   });
-  if (existing) return errorResponse(res, 'You already have an active quotation.', 409);
+  if (existing) return errorResponse(res, 'You already have an active quotation for this repair request.', 409);
+
+  // Trusted backend financial calculation & validation
+  const inspectionFee = Math.max(0, Number(req.body.inspectionFee) || 0);
+  const laborCostMinimum = Math.max(0, Number(req.body.laborCostMinimum) || 0);
+  const laborCostMaximum = Math.max(laborCostMinimum, Number(req.body.laborCostMaximum) || laborCostMinimum);
+  const partsEstimate = Math.max(0, Number(req.body.partsEstimate) || 0);
+  const transportFee = Math.max(0, Number(req.body.transportFee) || 0);
+  const otherCosts = Math.max(0, Number(req.body.otherCosts) || 0);
+  const estimatedTotalMinimum = inspectionFee + laborCostMinimum + partsEstimate + transportFee + otherCosts;
+  const estimatedTotalMaximum = inspectionFee + laborCostMaximum + partsEstimate + transportFee + otherCosts;
+
+  let budgetWarning = null;
+  if (request.budget?.maximum && estimatedTotalMaximum > request.budget.maximum) {
+    budgetWarning = `Quotation total (৳${estimatedTotalMaximum}) exceeds owner's stated budget ceiling of ৳${request.budget.maximum}.`;
+  }
 
   const quotation = await Quotation.create({
     repairRequest: req.params.id,
     technician: req.user.userId,
     ...req.body,
+    inspectionFee,
+    laborCostMinimum,
+    laborCostMaximum,
+    partsEstimate,
+    transportFee,
+    otherCosts,
+    estimatedTotalMinimum,
+    estimatedTotalMaximum,
     status: QUOTATION_STATUS.SUBMITTED,
   });
 
-  // Update request status
-  if (request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS ||
-      request.requestStatus === REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS ||
-      request.requestStatus === REPAIR_REQUEST_STATUS.PUBLISHED) {
-    request.requestStatus = REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED;
+  // Update request status via state transition service if appropriate
+  if (
+    request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS ||
+    request.requestStatus === REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS ||
+    request.requestStatus === REPAIR_REQUEST_STATUS.PUBLISHED
+  ) {
+    const { transitionRepairRequest } = require('../services/stateTransitionService');
+    await transitionRepairRequest(request._id, REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED, req.user, {
+      reason: 'First quotation received from technician',
+      req,
+    });
+  }
+
+  // Update invitation status if technician was invited
+  const inv = request.selectedTechnicians?.find(
+    (t) => t.technician.toString() === req.user.userId.toString()
+  );
+  if (inv) {
+    inv.status = 'accepted';
+    inv.respondedAt = new Date();
     await request.save();
   }
 
-  // Update invitation status
-  const inv = request.selectedTechnicians.find(
-    (t) => t.technician.toString() === req.user.userId.toString()
-  );
-  if (inv) { inv.status = 'accepted'; inv.respondedAt = new Date(); await request.save(); }
-
   await createNotification({
-    userId: request.owner.toString(), type: NOTIFICATION_TYPES.QUOTATION_SUBMITTED,
+    userId: request.owner.toString(),
+    type: NOTIFICATION_TYPES.QUOTATION_SUBMITTED,
     title: 'New Quotation Received',
-    message: `A technician has submitted a quotation for your repair request.`,
-    relatedEntityType: 'Quotation', relatedEntityId: quotation._id,
+    message: `A technician has submitted a quotation (৳${estimatedTotalMinimum} - ৳${estimatedTotalMaximum}) for your repair request.`,
+    relatedEntityType: 'Quotation',
+    relatedEntityId: quotation._id,
   });
 
-  return successResponse(res, { quotation }, 'Quotation submitted', 201);
+  return successResponse(
+    res,
+    { quotation, budgetWarning },
+    'Quotation submitted successfully',
+    201
+  );
 });
 
 const getQuotationsForRequest = asyncHandler(async (req, res) => {
@@ -127,15 +170,22 @@ const acceptQuotation = asyncHandler(async (req, res) => {
   if (!request) return errorResponse(res, 'Request not found.', 404);
   if (request.owner.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
 
-  if (request.selectedQuotation) return errorResponse(res, 'A quotation has already been accepted.', 400);
+  // Idempotency: if this exact quotation is already accepted, return success
+  if (request.selectedQuotation?.toString() === quotation._id.toString()) {
+    return successResponse(res, { quotation }, 'Quotation already accepted');
+  }
+
+  if (request.selectedQuotation) {
+    return errorResponse(res, 'A different quotation has already been accepted.', 409);
+  }
 
   quotation.status = QUOTATION_STATUS.ACCEPTED;
   quotation.ownerDecisionAt = new Date();
   await quotation.save();
 
-  // Mark other quotations as not selected
+  // Mark competing quotations as not selected
   await Quotation.updateMany(
-    { repairRequest: request._id, _id: { $ne: quotation._id }, status: QUOTATION_STATUS.SUBMITTED },
+    { repairRequest: request._id, _id: { $ne: quotation._id }, status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED] } },
     { status: QUOTATION_STATUS.NOT_SELECTED, ownerDecisionAt: new Date() }
   );
 
@@ -143,19 +193,27 @@ const acceptQuotation = asyncHandler(async (req, res) => {
   request.requestStatus = REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED;
   await request.save();
 
-  // Create repair job
-  await RepairJob.create({
-    repairRequest: request._id, owner: request.owner,
-    technician: quotation.technician, acceptedQuotation: quotation._id,
-  });
+  // Create repair job if not already created
+  let repairJob = await RepairJob.findOne({ repairRequest: request._id });
+  if (!repairJob) {
+    repairJob = await RepairJob.create({
+      repairRequest: request._id,
+      owner: request.owner,
+      technician: quotation.technician,
+      acceptedQuotation: quotation._id,
+    });
+  }
 
   await createNotification({
-    userId: quotation.technician.toString(), type: NOTIFICATION_TYPES.QUOTATION_ACCEPTED,
-    title: 'Quotation Accepted', message: 'Your quotation has been accepted!',
-    relatedEntityType: 'Quotation', relatedEntityId: quotation._id,
+    userId: quotation.technician.toString(),
+    type: NOTIFICATION_TYPES.QUOTATION_ACCEPTED,
+    title: 'Quotation Accepted',
+    message: 'Your quotation has been accepted by the owner!',
+    relatedEntityType: 'Quotation',
+    relatedEntityId: quotation._id,
   });
 
-  return successResponse(res, { quotation }, 'Quotation accepted');
+  return successResponse(res, { quotation, repairJob }, 'Quotation accepted');
 });
 
 const rejectQuotation = asyncHandler(async (req, res) => {

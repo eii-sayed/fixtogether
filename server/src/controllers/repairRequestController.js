@@ -1,11 +1,33 @@
-const { RepairRequest, Item, AIAnalysis, TechnicianMatch, ItemCategory } = require('../models');
-const { REPAIR_REQUEST_STATUS, REPAIR_STATUS_TRANSITIONS, NOTIFICATION_TYPES } = require('../constants');
+const { RepairRequest, Item, AIAnalysis, TechnicianMatch, ItemCategory, User, Notification, TechnicianProfile } = require('../models');
+const { REPAIR_REQUEST_STATUS, REPAIR_STATUS_TRANSITIONS, NOTIFICATION_TYPES, ROLES } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta } = require('../utils/helpers');
 const aiService = require('../services/ai');
 const safetyService = require('../services/safetyService');
 const matchingService = require('../services/matchingService');
-const { createNotification } = require('../services/notificationService');
+const { createNotification, createBulkNotifications, getIO } = require('../services/notificationService');
 const logger = require('../utils/logger');
+
+/**
+ * Statuses that are visible to technicians on the browse wall.
+ * Drafts and internal review states are NEVER exposed to technicians.
+ */
+const TECHNICIAN_VISIBLE_STATUSES = [
+  REPAIR_REQUEST_STATUS.PUBLISHED,
+  REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+  REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+  REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+  REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED,
+  REPAIR_REQUEST_STATUS.APPOINTMENT_SCHEDULED,
+  REPAIR_REQUEST_STATUS.UNDER_INSPECTION,
+  REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL,
+  REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+  REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+  REPAIR_REQUEST_STATUS.QUALITY_CHECK,
+  REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION,
+  REPAIR_REQUEST_STATUS.COMPLETED,
+  REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
+  REPAIR_REQUEST_STATUS.CANCELLED,
+];
 
 /**
  * Validate status transition
@@ -45,42 +67,307 @@ const createRepairRequest = asyncHandler(async (req, res) => {
 
 /**
  * GET /repair-requests
+ *
+ * Role-based filtering enforced server-side:
+ * - Owner: sees only their own requests (including drafts)
+ * - Technician: sees published/discoverable requests + ones they're assigned to; NEVER drafts
+ * - Admin: sees all requests across all statuses
+ */
+/**
+ * GET /repair-requests
+ *
+ * Role-based filtering enforced server-side:
+ * - Owner tabs: Action Required, Active, Drafts, Completed, Cancelled
+ * - Technician tabs: Available, Invited, Quoted, Assigned, In Progress, Completed (NEVER drafts)
+ * - Admin tabs: All, Recently Published, Flagged, Unassigned, In Progress, Disputed, Completed
  */
 const getRepairRequests = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const { status, search } = req.query;
+  const { status, tab, search } = req.query;
   const query = {};
 
-  // Scope by role
-  if (req.user.role === 'owner') {
+  if (req.user.role === ROLES.OWNER) {
+    // Owner sees only their own requests
     query.owner = req.user.userId;
-  } else if (req.user.role === 'technician') {
-    // Technicians see published requests or ones they're invited to
-    query.$or = [
-      { requestStatus: REPAIR_REQUEST_STATUS.PUBLISHED },
-      { requestStatus: REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS },
-      { requestStatus: REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED },
-      { 'selectedTechnicians.technician': req.user.userId },
-    ];
-  }
-  // Admin sees all
 
-  if (status) query.requestStatus = status;
+    if (tab) {
+      switch (tab) {
+        case 'action_required':
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.DRAFT,
+              REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW,
+              REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION,
+              REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+              REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL,
+              REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION,
+            ],
+          };
+          break;
+        case 'active':
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.PUBLISHED,
+              REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+              REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+              REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED,
+              REPAIR_REQUEST_STATUS.APPOINTMENT_SCHEDULED,
+              REPAIR_REQUEST_STATUS.UNDER_INSPECTION,
+              REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+              REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+              REPAIR_REQUEST_STATUS.QUALITY_CHECK,
+            ],
+          };
+          break;
+        case 'drafts':
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.DRAFT,
+              REPAIR_REQUEST_STATUS.AWAITING_AI_ANALYSIS,
+              REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW,
+              REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION,
+            ],
+          };
+          break;
+        case 'completed':
+          query.requestStatus = REPAIR_REQUEST_STATUS.COMPLETED;
+          break;
+        case 'cancelled':
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.CANCELLED,
+              REPAIR_REQUEST_STATUS.DISPUTED,
+              REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
+            ],
+          };
+          break;
+        default:
+          break;
+      }
+    } else if (status) {
+      query.requestStatus = status;
+    }
+  } else if (req.user.role === ROLES.TECHNICIAN) {
+    const techUserId = req.user.userId;
+    const { TechnicianProfile, Quotation } = require('../models');
+    const { getMatchDetailsForTechnician } = require('../services/matchingService');
+
+    const techProfile = await TechnicianProfile.findOne({ user: techUserId })
+      .populate('skills')
+      .populate('supportedCategories');
+
+    if (tab) {
+      switch (tab) {
+        case 'recommended': {
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          if (techProfile?.supportedCategories?.length > 0) {
+            // Can match on category in item
+          }
+          break;
+        }
+        case 'nearby': {
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          break;
+        }
+        case 'new':
+        case 'available': {
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.PUBLISHED,
+              REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+              REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+            ],
+          };
+          break;
+        }
+        case 'invited': {
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          query.selectedTechnicians = {
+            $elemMatch: { technician: techUserId, status: 'invited' },
+          };
+          break;
+        }
+        case 'quoted': {
+          const myQuotes = await Quotation.find({ technician: techUserId }).select('repairRequest').lean();
+          const reqIds = myQuotes.map((q) => q.repairRequest);
+          query._id = { $in: reqIds };
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          break;
+        }
+        case 'saved': {
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          break;
+        }
+        case 'assigned': {
+          const acceptedQuotes = await Quotation.find({ technician: techUserId, status: 'accepted' }).select('repairRequest').lean();
+          const reqIds = acceptedQuotes.map((q) => q.repairRequest);
+          query._id = { $in: reqIds };
+          query.requestStatus = { $in: TECHNICIAN_VISIBLE_STATUSES };
+          break;
+        }
+        case 'in_progress': {
+          const acceptedQuotes = await Quotation.find({ technician: techUserId, status: 'accepted' }).select('repairRequest').lean();
+          const reqIds = acceptedQuotes.map((q) => q.repairRequest);
+          query._id = { $in: reqIds };
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.UNDER_INSPECTION,
+              REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL,
+              REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+              REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+              REPAIR_REQUEST_STATUS.QUALITY_CHECK,
+              REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION,
+            ],
+          };
+          break;
+        }
+        case 'completed': {
+          const acceptedQuotes = await Quotation.find({ technician: techUserId, status: 'accepted' }).select('repairRequest').lean();
+          const reqIds = acceptedQuotes.map((q) => q.repairRequest);
+          query._id = { $in: reqIds };
+          query.requestStatus = REPAIR_REQUEST_STATUS.COMPLETED;
+          break;
+        }
+        default:
+          query.$or = [
+            { requestStatus: { $in: TECHNICIAN_VISIBLE_STATUSES } },
+            { 'selectedTechnicians.technician': techUserId },
+          ];
+          break;
+      }
+    } else if (status) {
+      if (status === REPAIR_REQUEST_STATUS.DRAFT) {
+        // Technicians must never see drafts — return empty results immediately
+        return successResponse(res, {
+          repairRequests: [],
+          pagination: paginationMeta(0, page, limit),
+        });
+      }
+      query.$and = [
+        {
+          $or: [
+            { requestStatus: { $in: TECHNICIAN_VISIBLE_STATUSES } },
+            { 'selectedTechnicians.technician': techUserId },
+          ],
+        },
+        { requestStatus: status },
+      ];
+    } else {
+      query.$or = [
+        { requestStatus: { $in: TECHNICIAN_VISIBLE_STATUSES } },
+        { 'selectedTechnicians.technician': techUserId },
+      ];
+    }
+  } else if (req.user.role === ROLES.ADMIN) {
+    if (tab) {
+      switch (tab) {
+        case 'all':
+          break;
+        case 'recently_published':
+          query.requestStatus = REPAIR_REQUEST_STATUS.PUBLISHED;
+          break;
+        case 'flagged':
+          query['safetyFlags.0'] = { $exists: true };
+          break;
+        case 'unassigned':
+          query.selectedQuotation = null;
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.PUBLISHED,
+              REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+              REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+              REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+            ],
+          };
+          break;
+        case 'in_progress':
+          query.requestStatus = {
+            $in: [
+              REPAIR_REQUEST_STATUS.UNDER_INSPECTION,
+              REPAIR_REQUEST_STATUS.AWAITING_OWNER_APPROVAL,
+              REPAIR_REQUEST_STATUS.WAITING_FOR_PARTS,
+              REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS,
+              REPAIR_REQUEST_STATUS.QUALITY_CHECK,
+            ],
+          };
+          break;
+        case 'disputed':
+          query.requestStatus = REPAIR_REQUEST_STATUS.DISPUTED;
+          break;
+        case 'completed':
+          query.requestStatus = REPAIR_REQUEST_STATUS.COMPLETED;
+          break;
+        default:
+          break;
+      }
+    } else if (status) {
+      query.requestStatus = status;
+    }
+  }
+
   if (search) query.$text = { $search: search };
+
+  const sortOption = req.user.role === ROLES.ADMIN && tab === 'recently_published'
+    ? { publishedAt: -1, createdAt: -1 }
+    : { createdAt: -1 };
 
   const [requests, total] = await Promise.all([
     RepairRequest.find(query)
-      .populate('item', 'title category images condition')
-      .populate('owner', 'fullName')
-      .sort({ createdAt: -1 }).skip(skip).limit(limit),
+      .populate({ path: 'item', populate: { path: 'category', select: 'name icon riskLevel' } })
+      .populate('owner', 'fullName profileImage')
+      .populate('selectedQuotation')
+      .populate('selectedTechnicians.technician', 'fullName')
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit),
     RepairRequest.countDocuments(query),
   ]);
 
-  return successResponse(res, { repairRequests: requests, pagination: paginationMeta(total, page, limit) });
+  let sanitizedRequests = requests;
+
+  if (req.user.role === ROLES.TECHNICIAN) {
+    const { getMatchDetailsForTechnician } = require('../services/matchingService');
+    const techProfile = await TechnicianProfile.findOne({ user: req.user.userId })
+      .populate('skills')
+      .populate('supportedCategories');
+
+    sanitizedRequests = requests.map((r) => {
+      const doc = r.toObject ? r.toObject() : r;
+      // Redact private owner data
+      if (doc.owner) {
+        delete doc.owner.email;
+        delete doc.owner.phone;
+      }
+      if (doc.item?.approximateLocation) {
+        delete doc.item.approximateLocation.exactAddress;
+      }
+
+      // Calculate match score & explanation
+      if (techProfile) {
+        const matchData = getMatchDetailsForTechnician(doc, techProfile);
+        doc.matchScore = matchData.totalScore;
+        doc.matchExplanation = matchData.explanation;
+        doc.matchBreakdown = matchData.breakdown;
+      }
+
+      return doc;
+    });
+
+    if (tab === 'recommended') {
+      sanitizedRequests.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+    }
+  }
+
+  return successResponse(res, { repairRequests: sanitizedRequests, pagination: paginationMeta(total, page, limit) });
 });
 
 /**
  * GET /repair-requests/:id
+ *
+ * Authorization enforced per role:
+ * - Owner: can view if they own it
+ * - Technician: can view if status is NOT draft AND (discoverable OR assigned)
+ * - Admin: can always view
  */
 const getRepairRequestById = asyncHandler(async (req, res) => {
   const request = await RepairRequest.findById(req.params.id)
@@ -92,22 +379,52 @@ const getRepairRequestById = asyncHandler(async (req, res) => {
 
   if (!request) return errorResponse(res, 'Repair request not found.', 404);
 
-  // Access control
   const isOwner = request.owner._id.toString() === req.user.userId.toString();
-  const isTechnician = request.selectedTechnicians.some(
-    (t) => t.technician?._id?.toString() === req.user.userId.toString()
-  );
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = req.user.role === ROLES.ADMIN;
+  const isTechnicianRole = req.user.role === ROLES.TECHNICIAN;
 
-  if (!isOwner && !isTechnician && !isAdmin) {
-    // Return limited info for published requests
-    if (request.requestStatus !== REPAIR_REQUEST_STATUS.PUBLISHED &&
-        request.requestStatus !== REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS) {
+  if (isOwner || isAdmin) {
+    // Owner and admin always have access
+    return successResponse(res, { repairRequest: request });
+  }
+
+  if (isTechnicianRole) {
+    // Technicians must NEVER see drafts or internal review states
+    if (
+      request.requestStatus === REPAIR_REQUEST_STATUS.DRAFT ||
+      request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_AI_ANALYSIS ||
+      request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW ||
+      request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION
+    ) {
       return errorResponse(res, 'Access denied.', 403);
+    }
+
+    // Technician can view if discoverable OR assigned to them
+    const isAssigned = request.selectedTechnicians.some(
+      (t) => t.technician?._id?.toString() === req.user.userId.toString()
+    );
+    const isDiscoverable = TECHNICIAN_VISIBLE_STATUSES.includes(request.requestStatus);
+
+    if (isAssigned || isDiscoverable) {
+      const doc = request.toObject ? request.toObject() : request;
+      
+      // If not yet accepted, redact private contact information
+      const isAcceptedTech = request.selectedQuotation && doc.selectedQuotation?.technician?.toString() === req.user.userId.toString();
+      if (!isAcceptedTech) {
+        if (doc.owner) {
+          delete doc.owner.email;
+          delete doc.owner.phone;
+        }
+        if (doc.item?.approximateLocation) {
+          delete doc.item.approximateLocation.exactAddress;
+        }
+      }
+
+      return successResponse(res, { repairRequest: doc });
     }
   }
 
-  return successResponse(res, { repairRequest: request });
+  return errorResponse(res, 'Access denied.', 403);
 });
 
 /**
@@ -284,36 +601,98 @@ const submitClarificationAnswers = asyncHandler(async (req, res) => {
 
 /**
  * POST /repair-requests/:id/publish
+ *
+ * Publishes a repair request with idempotency:
+ * - If already published (or beyond), returns success without side effects.
+ * - Sets publishedAt, persists notifications for technicians and admins.
+ * - Emits authenticated Socket.IO event 'repair-request:published'.
+ * - Prevents duplicate notifications on re-publish.
  */
 const publishRepairRequest = asyncHandler(async (req, res) => {
   const request = await RepairRequest.findOne({ _id: req.params.id, owner: req.user.userId });
   if (!request) return errorResponse(res, 'Not found.', 404);
 
-  if (!isValidTransition(request.requestStatus, REPAIR_REQUEST_STATUS.PUBLISHED)) {
-    return errorResponse(res, `Cannot publish from status: ${request.requestStatus}`, 400);
+  // Idempotency: if already published or beyond, return success without duplicate side effects
+  if (request.requestStatus !== REPAIR_REQUEST_STATUS.DRAFT &&
+      request.requestStatus !== REPAIR_REQUEST_STATUS.AWAITING_AI_ANALYSIS &&
+      request.requestStatus !== REPAIR_REQUEST_STATUS.AWAITING_OWNER_REVIEW &&
+      request.requestStatus !== REPAIR_REQUEST_STATUS.AWAITING_CLARIFICATION) {
+    return successResponse(res, { repairRequest: request }, 'Request is already published');
   }
 
-  request.requestStatus = REPAIR_REQUEST_STATUS.PUBLISHED;
-  request.publishedAt = new Date();
-  await request.save();
+  const { transitionRepairRequest } = require('../services/stateTransitionService');
+  try {
+    await transitionRepairRequest(request._id, REPAIR_REQUEST_STATUS.PUBLISHED, req.user, {
+      reason: 'Owner published repair request',
+      req,
+    });
+  } catch (err) {
+    return errorResponse(res, err.message, 400);
+  }
+
+  // Populate for notifications and Socket.IO event
+  const populatedRequest = await RepairRequest.findById(request._id)
+    .populate({ path: 'item', populate: { path: 'category' } })
+    .populate('owner', 'fullName')
+    .populate('aiAnalysis');
+
+  // Prevent duplicate notifications: check if we already notified for this request
+  const existingNotification = await Notification.findOne({
+    relatedEntityId: request._id,
+    type: NOTIFICATION_TYPES.REPAIR_REQUEST_PUBLISHED,
+  });
+
+  if (!existingNotification) {
+    // Find relevant technicians (all active technicians) and admins
+    const [technicians, admins] = await Promise.all([
+      User.find({ role: ROLES.TECHNICIAN, accountStatus: 'active' }).select('_id').lean(),
+      User.find({ role: ROLES.ADMIN, accountStatus: 'active' }).select('_id').lean(),
+    ]);
+
+    const recipientIds = [
+      ...technicians.map((t) => t._id),
+      ...admins.map((a) => a._id),
+    ];
+
+    if (recipientIds.length > 0) {
+      await createBulkNotifications(recipientIds, {
+        type: NOTIFICATION_TYPES.REPAIR_REQUEST_PUBLISHED,
+        title: 'New Repair Request Published',
+        message: `A new repair request for "${populatedRequest.item?.title || 'an item'}" has been published.`,
+        relatedEntityType: 'RepairRequest',
+        relatedEntityId: request._id,
+      });
+    }
+  }
+
+  // Emit authenticated Socket.IO event
+  const io = getIO();
+  if (io) {
+    io.emit('repair-request:published', {
+      repairRequest: {
+        _id: populatedRequest._id,
+        item: populatedRequest.item,
+        owner: populatedRequest.owner,
+        requestStatus: populatedRequest.requestStatus,
+        publishedAt: populatedRequest.publishedAt,
+        problemDescription: populatedRequest.problemDescription,
+      },
+    });
+  }
 
   // Trigger matching in background
   try {
-    const populatedRequest = await RepairRequest.findById(request._id)
-      .populate({ path: 'item', populate: { path: 'category' } })
-      .populate('aiAnalysis');
-
     const matches = await matchingService.matchTechnicians(populatedRequest);
     if (matches.length > 0) {
       await matchingService.saveMatches(request._id, matches);
-      request.requestStatus = REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS;
-      await request.save();
+      await RepairRequest.findByIdAndUpdate(request._id, { requestStatus: REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS });
     }
   } catch (error) {
     logger.error('Matching failed:', error.message);
   }
 
-  return successResponse(res, { repairRequest: request }, 'Request published');
+  const finalRequest = await RepairRequest.findById(request._id);
+  return successResponse(res, { repairRequest: finalRequest }, 'Request published');
 });
 
 /**
@@ -323,13 +702,18 @@ const cancelRepairRequest = asyncHandler(async (req, res) => {
   const request = await RepairRequest.findOne({ _id: req.params.id, owner: req.user.userId });
   if (!request) return errorResponse(res, 'Not found.', 404);
 
-  if (!isValidTransition(request.requestStatus, REPAIR_REQUEST_STATUS.CANCELLED)) {
-    return errorResponse(res, `Cannot cancel from status: ${request.requestStatus}`, 400);
+  const { transitionRepairRequest } = require('../services/stateTransitionService');
+  try {
+    await transitionRepairRequest(request._id, REPAIR_REQUEST_STATUS.CANCELLED, req.user, {
+      reason: req.body.reason || 'Owner cancelled request',
+      req,
+    });
+  } catch (err) {
+    return errorResponse(res, err.message, 400);
   }
 
-  request.requestStatus = REPAIR_REQUEST_STATUS.CANCELLED;
-  await request.save();
-  return successResponse(res, { repairRequest: request }, 'Request cancelled');
+  const updatedRequest = await RepairRequest.findById(request._id);
+  return successResponse(res, { repairRequest: updatedRequest }, 'Request cancelled');
 });
 
 /**
@@ -348,7 +732,6 @@ const getMatches = asyncHandler(async (req, res) => {
     .sort({ totalScore: -1 });
 
   // Populate technician profiles
-  const { TechnicianProfile } = require('../models');
   const enrichedMatches = [];
   for (const match of matches) {
     const profile = await TechnicianProfile.findOne({ user: match.technician._id })

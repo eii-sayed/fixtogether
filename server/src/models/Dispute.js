@@ -58,7 +58,29 @@ const disputeSchema = new mongoose.Schema(
     resolution: {
       decision: { type: String, default: '' },
       notes: { type: String, default: '' },
+      internalFindings: { type: String, default: '' },
+      consequencePreview: { type: mongoose.Schema.Types.Mixed, default: {} },
       resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    },
+    missingInfoRequests: [
+      {
+        requestedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        requestText: { type: String, required: true },
+        requestedAt: { type: Date, default: Date.now },
+        respondedAt: { type: Date },
+        responseText: { type: String, default: '' },
+      },
+    ],
+    internalNotes: [
+      {
+        admin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        note: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    version: {
+      type: Number,
+      default: 1,
     },
     resolvedAt: { type: Date, default: null },
   },

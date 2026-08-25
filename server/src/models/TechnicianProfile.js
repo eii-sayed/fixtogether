@@ -124,6 +124,40 @@ const technicianProfileSchema = new mongoose.Schema(
     completedRepairCount: { type: Number, default: 0 },
     completionRate: { type: Number, default: 0, min: 0, max: 100 },
     averageResponseTime: { type: Number, default: 0 }, // in hours
+    maxConcurrentJobs: {
+      type: Number,
+      default: 5,
+      min: 1,
+      max: 50,
+    },
+    vacationMode: {
+      type: Boolean,
+      default: false,
+    },
+    vacationUntil: {
+      type: Date,
+      default: null,
+    },
+    categoryAvailability: [
+      {
+        category: { type: mongoose.Schema.Types.ObjectId, ref: 'ItemCategory' },
+        available: { type: Boolean, default: true },
+      },
+    ],
+    verificationStage: {
+      type: String,
+      enum: ['profile_setup', 'identity_submitted', 'trade_submitted', 'under_review', 'verified', 'rejected', 'expired'],
+      default: 'profile_setup',
+    },
+    rejectionReason: {
+      type: String,
+      default: '',
+    },
+    missingRequirements: [
+      {
+        type: String,
+      },
+    ],
     warrantyOptions: [
       {
         days: { type: Number, default: 30 },

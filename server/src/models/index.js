@@ -24,6 +24,9 @@ const SafetyRule = require('./SafetyRule');
 const AuditLog = require('./AuditLog');
 const Message = require('./Message');
 const ImpactRecord = require('./ImpactRecord');
+const ReviewQueueItem = require('./ReviewQueueItem');
+
+const OutboxEvent = require('./OutboxEvent');
 
 module.exports = {
   User,
@@ -52,4 +55,6 @@ module.exports = {
   AuditLog,
   ImpactRecord,
   Message,
+  ReviewQueueItem,
+  OutboxEvent,
 };

@@ -22,6 +22,11 @@ export function SocketProvider({ children }) {
       return;
     }
 
+    // Prevent duplicate connections — if socket is already connected for same user, skip
+    if (socketRef.current?.connected) {
+      return;
+    }
+
     // Create socket connection with auth token
     const token = localStorage.getItem('accessToken');
     const socket = io(SOCKET_URL, {
@@ -34,17 +39,23 @@ export function SocketProvider({ children }) {
 
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const onConnect = () => {
       setConnected(true);
-      // Join user's notification room
-      socket.emit('join', user.userId);
-    });
+      // NOTE: Server auto-joins user to `user:<userId>` room in the connection handler.
+      // No need to emit a redundant 'join' event here.
+    };
 
-    socket.on('disconnect', () => {
+    const onDisconnect = () => {
       setConnected(false);
-    });
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
 
     return () => {
+      // Clean up named listeners to prevent stacking on remount (React StrictMode)
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);

@@ -2,11 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const config = require('./config');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
+const { generalLimiter } = require('./middleware/rateLimiter');
 const logger = require('./utils/logger');
 
 // Import routes
@@ -56,20 +56,10 @@ if (config.env === 'development') {
   }));
 }
 
-// General rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later.' },
-});
-app.use('/api', limiter);
-
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health check
+// Health checks — placed ABOVE rate limiter so they are never throttled
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'FixTogether API is running', environment: config.env });
 });
@@ -77,6 +67,9 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: config.env });
 });
+
+// General rate limiting — applied after health checks
+app.use('/api', generalLimiter);
 
 // API v1 routes
 const API_PREFIX = '/api/v1';

@@ -30,7 +30,11 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Never retry rate-limited requests
+        if (error?.response?.status === 429 || error?.code === 'RATE_LIMIT_EXCEEDED') return false;
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
     },
   },

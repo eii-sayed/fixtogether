@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
+import AdminLayout from './components/layout/AdminLayout';
 import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
 
 // Pages
@@ -23,12 +24,34 @@ import NotificationsPage from './pages/notifications/NotificationsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
 import AdminSafetyPage from './pages/admin/AdminSafetyPage';
+import AdminReviewQueuePage from './pages/admin/AdminReviewQueuePage';
+import AdminDisputesPage from './pages/admin/AdminDisputesPage';
+import AdminTaxonomyPage from './pages/admin/AdminTaxonomyPage';
+import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage';
 
 export default function App() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Admin Command Center & Workspaces (Dedicated Left-Side Panel Layout) */}
+      <Route
+        element={
+          <ProtectedRoute roles={['admin']}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/admin" element={<DashboardPage />} />
+        <Route path="/admin/review-queue" element={<AdminReviewQueuePage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
+        <Route path="/admin/safety" element={<AdminSafetyPage />} />
+        <Route path="/admin/disputes" element={<AdminDisputesPage />} />
+        <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
+        <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
+      </Route>
+
+      {/* Main Public & User Layout */}
       <Route element={<MainLayout />}>
         <Route path="/" element={<LandingPage />} />
 
@@ -61,12 +84,6 @@ export default function App() {
 
         {/* Messages */}
         <Route path="/messages" element={<ProtectedRoute><ConversationsPage /></ProtectedRoute>} />
-
-        {/* Admin */}
-        <Route path="/admin" element={<ProtectedRoute roles={['admin']}><DashboardPage /></ProtectedRoute>} />
-        <Route path="/admin/users" element={<ProtectedRoute roles={['admin']}><AdminUsersPage /></ProtectedRoute>} />
-        <Route path="/admin/verifications" element={<ProtectedRoute roles={['admin']}><AdminVerificationsPage /></ProtectedRoute>} />
-        <Route path="/admin/safety" element={<ProtectedRoute roles={['admin']}><AdminSafetyPage /></ProtectedRoute>} />
 
         {/* 404 */}
         <Route path="*" element={

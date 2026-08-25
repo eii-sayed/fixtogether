@@ -60,9 +60,71 @@ const updateSkill = asyncHandler(async (req, res) => {
   if (req.body.description !== undefined) updates.description = req.body.description;
   if (req.body.category !== undefined) updates.category = req.body.category;
   if (req.body.active !== undefined) updates.active = req.body.active;
+  if (req.body.alternativeTerms !== undefined) updates.alternativeTerms = req.body.alternativeTerms;
+  if (req.body.verificationRequirement !== undefined) updates.verificationRequirement = req.body.verificationRequirement;
   const skill = await Skill.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
   if (!skill) return errorResponse(res, 'Skill not found.', 404);
   return successResponse(res, { skill }, 'Skill updated');
 });
 
-module.exports = { getCategories, createCategory, updateCategory, deactivateCategory, getSkills, createSkill, updateSkill };
+const mergeSkills = asyncHandler(async (req, res) => {
+  const { sourceSkillId, targetSkillId } = req.body;
+  if (sourceSkillId.toString() === targetSkillId.toString()) {
+    return errorResponse(res, 'Source and target skills cannot be identical.', 400);
+  }
+
+  const [source, target] = await Promise.all([
+    Skill.findById(sourceSkillId),
+    Skill.findById(targetSkillId),
+  ]);
+
+  if (!source || !target) return errorResponse(res, 'Skill not found.', 404);
+
+  // Re-link references in technician profiles
+  const { TechnicianProfile } = require('../models');
+  await TechnicianProfile.updateMany(
+    { skills: source._id },
+    { $addToSet: { skills: target._id }, $pull: { skills: source._id } }
+  );
+
+  source.active = false;
+  source.mergeTarget = target._id;
+  await source.save();
+
+  return successResponse(res, { source, target }, `Merged "${source.name}" into "${target.name}"`);
+});
+
+const getTaxonomyImpact = asyncHandler(async (req, res) => {
+  const { type, id } = req.params; // type = 'category' | 'skill'
+  const { RepairRequest, RepairJob, TechnicianProfile, Item } = require('../models');
+
+  let impact = { affectedRequests: 0, affectedJobs: 0, affectedTechnicians: 0, affectedItems: 0 };
+
+  if (type === 'category') {
+    const [reqCount, jobCount, techCount, itemCount] = await Promise.all([
+      RepairRequest.countDocuments({ 'item.category': id, requestStatus: { $nin: ['completed', 'cancelled'] } }),
+      RepairJob.countDocuments({ currentStatus: { $nin: ['completed', 'cancelled'] } }),
+      TechnicianProfile.countDocuments({ supportedCategories: id }),
+      Item.countDocuments({ category: id }),
+    ]);
+    impact = { affectedRequests: reqCount, affectedJobs: jobCount, affectedTechnicians: techCount, affectedItems: itemCount };
+  } else if (type === 'skill') {
+    const techCount = await TechnicianProfile.countDocuments({ skills: id });
+    impact = { affectedTechnicians: techCount, affectedRequests: 0, affectedJobs: 0, affectedItems: 0 };
+  }
+
+  return successResponse(res, { impact });
+});
+
+module.exports = {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deactivateCategory,
+  getSkills,
+  createSkill,
+  updateSkill,
+  mergeSkills,
+  getTaxonomyImpact,
+};
+
