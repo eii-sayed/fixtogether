@@ -59,6 +59,14 @@ const startServer = async () => {
       logger.debug(`User ${socket.userId} joined notification room`);
     }
 
+    socket.on('forum:join', (threadId) => {
+      if (threadId) socket.join(`forum:${threadId}`);
+    });
+
+    socket.on('forum:leave', (threadId) => {
+      if (threadId) socket.leave(`forum:${threadId}`);
+    });
+
     // Join a repair-request-specific chat room with participant authorization
     socket.on('chat:join', async (repairRequestId) => {
       if (!repairRequestId || !socket.userId) return;
