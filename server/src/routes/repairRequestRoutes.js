@@ -13,7 +13,7 @@ const { ROLES } = require('../constants');
 router.get('/', authenticate, authorize(ROLES.OWNER, ROLES.TECHNICIAN, ROLES.ADMIN), rrController.getRepairRequests);
 router.get('/:id', authenticate, authorize(ROLES.OWNER, ROLES.TECHNICIAN, ROLES.ADMIN), rrController.getRepairRequestById);
 
-// Owner-only mutations
+// Owner mutations & request lifecycle
 router.post('/', authenticate, authorize(ROLES.OWNER), validate(createRepairRequestSchema), writeLimiter, rrController.createRepairRequest);
 router.patch('/:id', authenticate, authorize(ROLES.OWNER), validate(updateRepairRequestSchema), writeLimiter, rrController.updateRepairRequest);
 router.post('/:id/analyze', authenticate, authorize(ROLES.OWNER), aiLimiter, rrController.analyzeRepairRequest);
@@ -22,7 +22,8 @@ router.post('/:id/answers', authenticate, authorize(ROLES.OWNER), validate(clari
 router.post('/:id/publish', authenticate, authorize(ROLES.OWNER), publishLimiter, rrController.publishRepairRequest);
 router.post('/:id/cancel', authenticate, authorize(ROLES.OWNER), writeLimiter, rrController.cancelRepairRequest);
 router.get('/:id/matches', authenticate, rrController.getMatches);
-router.post('/:id/invitations', authenticate, authorize(ROLES.OWNER), rrController.sendInvitations);
+router.post('/:id/invitations', authenticate, authorize(ROLES.OWNER, ROLES.ADMIN), rrController.sendInvitations);
+router.post('/:id/assign', authenticate, writeLimiter, rrController.assignTechnician);
 
 // Quotations on repair requests
 router.post('/:id/quotations', authenticate, authorize(ROLES.TECHNICIAN), quotationController.createQuotation);

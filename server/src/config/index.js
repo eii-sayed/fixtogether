@@ -15,8 +15,8 @@ const config = {
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret',
-    accessExpiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || '15m',
-    refreshExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || '24h',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   },
 
   // Client
@@ -74,7 +74,7 @@ const config = {
   },
   authRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10,
+    max: process.env.NODE_ENV === 'test' ? 10 : (parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10),
   },
   writeRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WRITE_WINDOW_MS, 10) || 15 * 60 * 1000,

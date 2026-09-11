@@ -167,8 +167,9 @@ const acceptQuotation = asyncHandler(async (req, res) => {
   if (!quotation) return errorResponse(res, 'Not found.', 404);
 
   const request = await RepairRequest.findById(quotation.repairRequest);
-  if (!request) return errorResponse(res, 'Request not found.', 404);
-  if (request.owner.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
+  const isOwner = request.owner.toString() === req.user.userId.toString();
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) return errorResponse(res, 'Access denied.', 403);
 
   // Idempotency: if this exact quotation is already accepted, return success
   if (request.selectedQuotation?.toString() === quotation._id.toString()) {
@@ -220,7 +221,10 @@ const rejectQuotation = asyncHandler(async (req, res) => {
   const quotation = await Quotation.findById(req.params.id);
   if (!quotation) return errorResponse(res, 'Not found.', 404);
   const request = await RepairRequest.findById(quotation.repairRequest);
-  if (request.owner.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
+  if (!request) return errorResponse(res, 'Request not found.', 404);
+  const isOwner = request.owner.toString() === req.user.userId.toString();
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) return errorResponse(res, 'Access denied.', 403);
   quotation.status = QUOTATION_STATUS.REJECTED;
   quotation.ownerDecisionAt = new Date();
   await quotation.save();

@@ -1,6 +1,8 @@
-const { RepairRequest, Item, AIAnalysis, TechnicianMatch, ItemCategory, User, Notification, TechnicianProfile } = require('../models');
-const { REPAIR_REQUEST_STATUS, REPAIR_STATUS_TRANSITIONS, NOTIFICATION_TYPES, ROLES } = require('../constants');
+const mongoose = require('mongoose');
+const { RepairRequest, Item, AIAnalysis, TechnicianMatch, ItemCategory, User, Notification, TechnicianProfile, Quotation, RepairJob } = require('../models');
+const { REPAIR_REQUEST_STATUS, REPAIR_STATUS_TRANSITIONS, NOTIFICATION_TYPES, ROLES, QUOTATION_STATUS, REPAIR_JOB_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta } = require('../utils/helpers');
+const { createAuditLog } = require('../middleware/auditLog');
 const aiService = require('../services/ai');
 const safetyService = require('../services/safetyService');
 const matchingService = require('../services/matchingService');
@@ -754,6 +756,35 @@ const getMatches = asyncHandler(async (req, res) => {
     });
   }
 
+  // Fallback to verified technicians if no automated matches are present
+  if (enrichedMatches.length === 0) {
+    const verifiedProfiles = await TechnicianProfile.find({ verificationStatus: 'approved' })
+      .populate('user', 'fullName profileImage')
+      .populate('skills', 'name')
+      .populate('supportedCategories', 'name')
+      .limit(10);
+
+    for (const vp of verifiedProfiles) {
+      if (vp.user) {
+        enrichedMatches.push({
+          technician: vp.user,
+          totalScore: Math.round((vp.averageRating || 4.8) * 20),
+          profile: {
+            biography: vp.biography,
+            skills: vp.skills,
+            yearsOfExperience: vp.yearsOfExperience,
+            averageRating: vp.averageRating,
+            reviewCount: vp.reviewCount,
+            completedRepairCount: vp.completedRepairCount,
+            serviceMethods: vp.serviceMethods,
+            priceRange: vp.priceRange,
+            verificationStatus: vp.verificationStatus,
+          },
+        });
+      }
+    }
+  }
+
   return successResponse(res, { matches: enrichedMatches });
 });
 
@@ -761,8 +792,14 @@ const getMatches = asyncHandler(async (req, res) => {
  * POST /repair-requests/:id/invitations
  */
 const sendInvitations = asyncHandler(async (req, res) => {
-  const request = await RepairRequest.findOne({ _id: req.params.id, owner: req.user.userId });
+  const request = await RepairRequest.findById(req.params.id);
   if (!request) return errorResponse(res, 'Not found.', 404);
+
+  const isOwner = request.owner.toString() === req.user.userId.toString();
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    return errorResponse(res, 'Access denied.', 403);
+  }
 
   const { technicianIds } = req.body;
   if (!technicianIds?.length) return errorResponse(res, 'No technicians selected.', 400);
@@ -800,8 +837,169 @@ const sendInvitations = asyncHandler(async (req, res) => {
   return successResponse(res, { repairRequest: request }, 'Invitations sent');
 });
 
+/**
+ * POST /repair-requests/:id/assign
+ * Directly assigns a technician to a repair request (by owner or admin)
+ */
+const assignTechnician = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { technicianId, note, estimatedCost } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return errorResponse(res, 'Invalid request ID format.', 400);
+  }
+  if (!technicianId || !mongoose.Types.ObjectId.isValid(technicianId)) {
+    return errorResponse(res, 'A valid technician ID is required.', 400);
+  }
+
+  const request = await RepairRequest.findById(id).populate('item', 'title');
+  if (!request) return errorResponse(res, 'Repair request not found.', 404);
+
+  const isOwner = request.owner.toString() === req.user.userId.toString();
+  const isAdmin = req.user.role === 'admin';
+  if (!isOwner && !isAdmin) {
+    return errorResponse(res, 'Access denied. Only the owner or an administrator can assign technicians.', 403);
+  }
+
+  // Prevent assigning if already completed or cancelled
+  if ([REPAIR_REQUEST_STATUS.COMPLETED, REPAIR_REQUEST_STATUS.CANCELLED].includes(request.requestStatus)) {
+    return errorResponse(res, `Cannot assign technician to a ${request.requestStatus} request.`, 400);
+  }
+
+  // Verify target is a valid technician
+  const techUser = await User.findById(technicianId);
+  if (!techUser || techUser.role !== ROLES.TECHNICIAN) {
+    return errorResponse(res, 'Target user is not a registered technician.', 400);
+  }
+
+  // Check if technician already has an active quote
+  let quotation = await Quotation.findOne({
+    repairRequest: request._id,
+    technician: techUser._id,
+  }).sort({ createdAt: -1 });
+
+  if (quotation) {
+    quotation.status = QUOTATION_STATUS.ACCEPTED;
+    quotation.ownerDecisionAt = new Date();
+    if (note) {
+      quotation.technicianNotes = quotation.technicianNotes
+        ? `${quotation.technicianNotes}\nAssignment Note: ${note}`
+        : note;
+    }
+    await quotation.save();
+  } else {
+    // Create direct assigned quotation record
+    const cost = Math.max(0, Number(estimatedCost) || 0);
+    quotation = await Quotation.create({
+      repairRequest: request._id,
+      technician: techUser._id,
+      quotationType: 'initial',
+      laborCostMinimum: cost,
+      laborCostMaximum: cost,
+      estimatedTotalMinimum: cost,
+      estimatedTotalMaximum: cost,
+      warrantyDays: 30,
+      expectedDuration: { value: 3, unit: 'days' },
+      status: QUOTATION_STATUS.ACCEPTED,
+      ownerDecisionAt: new Date(),
+      technicianNotes: note || 'Direct assignment by request owner / platform administrator.',
+    });
+  }
+
+  // Mark all competing quotes as NOT_SELECTED
+  await Quotation.updateMany(
+    {
+      repairRequest: request._id,
+      _id: { $ne: quotation._id },
+      status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED] },
+    },
+    { status: QUOTATION_STATUS.NOT_SELECTED, ownerDecisionAt: new Date() }
+  );
+
+  // Update selectedTechnicians array on the request
+  if (!request.selectedTechnicians) request.selectedTechnicians = [];
+  const existingIndex = request.selectedTechnicians.findIndex(
+    (t) => t.technician?.toString() === techUser._id.toString()
+  );
+  if (existingIndex >= 0) {
+    request.selectedTechnicians[existingIndex].status = 'accepted';
+    request.selectedTechnicians[existingIndex].respondedAt = new Date();
+  } else {
+    request.selectedTechnicians.push({
+      technician: techUser._id,
+      status: 'accepted',
+      invitedAt: new Date(),
+      respondedAt: new Date(),
+    });
+  }
+
+  request.selectedQuotation = quotation._id;
+  request.requestStatus = REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED;
+  await request.save();
+
+  // Find or create RepairJob
+  let repairJob = await RepairJob.findOne({ repairRequest: request._id });
+  if (!repairJob) {
+    repairJob = await RepairJob.create({
+      repairRequest: request._id,
+      owner: request.owner,
+      technician: techUser._id,
+      acceptedQuotation: quotation._id,
+      currentStatus: REPAIR_JOB_STATUS.PENDING_INSPECTION,
+    });
+  } else {
+    repairJob.technician = techUser._id;
+    repairJob.acceptedQuotation = quotation._id;
+    await repairJob.save();
+  }
+
+  // Create audit log
+  await createAuditLog({
+    action: 'TECHNICIAN_DIRECTLY_ASSIGNED',
+    entityType: 'RepairRequest',
+    entityId: request._id,
+    performedBy: req.user.userId,
+    details: {
+      technicianId: techUser._id,
+      technicianName: techUser.fullName,
+      assignedByRole: req.user.role,
+      jobId: repairJob._id,
+    },
+    req,
+  });
+
+  // Notify technician
+  await createNotification({
+    userId: techUser._id.toString(),
+    type: NOTIFICATION_TYPES.QUOTATION_ACCEPTED,
+    title: 'Assigned to Repair Job',
+    message: `You have been assigned to perform the repair for "${request.item?.title || 'item'}".`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: repairJob._id,
+  });
+
+  return successResponse(
+    res,
+    {
+      repairRequest: request,
+      repairJob,
+      quotation,
+    },
+    `Successfully assigned ${techUser.fullName} to this repair.`
+  );
+});
+
 module.exports = {
-  createRepairRequest, getRepairRequests, getRepairRequestById, updateRepairRequest,
-  analyzeRepairRequest, reviewAIAnalysis, submitClarificationAnswers, publishRepairRequest,
-  cancelRepairRequest, getMatches, sendInvitations,
+  createRepairRequest,
+  getRepairRequests,
+  getRepairRequestById,
+  updateRepairRequest,
+  analyzeRepairRequest,
+  reviewAIAnalysis,
+  submitClarificationAnswers,
+  publishRepairRequest,
+  cancelRepairRequest,
+  getMatches,
+  sendInvitations,
+  assignTechnician,
 };

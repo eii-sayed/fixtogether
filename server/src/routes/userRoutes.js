@@ -54,4 +54,7 @@ router.patch(
 router.get('/me/stats', authenticate, userController.getMyStats);
 router.get('/me/activity', authenticate, userController.getMyActivity);
 
+// Public user profile — accessible by anyone (owners, technicians, guests)
+router.get('/:id', userController.getUserPublicProfile);
+
 module.exports = router;

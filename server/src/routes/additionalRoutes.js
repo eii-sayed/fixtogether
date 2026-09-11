@@ -40,9 +40,10 @@ disputeRouter.post('/:id/responses', authenticate, rjController.addDisputeRespon
 
 // Notifications
 const notificationRouter = express.Router();
+notificationRouter.get('/unread-count', authenticate, rjController.getNotificationUnreadCount);
 notificationRouter.get('/', authenticate, rjController.getNotifications);
-notificationRouter.patch('/:id/read', authenticate, rjController.markNotificationRead);
 notificationRouter.patch('/read-all', authenticate, rjController.markAllNotificationsRead);
+notificationRouter.patch('/:id/read', authenticate, rjController.markNotificationRead);
 
 // Donation Operations Router
 const donationRouter = express.Router();
@@ -108,6 +109,8 @@ donationRouter.get('/:id', authenticate, rjController.getDonationById);
 donationRouter.get('/:id/matches', authenticate, rjController.getDonationMatches);
 donationRouter.post('/:id/accept', authenticate, orgController.decideDonationOffer);
 donationRouter.post('/:id/reject', authenticate, orgController.decideDonationOffer);
+donationRouter.post('/offers/:id/cancel', authenticate, rjController.cancelDonationOffer);
+donationRouter.post('/:id/cancel', authenticate, rjController.cancelDonationOffer);
 donationRouter.post('/:id/schedule', authenticate, orgController.scheduleDonationHandover);
 donationRouter.post('/:id/confirm-handover', authenticate, rjController.confirmHandover);
 

@@ -12,10 +12,8 @@ const {
   addPortfolioSchema,
 } = require('../validators/profileValidators');
 
-// Public technician routes
+// Public listing
 router.get('/', techController.getTechnicians);
-router.get('/:id', techController.getTechnicianById);
-router.get('/:id/reviews', require('../controllers/repairJobController').getTechnicianReviews);
 
 // Authenticated private technician routes
 router.get(
@@ -74,5 +72,9 @@ router.post(
   uploadMultipleImages('documents', 5),
   techController.submitVerification
 );
+
+// Public technician profile and reviews (accessible by anyone)
+router.get('/:id', techController.getTechnicianById);
+router.get('/:id/reviews', require('../controllers/repairJobController').getTechnicianReviews);
 
 module.exports = router;

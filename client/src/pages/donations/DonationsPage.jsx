@@ -36,6 +36,7 @@ import {
   PROCESSING_OUTCOMES_CONFIG,
   HUB_STATUS_CONFIG,
 } from '../../utils/organizationStatusConfig';
+import CreateDonationModal from '../../components/donations/CreateDonationModal';
 
 export default function DonationsPage() {
   const { user } = useAuth();
@@ -52,6 +53,9 @@ export default function DonationsPage() {
   const [conditionFilter, setConditionFilter] = useState('');
 
   // Modals & Drawers State
+  const [showCreateDonationModal, setShowCreateDonationModal] = useState(false);
+  const [preselectedNeedForDonation, setPreselectedNeedForDonation] = useState(null);
+  const [cancellingOfferId, setCancellingOfferId] = useState(null);
   const [selectedOfferForExplanation, setSelectedOfferForExplanation] = useState(null);
   const [decisionModalOffer, setDecisionModalOffer] = useState(null);
   const [decisionAction, setDecisionAction] = useState('accept');
@@ -144,7 +148,7 @@ export default function DonationsPage() {
   const { data: needsData, isLoading: needsLoading } = useQuery({
     queryKey: ['community-needs', page],
     queryFn: () => api.get(`/donations/needs?page=${page}&limit=12`).then((r) => r.data.data),
-    enabled: isOrg && activeMainTab === 'needs',
+    enabled: (isOrg && activeMainTab === 'needs') || (!isOrg && activeMainTab === 'community_needs'),
   });
 
   // Fetch Impact Records
@@ -158,10 +162,22 @@ export default function DonationsPage() {
   const { data: ownerDonationsData, isLoading: ownerDonationsLoading } = useQuery({
     queryKey: ['owner-donations', page],
     queryFn: () => api.get(`/donations?page=${page}&limit=12`).then((r) => r.data.data),
-    enabled: !isOrg,
+    enabled: !isOrg && activeMainTab === 'my_donations',
   });
 
   // Mutations
+  const cancelOfferMutation = useMutation({
+    mutationFn: (id) => api.post(`/donations/offers/${id}/cancel`),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['owner-donations']);
+      setCancellingOfferId(null);
+      toast.success('Donation offer cancelled');
+    },
+    onError: (err) => {
+      setCancellingOfferId(null);
+      toast.error(err.response?.data?.message || 'Failed to cancel donation offer');
+    },
+  });
   const decisionMutation = useMutation({
     mutationFn: ({ id, payload }) => api.post(`/donations/offers/${id}/decision`, payload),
     onSuccess: () => {
@@ -247,8 +263,12 @@ export default function DonationsPage() {
 
   // OWNER VIEW
   if (!isOrg) {
+    const ownerDonations = ownerDonationsData?.donations || ownerDonationsData?.offers || [];
+    const communityNeeds = needsData?.needs || [];
+
     return (
       <div className="space-y-6 max-w-7xl mx-auto">
+        {/* Top Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-xs">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
@@ -258,55 +278,394 @@ export default function DonationsPage() {
               Give unused electronics, appliances, and hardware to certified non-profits, schools, and repair hubs.
             </p>
           </div>
-          <Link to="/items" className="btn-primary text-xs flex items-center gap-1.5 shadow-xs">
-            <Plus className="w-4 h-4" /> Donate From My Items
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/items" className="btn-outline text-xs flex items-center gap-1.5 shadow-xs">
+              <Package className="w-4 h-4" /> My Items
+            </Link>
+            <button
+              onClick={() => {
+                setPreselectedNeedForDonation(null);
+                setShowCreateDonationModal(true);
+              }}
+              className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
+            >
+              <Plus className="w-4 h-4" /> Make a Donation
+            </button>
+          </div>
         </div>
 
-        {ownerDonationsLoading ? (
-          <PageLoader />
-        ) : ownerDonationsData?.donations?.length === 0 ? (
-          <EmptyState
-            icon={Heart}
-            title="No Active Donations"
-            description="You haven't offered any items for community donation yet. Browse your items inventory to donate."
-          />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {ownerDonationsData?.donations?.map((d) => (
-              <div key={d._id} className="card p-4 space-y-3 hover:shadow-md transition-shadow">
-                <div className="h-40 bg-gray-50 rounded-xl overflow-hidden flex items-center justify-center">
-                  {d.item?.images?.length > 0 ? (
-                    <img src={d.item.images[0].url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Heart className="w-12 h-12 text-pink-300" />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {d.item?.title || d.title || 'Donated Item'}
-                    </h3>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                        DONATION_STATUS_CONFIG[d.status]?.color || 'bg-gray-100'
-                      }`}
+        {/* Tab Navigation */}
+        <div className="flex gap-2 border-b border-gray-200 pb-2 overflow-x-auto scrollbar-none">
+          <button
+            onClick={() => handleTabChange('my_donations')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-2 ${
+              activeMainTab === 'my_donations'
+                ? 'bg-pink-600 text-white shadow-xs'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <Heart className="w-4 h-4" />
+            <span>My Donations</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeMainTab === 'my_donations' ? 'bg-pink-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {ownerDonations.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('community_needs')}
+            className={`px-4 py-2 text-xs font-bold rounded-xl transition-colors whitespace-nowrap flex items-center gap-2 ${
+              activeMainTab === 'community_needs'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Browse Community Needs</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                activeMainTab === 'community_needs' ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              {communityNeeds.length}
+            </span>
+          </button>
+        </div>
+
+        {/* TAB 1: MY DONATIONS */}
+        {activeMainTab === 'my_donations' && (
+          <div>
+            {ownerDonationsLoading ? (
+              <PageLoader />
+            ) : ownerDonations.length === 0 ? (
+              <EmptyState
+                icon={Heart}
+                title="No Active Donations"
+                description="You haven't offered any items for community donation yet. Browse active community needs or offer an item directly."
+                action={
+                  <div className="flex gap-2 justify-center mt-2">
+                    <button
+                      onClick={() => {
+                        setPreselectedNeedForDonation(null);
+                        setShowCreateDonationModal(true);
+                      }}
+                      className="btn-primary text-xs flex items-center gap-1.5"
                     >
-                      {DONATION_STATUS_CONFIG[d.status]?.label || d.status}
-                    </span>
+                      <Plus className="w-4 h-4" /> Offer an Item
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('community_needs')}
+                      className="btn-outline text-xs flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-4 h-4" /> Browse Needs
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{d.description}</p>
-                </div>
-                {d.handover?.confirmationCode && (
-                  <div className="p-2.5 bg-indigo-50 rounded-xl text-xs text-indigo-900 border border-indigo-100 flex items-center justify-between font-mono font-bold">
-                    <span>Confirmation Code:</span>
-                    <span className="text-sm text-indigo-700">{d.handover.confirmationCode}</span>
-                  </div>
-                )}
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {ownerDonations.map((d) => {
+                  const statusInfo = DONATION_STATUS_CONFIG[d.status] || {
+                    label: d.status,
+                    color: 'bg-gray-100 text-gray-800 border-gray-200',
+                  };
+                  const orgName =
+                    d.selectedOrganization?.organizationName ||
+                    d.matchedOrganizations?.[0]?.organization?.organizationName ||
+                    'Community Network';
+
+                  const canCancel = d.status === 'published' || d.status === 'matched';
+
+                  return (
+                    <div
+                      key={d._id}
+                      className="card p-5 space-y-4 hover:shadow-md transition-shadow flex flex-col justify-between border border-gray-100"
+                    >
+                      <div className="space-y-3">
+                        {/* Thumbnail */}
+                        <div className="h-44 bg-gray-50 rounded-2xl overflow-hidden flex items-center justify-center relative border border-gray-100">
+                          {d.item?.images?.length > 0 ? (
+                            <img
+                              src={d.item.images[0].url}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-2xl bg-pink-50 flex items-center justify-center">
+                              <Heart className="w-8 h-8 text-pink-400 fill-pink-100" />
+                            </div>
+                          )}
+                          <span
+                            className={`absolute top-2.5 right-2.5 text-[10px] font-bold px-2.5 py-1 rounded-full border backdrop-blur-xs shadow-2xs ${statusInfo.color}`}
+                          >
+                            {statusInfo.label}
+                          </span>
+                        </div>
+
+                        {/* Title & Organization */}
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900 truncate">
+                            {d.item?.title || d.title || 'Donated Item'}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-500">
+                            <Building className="w-3.5 h-3.5 text-gray-400" />
+                            <span className="truncate">{orgName}</span>
+                          </div>
+                          {d.description && (
+                            <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+                              {d.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Handover & Confirmation Box */}
+                        {d.handover?.confirmationCode && (
+                          <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl border border-indigo-100 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">
+                                Handover Code
+                              </span>
+                              <span className="text-xs font-mono font-black text-indigo-700 px-2 py-0.5 rounded-md bg-white border border-indigo-200">
+                                {d.handover.confirmationCode}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-indigo-600/90 leading-tight">
+                              Show this verification code upon handing over your item.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Scheduled Handover Details */}
+                        {d.handover?.scheduledDate && (
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 text-gray-700 font-semibold">
+                              <Calendar className="w-3.5 h-3.5 text-gray-500" />
+                              <span>
+                                {new Date(d.handover.scheduledDate).toLocaleDateString(undefined, {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                              <span className="text-gray-400">•</span>
+                              <span className="text-gray-500 font-normal">
+                                {d.handover.timeWindow || '09:00 - 13:00'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="truncate">
+                                {d.handover.hub?.name ||
+                                  d.handover.hub?.address?.city ||
+                                  d.pickupLocation?.approximateArea ||
+                                  'Designated Community Hub'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Status Messages */}
+                        {d.status === 'received' && (
+                          <div className="p-2.5 bg-purple-50 rounded-xl border border-purple-100 text-xs text-purple-800 flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span>Arrived at hub • Technical inspection in progress</span>
+                          </div>
+                        )}
+
+                        {d.status === 'inspected' && (
+                          <div className="p-2.5 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-800 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>Technical inspection passed • Ready for reuse</span>
+                          </div>
+                        )}
+
+                        {d.status === 'completed' && (
+                          <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-800 flex items-center gap-2">
+                            <Recycle className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>Successfully redistributed to beneficiary • E-waste diverted</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer Actions */}
+                      {canCancel && (
+                        <div className="pt-3 border-t border-gray-100">
+                          <button
+                            type="button"
+                            disabled={cancellingOfferId === d._id}
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to withdraw this donation offer?')) {
+                                setCancellingOfferId(d._id);
+                                cancelOfferMutation.mutate(d._id);
+                              }
+                            }}
+                            className="btn-outline btn-sm text-xs text-red-600 hover:bg-red-50 w-full flex items-center justify-center gap-1"
+                          >
+                            {cancellingOfferId === d._id ? (
+                              'Cancelling...'
+                            ) : (
+                              <>
+                                <XCircle className="w-3.5 h-3.5" /> Cancel Offer
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </div>
         )}
+
+        {/* TAB 2: COMMUNITY NEEDS */}
+        {activeMainTab === 'community_needs' && (
+          <div className="space-y-4">
+            <div className="bg-gradient-to-r from-indigo-50 via-white to-purple-50 p-4 rounded-2xl border border-indigo-100/60 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">
+                  Active Hardware Needs Posted by Non-Profits
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Select a community need to donate your hardware directly to students, teachers, and charitable clinics.
+                </p>
+              </div>
+            </div>
+
+            {needsLoading ? (
+              <PageLoader />
+            ) : communityNeeds.length === 0 ? (
+              <EmptyState
+                icon={Package}
+                title="No Community Needs Found"
+                description="There are currently no active community needs posted. You can still make an open donation to the community pool."
+                action={
+                  <button
+                    onClick={() => {
+                      setPreselectedNeedForDonation(null);
+                      setShowCreateDonationModal(true);
+                    }}
+                    className="btn-primary text-xs flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" /> Offer an Item to Community Pool
+                  </button>
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {communityNeeds.map((need) => {
+                  const urgencyColors = {
+                    critical: 'bg-red-100 text-red-800 border-red-200',
+                    high: 'bg-orange-100 text-orange-800 border-orange-200',
+                    medium: 'bg-blue-100 text-blue-800 border-blue-200',
+                    low: 'bg-gray-100 text-gray-700 border-gray-200',
+                  };
+
+                  const percentFulfilled = Math.min(
+                    100,
+                    Math.round(((need.quantityAccepted || 0) / (need.quantityRequested || 1)) * 100)
+                  );
+
+                  return (
+                    <div
+                      key={need._id}
+                      className="card p-5 space-y-4 hover:shadow-md transition-shadow flex flex-col justify-between border border-gray-100"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              urgencyColors[need.urgency] || urgencyColors.medium
+                            }`}
+                          >
+                            {need.urgency} Urgency
+                          </span>
+                          <span className="text-xs text-gray-500 font-semibold">
+                            {need.category?.name || 'Hardware'}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900 leading-snug">
+                            {need.title}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-indigo-700 font-medium">
+                            <Building className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{need.organization?.organizationName || 'Non-profit Organization'}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 line-clamp-2 leading-relaxed">
+                            {need.description}
+                          </p>
+                        </div>
+
+                        {need.beneficiaryContext && (
+                          <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 text-[11px] text-gray-600">
+                            <strong className="text-gray-800 block text-[10px] uppercase">
+                              Beneficiary Story:
+                            </strong>
+                            <span className="line-clamp-2">{need.beneficiaryContext}</span>
+                          </div>
+                        )}
+
+                        {/* Progress */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>Fulfilled:</span>
+                            <span className="font-bold text-gray-900">
+                              {need.quantityAccepted || 0} of {need.quantityRequested} items ({percentFulfilled}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-pink-500 rounded-full transition-all"
+                              style={{ width: `${percentFulfilled}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-gray-500 flex items-center justify-between pt-1">
+                          <span>Min condition: {need.minimumCondition}</span>
+                          {need.pickupAvailable && (
+                            <span className="text-emerald-700 font-medium flex items-center gap-1">
+                              <Truck className="w-3 h-3" /> Pickup Available
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreselectedNeedForDonation(need);
+                            setShowCreateDonationModal(true);
+                          }}
+                          className="btn-primary btn-sm text-xs w-full flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <Heart className="w-3.5 h-3.5 fill-white" /> Donate to this Need
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Global Create Donation Modal */}
+        <CreateDonationModal
+          open={showCreateDonationModal}
+          onClose={() => {
+            setShowCreateDonationModal(false);
+            setPreselectedNeedForDonation(null);
+          }}
+          preselectedNeed={preselectedNeedForDonation}
+        />
       </div>
     );
   }

@@ -28,9 +28,11 @@ export default function LoginPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await login(data.email, data.password);
+      const loggedInUser = await login(data.email, data.password);
       toast.success('Welcome back!');
-      navigate(from, { replace: true });
+      const defaultPath = loggedInUser?.role === 'admin' ? '/admin' : '/dashboard';
+      const targetPath = location.state?.from?.pathname || defaultPath;
+      navigate(targetPath, { replace: true });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Login failed');
     } finally {

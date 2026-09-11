@@ -15,6 +15,7 @@ import {
   Phone,
   Mail,
   Edit,
+  Shield,
   ShieldCheck,
   Star,
   Package,

@@ -322,26 +322,183 @@ class MockAIProvider {
   /**
    * Conversational Assistant Chat
    */
-  async chat({ message }) {
+  async chat({ message, imageBase64 }) {
     const lower = (message || '').toLowerCase();
 
-    if (lower.includes('safe') || lower.includes('microwave') || lower.includes('battery')) {
+    // 1. Technician & Expert Inquiries (e.g. "list the technocians", "find a technician", "who can fix")
+    if (
+      lower.includes('technician') ||
+      lower.includes('technocian') ||
+      lower.includes('tech') ||
+      lower.includes('mechanic') ||
+      lower.includes('expert') ||
+      lower.includes('who can fix') ||
+      lower.includes('repair shop') ||
+      lower.includes('list the')
+    ) {
       return {
-        reply: '⚠️ **Safety First!** High-voltage devices like microwaves, CRT monitors, and swollen lithium-ion batteries carry significant risks of electric shock or fire. We strongly recommend having a certified FixTogether technician inspect these items rather than attempting self-disassembly.',
-        suggestedActions: ['Find a certified technician', 'Post a repair request', 'Battery safety tips'],
+        reply: `🔧 **Verified Technicians on FixTogether**\n\nWe connect you with certified, background-checked repair professionals across multiple specializations:\n\n* **Sumon Electronics Pro** — *Specialties:* Motherboard micro-soldering, laptop chipset repair, display panel replacement (⭐ 4.9 Rating)\n* **Master Tech Lab** — *Specialties:* Smartphone screen replacement, battery restoration, charging IC diagnostics (⭐ 4.8 Rating)\n* **EcoFix Appliance Hub** — *Specialties:* Home appliances, power supplies, inverter boards (⭐ 4.9 Rating)\n\n### 🚀 How to get quotes from technicians:\n1. Click **Create Repair Request** to post your device issue.\n2. Matched technicians will review your request and send competitive price quotes with labor & parts breakdown.\n3. Chat directly with technicians, compare ratings, and choose the best offer!`,
+        category: 'Electronics',
+        skills: ['Micro-soldering', 'Smartphone Repair', 'Laptop Diagnostics', 'Appliance Repair'],
+        suggestedActions: [
+          'Create a repair request',
+          'View technician directory',
+          'How do quotations work?',
+        ],
       };
     }
 
-    if (lower.includes('quote') || lower.includes('price') || lower.includes('cost')) {
+    // 2. Critical Safety & Hazard Warnings
+    if (
+      lower.includes('safe') ||
+      lower.includes('smoke') ||
+      lower.includes('spark') ||
+      lower.includes('shock') ||
+      lower.includes('fire') ||
+      lower.includes('smell') ||
+      lower.includes('swollen') ||
+      lower.includes('burn') ||
+      lower.includes('microwave') ||
+      lower.includes('high voltage') ||
+      lower.includes('gas')
+    ) {
       return {
-        reply: '💰 **How Quotations Work:** Once you publish a repair request, matched technicians review your issue and submit itemized quotations (labor, parts estimate, expected duration, and warranty). You can compare quotes and message technicians directly before accepting!',
-        suggestedActions: ['Create a repair request', 'View technician profiles', 'How long does repair take?'],
+        reply: `⚠️ **CRITICAL SAFETY ADVISORY**\n\nHigh-voltage equipment, exposed wiring, and swollen lithium-ion batteries present severe hazards including **electric shock, fire, and toxic chemical exposure**.\n\n* **Do NOT attempt to disassemble or puncture swollen batteries.**\n* **Never open microwave ovens or power supplies with large charged capacitors.**\n* **Immediately disconnect the item from wall power outlets.**\n\nWe strongly recommend having a certified FixTogether technician inspect the device in a safe workshop environment.`,
+        category: 'Safety Hazards',
+        skills: ['High-voltage safety', 'Battery handling'],
+        suggestedActions: [
+          'Find a certified technician',
+          'Create a repair request',
+          'Battery safety guidelines',
+        ],
+      };
+    }
+
+    // 3. Laptop / Computer Diagnostics
+    if (
+      lower.includes('laptop') ||
+      lower.includes('computer') ||
+      lower.includes('pc') ||
+      lower.includes('macbook') ||
+      lower.includes('motherboard') ||
+      lower.includes('boot') ||
+      lower.includes('blue screen') ||
+      lower.includes('ram') ||
+      lower.includes('cpu')
+    ) {
+      return {
+        reply: `💻 **Laptop & Computer Diagnostic Assessment**\n\nCommon failure points identified:\n\n1. **Power & Charging Circuit:** Test with a verified working adapter. Check for battery charging indicator LEDs.\n2. **Thermal & Cooling:** Overheating can trigger thermal shutdowns. Inspect air vents and listen for fan operation.\n3. **Display vs GPU:** If the power LED lights up but the screen remains dark, connect an external HDMI monitor to isolate whether the fault is with the display panel or motherboard.\n\n*Preliminary Recommendation:* A technician equipped with multimeter & diagnostic bench equipment can test the power rail and component integrity.`,
+        category: 'Laptops',
+        skills: ['Motherboard diagnostics', 'Thermal management', 'Screen replacement', 'Soldering'],
+        suggestedActions: [
+          'Create laptop repair request',
+          'Is it worth repairing?',
+          'How long do laptop repairs take?',
+        ],
+      };
+    }
+
+    // 4. Smartphone / Mobile Diagnostics
+    if (
+      lower.includes('phone') ||
+      lower.includes('smartphone') ||
+      lower.includes('iphone') ||
+      lower.includes('samsung') ||
+      lower.includes('screen') ||
+      lower.includes('touch') ||
+      lower.includes('cracked') ||
+      lower.includes('display')
+    ) {
+      return {
+        reply: `📱 **Smartphone & Display Diagnostic Assessment**\n\n* **Cracked Glass vs OLED/LCD:** If touch response works and there are no colored vertical lines or black ink spots, only the top glass or digitizer assembly requires replacement.\n* **Charging Port Issues:** Inspect the USB-C/Lightning port under a flashlight for compacted lint before attempting cable replacement.\n* **Battery Degradation:** If the phone powers off unexpectedly under 20% charge, the battery capacity has likely degraded below 80% health.\n\n*Next Step:* Post a repair request to receive competitive quotations from local mobile technicians!`,
+        category: 'Smartphones',
+        skills: ['Screen replacement', 'Battery replacement', 'Charging port repair', 'Micro-soldering'],
+        suggestedActions: [
+          'Request screen repair',
+          'Get battery replacement quote',
+          'View mobile technicians',
+        ],
+      };
+    }
+
+    // 5. Water & Liquid Damage
+    if (lower.includes('water') || lower.includes('liquid') || lower.includes('spill') || lower.includes('dropped in')) {
+      return {
+        reply: `💧 **Liquid Damage Emergency Checklist**\n\n1. **Power Off Immediately:** Do not try to turn on or charge the device.\n2. **Do NOT use rice or hair dryers:** Rice leaves starch dust and heat pushes moisture deeper into sensitive chips.\n3. **Disconnect Battery:** If the battery is removable, take it out right away.\n4. **Seek Professional Ultrasonic Cleaning:** Mineral deposits cause rapid corrosion on PCB traces. A technician will clean the motherboard in an isopropyl alcohol/ultrasonic bath.`,
+        category: 'Liquid Damage',
+        skills: ['Ultrasonic cleaning', 'Corrosion repair', 'Board diagnostics'],
+        suggestedActions: [
+          'Find emergency technician',
+          'Create repair request',
+        ],
+      };
+    }
+
+    // 6. Donations, E-Waste & Reuse Inquiries
+    if (
+      lower.includes('donate') ||
+      lower.includes('donation') ||
+      lower.includes('recycle') ||
+      lower.includes('e-waste') ||
+      lower.includes('give away') ||
+      lower.includes('organization') ||
+      lower.includes('reuse')
+    ) {
+      return {
+        reply: `🌱 **Donations & Responsible E-Waste Recycling**\n\nFixTogether partners with verified community organizations, schools, and non-profits:\n\n* **Donation Offers:** You can list working, partially working, or fixable devices for donation. Local organizations will arrange pickup or drop-off.\n* **Refurbishment Projects:** Non-profit technical teams refurbish donated electronics and distribute them to underserved students and community centers.\n* **Zero E-Waste Policy:** Non-repairable items are recycled responsibly for raw metal and component recovery.`,
+        category: 'Donations',
+        skills: ['Refurbishment', 'Hardware testing'],
+        suggestedActions: [
+          'Donate an item now',
+          'View community needs',
+          'How donation pickup works',
+        ],
+      };
+    }
+
+    // 7. Quotations, Pricing & Payment Inquiries
+    if (
+      lower.includes('quote') ||
+      lower.includes('price') ||
+      lower.includes('cost') ||
+      lower.includes('how much') ||
+      lower.includes('fee') ||
+      lower.includes('charge')
+    ) {
+      return {
+        reply: `💰 **How Quotations & Payments Work**\n\n1. **Free to Post:** Submitting a repair request and receiving diagnostic advice is 100% free.\n2. **Itemized Quotes:** Technicians submit competitive bids broken down by **Labor**, **Parts Cost**, and **Estimated Duration**.\n3. **Warranty Included:** Technicians specify repair warranty duration (typically 30 to 90 days).\n4. **Direct Payment Transparency:** Repair payments are settled directly between you and the technician upon satisfactory inspection.`,
+        category: 'Quotations',
+        skills: ['General repair'],
+        suggestedActions: [
+          'Create a repair request',
+          'View technician profiles',
+          'Warranty policy details',
+        ],
+      };
+    }
+
+    // 8. General & Visual Inspection Fallback
+    if (imageBase64) {
+      return {
+        reply: `📷 **Visual Inspection Analysis Completed**\n\nBased on the photo provided:\n\n* **Item Identified:** Electronic hardware device.\n* **Visual Findings:** Visible wear and potential component fault requiring internal inspection.\n* **Preliminary Recommendation:** Clean external contact points, verify power supply stability, and submit a repair request to have verified technicians diagnose the internal circuits.\n\n*Safety Reminder: Always unplug from mains power before inspection.*`,
+        category: 'Electronics',
+        skills: ['Visual inspection', 'Hardware diagnostics'],
+        suggestedActions: [
+          'Create repair request with this photo',
+          'Find matching technicians',
+          'Is it safe to repair?',
+        ],
       };
     }
 
     return {
-      reply: `👋 Hello! I am **Fixie**, your FixTogether AI repair assistant. I can help you diagnose broken electronics, verify safety precautions, prepare detailed repair requests, or connect with verified technicians. How can I assist you today?`,
-      suggestedActions: ['Help diagnose my item', 'Is it safe to repair?', 'How do quotations work?'],
+      reply: `👋 Hello! I am **Fixie**, your FixTogether AI repair assistant.\n\nI can help you with:\n* 🔍 **Diagnosing broken devices** (upload a photo or describe the symptoms)\n* ⚡ **Safety & hazard checks** (verify high-voltage & battery precautions)\n* 👨‍🔧 **Connecting with verified local technicians**\n* 🎁 **Donating unused items to community organizations**\n\nHow can I help you today?`,
+      suggestedActions: [
+        'List the technicians',
+        'Diagnose a broken device',
+        'Is it safe to repair myself?',
+        'How do repair requests work?',
+      ],
     };
   }
 }

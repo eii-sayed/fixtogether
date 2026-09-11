@@ -181,7 +181,7 @@ const login = asyncHandler(async (req, res) => {
  * POST /auth/refresh
  */
 const refreshTokenHandler = asyncHandler(async (req, res) => {
-  const token = req.cookies.refreshToken || req.body.refreshToken;
+  const token = req.body?.refreshToken || req.cookies?.refreshToken;
 
   if (!token) {
     return errorResponse(res, 'Refresh token is required.', 401);
@@ -199,10 +199,30 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
     return errorResponse(res, 'User not found.', 401);
   }
 
-  // Verify the token exists in user's refresh tokens
-  const tokenExists = user.refreshTokens.some((rt) => rt.token === token);
-  if (!tokenExists) {
-    // Possible token reuse attack - revoke all tokens
+  const userRefreshTokens = user.refreshTokens || [];
+  const foundToken = userRefreshTokens.find((rt) => rt.token === token);
+
+  // Grace period for concurrent requests: if token was rotated in the last 60 seconds, return the replacement
+  if (foundToken && foundToken.revokedAt) {
+    const gracePeriodMs = 60 * 1000;
+    const isWithinGracePeriod = (Date.now() - new Date(foundToken.revokedAt).getTime()) < gracePeriodMs;
+    if (isWithinGracePeriod && foundToken.replacedByToken) {
+      const existingAccessToken = generateAccessToken(user._id, user.role);
+      res.cookie('refreshToken', foundToken.replacedByToken, {
+        httpOnly: true,
+        secure: config.env === 'production',
+        sameSite: config.env === 'production' ? 'none' : 'strict',
+        maxAge: parseDuration(config.jwt.refreshExpiresIn),
+      });
+      return successResponse(res, {
+        accessToken: existingAccessToken,
+        refreshToken: foundToken.replacedByToken,
+      }, 'Token refreshed');
+    }
+  }
+
+  // If token is missing from user's record or revoked outside grace period, treat as reuse attack
+  if (!foundToken || foundToken.revokedAt) {
     await User.findByIdAndUpdate(user._id, { refreshTokens: [] });
     return errorResponse(res, 'Token reuse detected. All sessions revoked.', 401);
   }
@@ -211,11 +231,33 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   const newAccessToken = generateAccessToken(user._id, user.role);
   const newRefreshToken = generateRefreshToken(user._id);
 
-  // Remove old token, add new one
+  // Mark current token as revoked and replaced with new token
   const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
+  const twoMinutesAgo = new Date(Date.now() - 120000);
+
+  await User.updateOne(
+    { _id: user._id, 'refreshTokens.token': token },
+    {
+      $set: {
+        'refreshTokens.$.revokedAt': new Date(),
+        'refreshTokens.$.replacedByToken': newRefreshToken,
+      },
+    }
+  );
+
+  // Prune expired or stale revoked tokens older than 2 minutes
   await User.findByIdAndUpdate(user._id, {
-    $pull: { refreshTokens: { token } },
+    $pull: {
+      refreshTokens: {
+        $or: [
+          { expiresAt: { $lt: new Date() } },
+          { revokedAt: { $ne: null, $lt: twoMinutesAgo } },
+        ],
+      },
+    },
   });
+
+  // Add the new refresh token
   await User.findByIdAndUpdate(user._id, {
     $push: {
       refreshTokens: {

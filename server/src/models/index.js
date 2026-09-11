@@ -25,8 +25,9 @@ const AuditLog = require('./AuditLog');
 const Message = require('./Message');
 const ImpactRecord = require('./ImpactRecord');
 const ReviewQueueItem = require('./ReviewQueueItem');
-
 const OutboxEvent = require('./OutboxEvent');
+const Thread = require('./Thread');
+const ThreadComment = require('./ThreadComment');
 
 module.exports = {
   User,
@@ -57,4 +58,6 @@ module.exports = {
   Message,
   ReviewQueueItem,
   OutboxEvent,
+  Thread,
+  ThreadComment,
 };

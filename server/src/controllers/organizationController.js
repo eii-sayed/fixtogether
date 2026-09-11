@@ -591,6 +591,7 @@ const getDonationOffers = asyncHandler(async (req, res) => {
 
   return successResponse(res, {
     offers: sanitizedOffers,
+    donations: sanitizedOffers,
     pagination: paginationMeta(total, page, limit),
     tabCounts,
   });
@@ -1026,7 +1027,11 @@ const getCommunityNeeds = asyncHandler(async (req, res) => {
   }
 
   if (category) query.category = category;
-  if (status) query.status = status;
+  if (status) {
+    query.status = status;
+  } else if (req.user.role === 'owner') {
+    query.status = { $in: [COMMUNITY_NEED_STATUS.PUBLISHED, COMMUNITY_NEED_STATUS.PARTIALLY_MATCHED] };
+  }
   if (urgency) query.urgency = urgency;
 
   const [needs, total] = await Promise.all([

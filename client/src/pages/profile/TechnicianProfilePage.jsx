@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { PageLoader, ErrorState, Pagination } from '../../components/ui';
 import ReviewCard from '../../components/reviews/ReviewCard';
+import { useAuth } from '../../context/AuthContext';
 import {
   ArrowLeft,
   Star,
@@ -19,28 +20,54 @@ import {
   Award,
   DollarSign,
   Shield,
+  MessageCircle,
 } from 'lucide-react';
 
 export default function TechnicianProfilePage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('portfolio');
 
+  const effectiveId = id === 'profile' || id === 'me' ? user?.userId || user?._id : id;
+
   const { data: profileData, isLoading: profileLoading, error: profileError } = useQuery({
-    queryKey: ['technician', id],
-    queryFn: () => api.get(`/technicians/${id}`).then((r) => r.data.data.technician),
+    queryKey: ['technician', effectiveId],
+    queryFn: () => api.get(`/technicians/${effectiveId}`).then((r) => r.data.data.technician),
+    enabled: !!effectiveId,
   });
 
   const { data: reviewsData, isLoading: reviewsLoading } = useQuery({
-    queryKey: ['technician-reviews', id, page],
+    queryKey: ['technician-reviews', effectiveId, page],
     queryFn: () =>
-      api.get(`/technicians/${profileData?.userId || id}/reviews?page=${page}&limit=10`).then((r) => r.data.data),
+      api.get(`/technicians/${profileData?.userId || effectiveId}/reviews?page=${page}&limit=10`).then((r) => r.data.data),
     enabled: !!profileData,
   });
 
   if (profileLoading) return <PageLoader />;
-  if (profileError) return <ErrorState error={profileError} />;
+
+  if (profileError || (!effectiveId && !profileLoading)) {
+    return (
+      <div className="page-container max-w-xl py-16 text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+          <Wrench className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900">Technician Profile Not Found</h2>
+        <p className="text-sm text-gray-500">
+          The technician profile you are looking for might have moved, or is currently undergoing verification.
+        </p>
+        <div className="pt-2 flex items-center justify-center gap-3">
+          <Link to="/technicians" className="btn-primary text-xs">
+            Browse All Technicians
+          </Link>
+          <button onClick={() => navigate(-1)} className="btn-ghost text-xs">
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tech = profileData;
 
@@ -58,9 +85,11 @@ export default function TechnicianProfilePage() {
 
   return (
     <div className="page-container max-w-5xl space-y-6">
-      <button onClick={() => navigate(-1)} className="btn-ghost -ml-2">
-        <ArrowLeft className="w-4 h-4" /> Back to Directory
-      </button>
+      <div className="flex items-center gap-2">
+        <Link to="/technicians" className="btn-ghost -ml-2 text-xs flex items-center gap-1.5">
+          <ArrowLeft className="w-4 h-4" /> All Technicians Directory
+        </Link>
+      </div>
 
       {/* HEADER CARD */}
       <div className="card bg-white border overflow-hidden">
@@ -98,9 +127,15 @@ export default function TechnicianProfilePage() {
 
             <div className="flex items-center gap-3">
               {getAvailabilityChip(tech?.availabilityStatus)}
-              <Link to="/repair-requests/new" className="btn-primary btn-sm flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5" /> Request Repair
-              </Link>
+              {user && (user.userId === tech?.userId || user._id === tech?.userId) ? (
+                <Link to="/profile" className="btn-outline btn-sm flex items-center gap-1.5 text-xs font-semibold">
+                  Edit My Profile
+                </Link>
+              ) : (
+                <Link to="/repair-requests/new" className="btn-primary btn-sm flex items-center gap-1.5 shadow-xs">
+                  <Wrench className="w-3.5 h-3.5" /> Request Repair
+                </Link>
+              )}
             </div>
           </div>
 

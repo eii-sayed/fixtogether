@@ -7,11 +7,10 @@ const {
   parsePagination,
   paginationMeta,
 } = require('../utils/helpers');
-const { VERIFICATION_STATUS, ROLES } = require('../constants');
+const { VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, QUOTATION_STATUS } = require('../constants');
 const uploadService = require('../services/uploadService');
 const { createAuditLog } = require('../middleware/auditLog');
 const { createNotification } = require('../services/notificationService');
-const { NOTIFICATION_TYPES } = require('../constants');
 
 /**
  * GET /technicians
@@ -78,7 +77,16 @@ const getTechnicians = asyncHandler(async (req, res) => {
  * Public technician profile DTO
  */
 const getTechnicianById = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  let { id } = req.params;
+
+  // Handle 'profile' or 'me' aliases
+  if (id === 'profile' || id === 'me') {
+    if (req.user?.userId) {
+      id = req.user.userId;
+    } else {
+      return errorResponse(res, 'Please provide a valid technician ID.', 400);
+    }
+  }
 
   let query = {};
   if (mongoose.Types.ObjectId.isValid(id)) {

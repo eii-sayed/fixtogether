@@ -3,10 +3,18 @@ import api from '../api/axios';
 
 const AuthContext = createContext(null);
 
+const normalizeUser = (u) => {
+  if (!u) return null;
+  return {
+    ...u,
+    userId: u.userId || u._id,
+  };
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
+    return saved ? normalizeUser(JSON.parse(saved)) : null;
   });
   const [loading, setLoading] = useState(true);
 
@@ -18,12 +26,13 @@ export function AuthProvider({ children }) {
         .get('/auth/me')
         .then(({ data }) => {
           if (data?.data?.user) {
-            setUser(data.data.user);
-            localStorage.setItem('user', JSON.stringify(data.data.user));
+            const normalized = normalizeUser(data.data.user);
+            setUser(normalized);
+            localStorage.setItem('user', JSON.stringify(normalized));
           }
         })
         .catch((err) => {
-          if (err.response?.status === 401) {
+          if (err.response?.status === 401 && !localStorage.getItem('accessToken')) {
             localStorage.clear();
             setUser(null);
           }
@@ -37,21 +46,23 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     const { user: u, accessToken, refreshToken } = data.data;
+    const normalized = normalizeUser(u);
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(u));
-    setUser(u);
-    return u;
+    localStorage.setItem('user', JSON.stringify(normalized));
+    setUser(normalized);
+    return normalized;
   }, []);
 
   const register = useCallback(async (formData) => {
     const { data } = await api.post('/auth/register', formData);
     const { user: u, accessToken, refreshToken } = data.data;
+    const normalized = normalizeUser(u);
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(u));
-    setUser(u);
-    return u;
+    localStorage.setItem('user', JSON.stringify(normalized));
+    setUser(normalized);
+    return normalized;
   }, []);
 
   const logout = useCallback(async () => {
@@ -64,7 +75,7 @@ export function AuthProvider({ children }) {
 
   const updateUser = useCallback((updates) => {
     setUser((prev) => {
-      const updated = { ...(prev || {}), ...updates };
+      const updated = normalizeUser({ ...(prev || {}), ...updates });
       localStorage.setItem('user', JSON.stringify(updated));
       return updated;
     });
@@ -74,8 +85,9 @@ export function AuthProvider({ children }) {
     try {
       const { data } = await api.get('/auth/me');
       if (data?.data?.user) {
-        setUser(data.data.user);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
+        const normalized = normalizeUser(data.data.user);
+        setUser(normalized);
+        localStorage.setItem('user', JSON.stringify(normalized));
       }
     } catch {}
   }, []);

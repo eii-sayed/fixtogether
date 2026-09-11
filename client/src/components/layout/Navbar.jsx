@@ -23,36 +23,36 @@ import {
   Sparkles,
   ShieldCheck,
   Search,
+  MessagesSquare,
 } from 'lucide-react';
 
 const roleNavItems = {
   owner: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'My Items', path: '/items', icon: Package },
+    { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
     { label: 'Donations', path: '/donations', icon: Heart },
   ],
   technician: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: ClipboardList },
     { label: 'My Jobs', path: '/repair-jobs', icon: Wrench },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
   ],
   organization: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Donations', path: '/donations', icon: Heart },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
   ],
   admin: [
-    { label: 'Command Center', path: '/admin', icon: LayoutDashboard },
-    { label: 'Review Queue', path: '/admin/review-queue', icon: ClipboardList },
-    { label: 'Verifications', path: '/admin/verifications', icon: ShieldCheck },
-    { label: 'Users', path: '/admin/users', icon: Users },
-    { label: 'Safety & Regex', path: '/admin/safety', icon: Cog },
-    { label: 'Disputes', path: '/admin/disputes', icon: MessageCircle },
-    { label: 'Taxonomy', path: '/admin/taxonomy', icon: Package },
-    { label: 'Audit & AI', path: '/admin/audit-logs', icon: ShieldCheck },
+    { label: 'Admin Console', path: '/admin', icon: LayoutDashboard },
+    { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
+    { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
+    { label: 'Donation Network', path: '/donations', icon: Heart },
   ],
 };
 
@@ -270,8 +270,19 @@ export default function Navbar() {
                             className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
                             onClick={() => setProfileOpen(false)}
                           >
-                            <User className="w-4 h-4 text-gray-400" /> My Profile & Dashboard
+                            <User className="w-4 h-4 text-gray-400" /> My Profile
                           </Link>
+
+                          {user?.role === 'admin' && (
+                            <Link
+                              to="/admin"
+                              role="menuitem"
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-primary-700 bg-primary-50/70 hover:bg-primary-100/80 transition-colors"
+                              onClick={() => setProfileOpen(false)}
+                            >
+                              <LayoutDashboard className="w-4 h-4 text-primary-600" /> Admin Command Center
+                            </Link>
+                          )}
 
                           {(user?.role === 'technician' || user?.role === 'organization') && (
                             <Link
@@ -310,6 +321,13 @@ export default function Navbar() {
               </>
             ) : (
               <div className="flex items-center gap-2">
+                <Link
+                  to="/forum"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-gray-600 hover:text-primary-700 hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  <MessagesSquare className="w-4 h-4 text-primary-600" />
+                  <span>Forum</span>
+                </Link>
                 <Link to="/login" className="btn-ghost btn-sm font-semibold">
                   Log in
                 </Link>

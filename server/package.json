@@ -9,6 +9,9 @@
     "test": "jest --forceExit --detectOpenHandles --coverage",
     "test:watch": "jest --watch",
     "seed": "node src/scripts/seed.js",
+    "seed:donations": "node src/scripts/seedDonations.js",
+    "seed:threads": "node src/scripts/seedThreads.js",
+    "build": "node -e \"console.log('No build required for server')\"",
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },

@@ -41,6 +41,9 @@ import {
   AlertCircle,
   X,
   Loader2,
+  CheckSquare,
+  PackageCheck,
+  UserCheck,
 } from 'lucide-react';
 import RepairConversation from '../../components/chat/RepairConversation';
 import QuotationBuilderModal from '../../components/quotations/QuotationBuilderModal';
@@ -48,6 +51,7 @@ import InspectionReportModal from '../../components/jobs/InspectionReportModal';
 import CostApprovalModal from '../../components/jobs/CostApprovalModal';
 import PartsTrackerModal from '../../components/jobs/PartsTrackerModal';
 import QualityCheckModal from '../../components/jobs/QualityCheckModal';
+import AssignTechnicianModal from '../../components/repairs/AssignTechnicianModal';
 
 export default function RepairRequestDetailPage() {
   const { id } = useParams();
@@ -57,6 +61,7 @@ export default function RepairRequestDetailPage() {
 
   // Modals & UI state
   const [showQuotationModal, setShowQuotationModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [showInspectionModal, setShowInspectionModal] = useState(false);
   const [showCostApprovalModal, setShowCostApprovalModal] = useState(false);
   const [showPartsModal, setShowPartsModal] = useState(false);
@@ -87,12 +92,31 @@ export default function RepairRequestDetailPage() {
   });
 
   const rr = data?.repairRequest;
-  const isOwner = user?.userId === rr?.owner?._id || user?.userId === rr?.owner;
+  const currentUserId = (user?.userId || user?._id)?.toString();
+  const ownerId = (rr?.owner?._id || rr?.owner)?.toString();
+  const isOwner = Boolean(currentUserId && ownerId && currentUserId === ownerId);
   const isAdmin = user?.role === 'admin';
   const isTechnician = user?.role === 'technician';
+  const canManageAssignment = isOwner || isAdmin;
   const analysis = rr?.aiAnalysis;
   const statusConfig = getStatusConfig(rr?.requestStatus);
   const currentStageIndex = getStageProgress(rr?.requestStatus);
+
+  const resolvedPrimaryAction = statusConfig.primaryAction
+    ? (isOwner
+        ? (statusConfig.primaryAction.owner || statusConfig.primaryAction)
+        : isTechnician
+        ? statusConfig.primaryAction.technician
+        : statusConfig.primaryAction.admin || statusConfig.primaryAction.owner || statusConfig.primaryAction)
+    : null;
+
+  const resolvedSecondaryAction = statusConfig.secondaryAction
+    ? (isOwner
+        ? (statusConfig.secondaryAction.owner || statusConfig.secondaryAction)
+        : isTechnician
+        ? statusConfig.secondaryAction.technician
+        : statusConfig.secondaryAction.admin || statusConfig.secondaryAction.owner || statusConfig.secondaryAction)
+    : null;
 
   // 2. Fetch Quotations if in quote/active stages
   const { data: quotesData } = useQuery({
@@ -253,6 +277,12 @@ export default function RepairRequestDetailPage() {
       case 'view_matches':
         navigate(`/repair-requests/${id}/matches`);
         break;
+      case 'scroll_quotes':
+        document.getElementById('quotations-section')?.scrollIntoView({ behavior: 'smooth' });
+        break;
+      case 'assign_technician':
+        setShowAssignModal(true);
+        break;
       case 'confirm_completion':
         confirmCompletionMutation.mutate();
         break;
@@ -384,28 +414,39 @@ export default function RepairRequestDetailPage() {
 
               {/* Action Buttons Row */}
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                {isOwner && statusConfig.primaryAction && (
+                {canManageAssignment && resolvedPrimaryAction?.label && (
                   <button
-                    onClick={() => handleActionClick(statusConfig.primaryAction.action)}
+                    onClick={() => handleActionClick(resolvedPrimaryAction.action)}
                     disabled={analyzeMutation.isPending || publishMutation.isPending}
                     className="btn-primary btn-sm flex items-center gap-1.5 shadow-sm active:scale-95"
                   >
                     {analyzeMutation.isPending || publishMutation.isPending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      statusConfig.primaryAction.icon && <statusConfig.primaryAction.icon className="w-4 h-4" />
+                      resolvedPrimaryAction.icon && <resolvedPrimaryAction.icon className="w-4 h-4" />
                     )}
-                    <span>{statusConfig.primaryAction.label}</span>
+                    <span>{resolvedPrimaryAction.label}</span>
                   </button>
                 )}
 
-                {isOwner && statusConfig.secondaryAction && (
+                {canManageAssignment && resolvedSecondaryAction?.label && (
                   <button
-                    onClick={() => handleActionClick(statusConfig.secondaryAction.action)}
+                    onClick={() => handleActionClick(resolvedSecondaryAction.action)}
                     className="btn-outline btn-sm bg-white hover:bg-gray-50 flex items-center gap-1.5"
                   >
-                    {statusConfig.secondaryAction.icon && <statusConfig.secondaryAction.icon className="w-4 h-4" />}
-                    <span>{statusConfig.secondaryAction.label}</span>
+                    {resolvedSecondaryAction.icon && <resolvedSecondaryAction.icon className="w-4 h-4" />}
+                    <span>{resolvedSecondaryAction.label}</span>
+                  </button>
+                )}
+
+                {/* Direct Assign Technician Button */}
+                {canManageAssignment && !rr?.selectedQuotation && !activeJob && ['published', 'matching_technicians', 'awaiting_quotations', 'quotations_received'].includes(rr?.requestStatus) && (
+                  <button
+                    onClick={() => setShowAssignModal(true)}
+                    className="btn-secondary btn-sm flex items-center gap-1.5 shadow-xs bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-300 active:scale-95 font-bold"
+                  >
+                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Assign Technician</span>
                   </button>
                 )}
 
@@ -700,7 +741,14 @@ export default function RepairRequestDetailPage() {
                     Received Quotations ({quotations.length})
                   </h3>
                 </div>
-                <span className="text-xs text-gray-500">Compare verified proposals</span>
+                {canManageAssignment && !rr?.selectedQuotation && (
+                  <button
+                    onClick={() => setShowAssignModal(true)}
+                    className="btn-outline btn-xs flex items-center gap-1 font-semibold text-primary-700 hover:text-primary-800 bg-white"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" /> Directly Assign Someone Else
+                  </button>
+                )}
               </div>
 
               <div className="divide-y divide-gray-100">
@@ -769,14 +817,14 @@ export default function RepairRequestDetailPage() {
                         </p>
                       )}
 
-                      {/* Accept Proposal Button for Owner */}
-                      {isOwner && q.status === 'submitted' && !rr?.selectedQuotation && (
-                        <div className="pt-2">
+                      {/* Accept Proposal Button for Owner / Admin */}
+                      {canManageAssignment && ['submitted', 'revised'].includes(q.status) && !rr?.selectedQuotation && (
+                        <div className="pt-3 border-t border-gray-100 mt-2">
                           <button
                             onClick={() => setSelectedQuoteForAccept(q)}
-                            className="btn-primary btn-sm w-full flex items-center justify-center gap-2 py-2.5"
+                            className="btn-primary btn-sm w-full flex items-center justify-center gap-2 py-2.5 font-bold shadow-xs hover:shadow-md transition-all active:scale-98"
                           >
-                            <CheckCircle className="w-4 h-4" /> Accept Quotation & Assign Technician
+                            <CheckCircle className="w-4 h-4" /> Assign to {q.technician?.fullName || 'Technician'} & Accept Quotation
                           </button>
                         </div>
                       )}
@@ -784,6 +832,27 @@ export default function RepairRequestDetailPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Direct Assignment Banner when no quotations yet */}
+          {quotations.length === 0 && canManageAssignment && !rr?.selectedQuotation && !activeJob && ['published', 'matching_technicians', 'awaiting_quotations'].includes(rr?.requestStatus) && (
+            <div className="card p-5 bg-gradient-to-r from-primary-50/60 via-emerald-50/40 to-teal-50/60 border border-primary-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900">Want to assign a specialist directly?</h4>
+                  <p className="text-xs text-gray-500">You don't have to wait for quotes. You can select and assign any verified technician right now.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAssignModal(true)}
+                className="btn-primary btn-sm shrink-0 flex items-center gap-1.5 shadow-sm font-bold active:scale-95"
+              >
+                <UserCheck className="w-4 h-4" /> Assign Technician Now
+              </button>
             </div>
           )}
 
@@ -1029,18 +1098,18 @@ export default function RepairRequestDetailPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 2: CONFIRM QUOTATION ACCEPTANCE */}
+      {/* MODAL 2: CONFIRM QUOTATION ACCEPTANCE & TECHNICIAN ASSIGNMENT */}
       {/* ========================================================================= */}
       {selectedQuoteForAccept && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
             <div className="flex items-center gap-2 text-primary-700 font-bold text-base">
               <CheckCircle className="w-5 h-5" />
-              <span>Accept Quotation Proposal</span>
+              <span>Assign Technician & Accept Proposal</span>
             </div>
 
             <p className="text-xs text-gray-600 leading-relaxed">
-              You are selecting <strong>{selectedQuoteForAccept.technician?.fullName}</strong> for this repair.
+              You are assigning <strong>{selectedQuoteForAccept.technician?.fullName}</strong> to perform and complete this repair work.
             </p>
 
             <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 text-xs space-y-1.5">
@@ -1059,7 +1128,7 @@ export default function RepairRequestDetailPage() {
             </div>
 
             <p className="text-[11px] text-gray-500">
-              * Competing quotations will be automatically marked as closed. You can coordinate handover right away.
+              * Competing quotations will be automatically closed. An active repair job will be generated immediately.
             </p>
 
             <div className="flex gap-2 justify-end pt-2">
@@ -1069,10 +1138,10 @@ export default function RepairRequestDetailPage() {
               <button
                 onClick={() => acceptQuotationMutation.mutate(selectedQuoteForAccept._id)}
                 disabled={acceptQuotationMutation.isPending}
-                className="btn-primary btn-sm flex items-center gap-1.5"
+                className="btn-primary btn-sm flex items-center gap-1.5 font-bold"
               >
                 {acceptQuotationMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Confirm Acceptance
+                Confirm & Assign Technician
               </button>
             </div>
           </div>
@@ -1267,6 +1336,15 @@ export default function RepairRequestDetailPage() {
           open={showQualityCheckModal}
           onClose={() => setShowQualityCheckModal(false)}
           repairJob={activeJob}
+        />
+      )}
+
+      {showAssignModal && (
+        <AssignTechnicianModal
+          open={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          repairRequest={rr}
+          quotations={quotations}
         />
       )}
     </div>

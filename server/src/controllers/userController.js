@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const {
   User,
   TechnicianProfile,
@@ -657,6 +658,66 @@ const moderateUser = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * GET /users/:id
+ * Public user profile DTO - accessible by anyone
+ */
+const getUserPublicProfile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return errorResponse(res, 'Invalid user ID format.', 400);
+  }
+
+  const user = await User.findById(id).select(
+    'fullName profileImage bio city serviceArea role createdAt privacySettings'
+  );
+
+  if (!user) {
+    return errorResponse(res, 'User not found.', 404);
+  }
+
+  const privacy = user.privacySettings || {};
+
+  let roleProfile = null;
+  if (user.role === ROLES.TECHNICIAN) {
+    roleProfile = await TechnicianProfile.findOne({ user: user._id })
+      .populate('skills', 'name')
+      .populate('supportedCategories', 'name icon')
+      .select('verificationStatus averageRating reviewCount completedRepairCount availabilityStatus yearsOfExperience professionalName minimumServiceCharge');
+  } else if (user.role === ROLES.ORGANIZATION) {
+    roleProfile = await OrganizationProfile.findOne({ user: user._id })
+      .select('organizationName organizationType verificationStatus city serviceAreas');
+  }
+
+  // Aggregate public contributions
+  const [itemsCount, completedRepairsCount, donationsCount] = await Promise.all([
+    Item.countDocuments({ owner: user._id }),
+    RepairJob.countDocuments({ owner: user._id, status: 'completed' }),
+    DonationOffer.countDocuments({ owner: user._id, status: { $in: ['accepted', 'completed'] } }),
+  ]);
+
+  const publicUser = {
+    _id: user._id,
+    fullName: user.fullName,
+    profileImage: user.profileImage,
+    bio: user.bio,
+    city: privacy.showLocationPublicly ? user.city : undefined,
+    serviceArea: privacy.showLocationPublicly ? user.serviceArea : undefined,
+    role: user.role,
+    memberSince: user.createdAt,
+    technicianProfile: roleProfile && user.role === ROLES.TECHNICIAN ? roleProfile : undefined,
+    organizationProfile: roleProfile && user.role === ROLES.ORGANIZATION ? roleProfile : undefined,
+    stats: {
+      itemsRegistered: itemsCount,
+      repairsCompleted: completedRepairsCount,
+      donationsContributed: donationsCount,
+    },
+  };
+
+  return successResponse(res, { user: publicUser });
+});
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
@@ -670,5 +731,6 @@ module.exports = {
   getAllUsers,
   updateUserStatus,
   moderateUser,
+  getUserPublicProfile,
 };
 

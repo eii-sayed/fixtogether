@@ -127,10 +127,12 @@ const userSchema = new mongoose.Schema(
     },
     refreshTokens: [
       {
-        token: { type: String, select: false },
+        token: { type: String },
         createdAt: { type: Date, default: Date.now },
         expiresAt: { type: Date },
         userAgent: { type: String, default: '' },
+        replacedByToken: { type: String, default: '' },
+        revokedAt: { type: Date, default: null },
       },
     ],
     passwordResetToken: {

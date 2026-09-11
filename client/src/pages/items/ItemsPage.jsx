@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { PageLoader, ErrorState, EmptyState, StatusBadge, Pagination, ConfirmModal } from '../../components/ui';
 import { toast } from 'sonner';
-import { Package, Plus, Search, Trash2, Edit, Wrench, Clock } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit, Wrench, Clock, Heart } from 'lucide-react';
 
 export default function ItemsPage() {
   const [page, setPage] = useState(1);
@@ -89,6 +89,13 @@ export default function ItemsPage() {
                   <div className="mt-4 flex items-center gap-2">
                     <Link to={`/repair-requests/new?item=${item._id}`} className="btn-primary btn-sm flex-1">
                       <Wrench className="w-3.5 h-3.5" /> Repair
+                    </Link>
+                    <Link
+                      to={`/donations/new?item=${item._id}`}
+                      className="btn-outline btn-sm flex-1 text-pink-700 hover:bg-pink-50 hover:border-pink-300 flex items-center justify-center gap-1"
+                      title="Donate this item"
+                    >
+                      <Heart className="w-3.5 h-3.5 text-pink-600 fill-pink-100" /> Donate
                     </Link>
                     <Link to={`/items/${item._id}/edit`} className="btn-ghost btn-sm text-gray-500 hover:text-primary-700 hover:bg-primary-50" title="Edit item">
                       <Edit className="w-3.5 h-3.5" />

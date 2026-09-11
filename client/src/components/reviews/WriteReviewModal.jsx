@@ -16,8 +16,6 @@ const schema = z.object({
 });
 
 export default function WriteReviewModal({ open, onClose, repairJobId, technicianName }) {
-  if (!open) return null;
-
   const queryClient = useQueryClient();
   const [hoverRating, setHoverRating] = useState({ overall: 0, comm: 0, service: 0, value: 0 });
 
@@ -46,6 +44,8 @@ export default function WriteReviewModal({ open, onClose, repairJobId, technicia
       toast.error(err.response?.data?.message || 'Failed to submit review');
     }
   });
+
+  if (!open) return null;
 
   const StarRating = ({ name, label, size = 'w-6 h-6' }) => (
     <div>

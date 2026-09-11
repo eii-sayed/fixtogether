@@ -96,12 +96,12 @@ const ADMIN_MENU_GROUPS = [
     items: [
       {
         label: 'All Repair Requests',
-        path: '/repair-requests',
+        path: '/admin/repair-requests',
         icon: Wrench,
       },
       {
         label: 'Donation Network',
-        path: '/donations',
+        path: '/admin/donations',
         icon: Heart,
       },
     ],
@@ -113,9 +113,30 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('admin_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('admin_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Close mobile drawer on route change
+  React.useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [location.pathname]);
 
   // Live badge counts from dashboard overview
   const { data: dashboardData } = useQuery({
@@ -150,10 +171,10 @@ export default function AdminLayout() {
       {/* TOP HEADER BAR */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200/90 h-16 px-4 sm:px-6 flex items-center justify-between shadow-2xs">
         <div className="flex items-center gap-3">
-          {/* Mobile drawer trigger */}
+          {/* Mobile drawer trigger (visible only on small displays < md) */}
           <button
             onClick={() => setMobileDrawerOpen(true)}
-            className="lg:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100 active:scale-95 transition-all"
+            className="md:hidden p-2 rounded-xl text-gray-600 hover:bg-gray-100 active:scale-95 transition-all"
             aria-label="Open Admin Menu"
           >
             <Menu className="w-5 h-5" />
@@ -209,37 +230,43 @@ export default function AdminLayout() {
             <Bell className="w-4 h-4" />
           </Link>
 
-          {/* Exit Admin View */}
+          {/* Exit Admin View to Public Site */}
           <Link
-            to="/dashboard"
+            to="/"
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors border border-gray-200"
+            title="Return to Public Platform"
           >
             <ExternalLink className="w-3.5 h-3.5 text-gray-500" />
-            <span>User Portal</span>
+            <span>Public Site</span>
           </Link>
         </div>
       </header>
 
       <div className="flex flex-1 relative">
-        {/* DESKTOP LEFT-SIDE PANEL (SIDEBAR) */}
+        {/* PERSISTENT LEFT-SIDE PANEL FOR LARGER DISPLAYS (>= md: tablets, laptops, desktops) */}
         <aside
-          className={`hidden lg:flex flex-col bg-white border-r border-gray-200/80 transition-all duration-300 z-20 shrink-0 sticky top-16 h-[calc(100vh-4rem)] ${
+          className={`hidden md:flex flex-col bg-white border-r border-gray-200/80 transition-all duration-300 z-20 shrink-0 sticky top-16 h-[calc(100vh-4rem)] ${
             sidebarCollapsed ? 'w-20' : 'w-64'
           }`}
         >
           {/* Collapse/Expand Header Action */}
           <div className="p-3 border-b border-gray-100 flex items-center justify-between">
-            {!sidebarCollapsed && (
+            {!sidebarCollapsed ? (
               <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-2">
                 Navigation Modules
               </span>
+            ) : (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mx-auto">
+                Menu
+              </span>
             )}
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={toggleSidebar}
               className={`p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors ${
                 sidebarCollapsed ? 'mx-auto' : ''
               }`}
               title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              aria-label={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             >
               {sidebarCollapsed ? (
                 <ChevronRight className="w-4 h-4" />
@@ -267,12 +294,14 @@ export default function AdminLayout() {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all group ${
+                      className={`relative flex items-center ${
+                        sidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-3 py-2.5'
+                      } rounded-xl text-xs font-semibold transition-all group ${
                         active
-                          ? 'bg-primary-50 text-primary-700 font-bold shadow-2xs border border-primary-100/60'
+                          ? 'bg-primary-50 text-primary-800 font-bold border border-primary-200/80 border-l-4 border-l-primary-600 shadow-2xs'
                           : 'text-gray-600 hover:bg-gray-100/70 hover:text-gray-900'
                       }`}
-                      title={sidebarCollapsed ? item.label : undefined}
+                      title={sidebarCollapsed ? `${item.label}${count > 0 ? ` (${count})` : ''}` : undefined}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Icon
@@ -286,7 +315,7 @@ export default function AdminLayout() {
                       </div>
 
                       {/* Badge Counter */}
-                      {count > 0 && (
+                      {count > 0 && !sidebarCollapsed && (
                         <span
                           className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full shrink-0 ${
                             item.badgeColor || 'bg-gray-200 text-gray-800'
@@ -294,6 +323,11 @@ export default function AdminLayout() {
                         >
                           {count}
                         </span>
+                      )}
+
+                      {/* Dot indicator when collapsed */}
+                      {count > 0 && sidebarCollapsed && (
+                        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
                       )}
                     </Link>
                   );
@@ -337,16 +371,16 @@ export default function AdminLayout() {
           </div>
         </aside>
 
-        {/* MOBILE SLIDE-OVER DRAWER */}
+        {/* MOBILE SLIDE-OVER DRAWER (From the LEFT, for displays < md) */}
         {mobileDrawerOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex">
+          <div className="fixed inset-0 z-50 md:hidden flex">
             {/* Backdrop */}
             <div
               className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
               onClick={() => setMobileDrawerOpen(false)}
             />
 
-            {/* Drawer Container */}
+            {/* Drawer Container (slides in from the left) */}
             <div className="relative w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-200">
               <div className="p-4 bg-gray-900 text-white flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -417,10 +451,83 @@ export default function AdminLayout() {
         )}
 
         {/* MAIN ADMIN WORKSPACE CONTENT */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full pb-20 md:pb-8">
           <Outlet />
         </main>
       </div>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR FOR ADMIN (< md screens) */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-gray-200/90 z-40 px-2 py-1.5 flex items-center justify-around shadow-lg">
+        <Link
+          to="/admin"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+            location.pathname === '/admin' ? 'text-primary-700 font-bold' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span className="text-[10px]">Command</span>
+        </Link>
+
+        <Link
+          to="/admin/review-queue"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl relative transition-all ${
+            location.pathname.startsWith('/admin/review-queue') ? 'text-primary-700 font-bold' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <div className="relative">
+            <ClipboardList className="w-5 h-5" />
+            {badgeCounts.urgentQueueCount > 0 && (
+              <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center">
+                {badgeCounts.urgentQueueCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Queue</span>
+        </Link>
+
+        <Link
+          to="/admin/disputes"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl relative transition-all ${
+            location.pathname.startsWith('/admin/disputes') ? 'text-primary-700 font-bold' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <div className="relative">
+            <MessageSquare className="w-5 h-5" />
+            {badgeCounts.disputesCount > 0 && (
+              <span className="absolute -top-1 -right-2 bg-purple-600 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center">
+                {badgeCounts.disputesCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Disputes</span>
+        </Link>
+
+        <Link
+          to="/admin/verifications"
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl relative transition-all ${
+            location.pathname.startsWith('/admin/verifications') ? 'text-primary-700 font-bold' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          <div className="relative">
+            <ShieldCheck className="w-5 h-5" />
+            {badgeCounts.verificationsCount > 0 && (
+              <span className="absolute -top-1 -right-2 bg-amber-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] text-center">
+                {badgeCounts.verificationsCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Verify</span>
+        </Link>
+
+        <button
+          onClick={() => setMobileDrawerOpen(true)}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-gray-500 hover:text-gray-900 transition-all"
+          aria-label="Open More Modules"
+        >
+          <Menu className="w-5 h-5" />
+          <span className="text-[10px]">Menu</span>
+        </button>
+      </nav>
     </div>
   );
 }

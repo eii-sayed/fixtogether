@@ -276,7 +276,7 @@ export default function RepairConversation({
         }
       });
     } catch (err) {
-      logger.error('Failed to load older messages');
+      console.error('Failed to load older messages', err);
     } finally {
       setLoadingOlder(false);
     }
@@ -535,14 +535,20 @@ export default function RepairConversation({
             <>
               <div className="fixed inset-0 z-20" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-xl ring-1 border border-gray-100 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs">
-                {otherParticipant?._id && otherParticipant.role === 'technician' && (
+                {otherParticipant?._id && (
                   <Link
-                    to={`/technicians/${otherParticipant._id}`}
+                    to={
+                      otherParticipant.role === 'technician'
+                        ? `/technicians/${otherParticipant._id}`
+                        : otherParticipant.role === 'organization'
+                        ? `/organizations/${otherParticipant._id}`
+                        : `/users/${otherParticipant._id}`
+                    }
                     className="flex items-center gap-2 px-3.5 py-2 text-gray-700 hover:bg-gray-50"
                     onClick={() => setMenuOpen(false)}
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-                    View Technician Profile
+                    View {otherParticipant.role === 'technician' ? 'Technician' : otherParticipant.role === 'organization' ? 'Organization' : 'User'} Profile
                   </Link>
                 )}
                 <Link

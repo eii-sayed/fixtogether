@@ -1,6 +1,6 @@
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, Navigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { StatCard, PageLoader, ErrorState, StatusBadge } from '../../components/ui';
 import {
@@ -23,6 +23,8 @@ import {
   Award,
   DollarSign,
   Activity,
+  Truck,
+  Recycle,
 } from 'lucide-react';
 import { getStatusConfig } from '../../utils/repairStatusConfig';
 
@@ -303,7 +305,7 @@ function TechnicianDashboard() {
               Active Load: {profile?.activeJobsCount || 0} / {profile?.maxConcurrentJobs || 5} concurrent jobs
             </p>
           </div>
-          <Link to="/technicians/profile" className="btn-secondary py-1.5 px-3 text-xs font-semibold">
+          <Link to="/profile" className="btn-secondary py-1.5 px-3 text-xs font-semibold">
             Manage Load
           </Link>
         </div>
@@ -1170,6 +1172,13 @@ function OrgDashboard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const location = useLocation();
+
+  // Keep admin navigation consistent inside the dedicated Admin Panel
+  if (user?.role === 'admin' && location.pathname === '/dashboard') {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <div className="page-container">
       {user?.role === 'admin' ? (

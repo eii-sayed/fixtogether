@@ -716,6 +716,18 @@ const seed = async () => {
     const notifications = await Notification.create(notificationsData);
     console.log(`✅ Notifications created: ${notifications.length} notifications`);
 
+    // 18. DONATIONS & COMMUNITY NEEDS
+    console.log('⏳ Seeding donations, community needs & impact ledgers...');
+    const seedDonations = require('./seedDonations');
+    await seedDonations(false);
+    console.log('✅ Donation system data seeded successfully');
+
+    // 19. COMMUNITY FORUM THREADS & OPINIONS
+    console.log('⏳ Seeding community forum questions, answers & discussions...');
+    const seedThreads = require('./seedThreads');
+    await seedThreads(false);
+    console.log('✅ Community forum threads seeded successfully');
+
     console.log('\n🎉 ========================================================');
     console.log('   DATABASE SEEDED SUCCESSFULLY WITH 10+ RECORDS PER FIELD!');
     console.log('========================================================\n');

@@ -69,13 +69,14 @@ const handleAIChat = async (req, res) => {
     let matchedTechnicians = [];
     try {
       const techQuery = {
-        activeStatus: 'active',
+        vacationMode: { $ne: true },
       };
 
-      // Search for active technicians
+      // Search for top technicians
       const potentialTechs = await TechnicianProfile.find(techQuery)
-        .populate('user', 'fullName avatar rating totalReviews address isVerified')
-        .sort({ averageRating: -1, totalRepairsCompleted: -1 })
+        .populate('user', 'fullName profileImage rating totalReviews address isVerified city')
+        .populate('skills', 'name')
+        .sort({ averageRating: -1, completedRepairCount: -1 })
         .limit(6);
 
       // Filter or rank by skills matching if available
@@ -85,13 +86,14 @@ const handleAIChat = async (req, res) => {
           .map((t) => ({
             id: t._id,
             userId: t.user._id,
-            name: t.user.fullName,
-            avatar: typeof t.user.avatar === 'object' ? t.user.avatar?.url : t.user.avatar,
-            rating: t.averageRating || t.user.rating || 5.0,
-            completedRepairs: t.totalRepairsCompleted || 0,
-            isVerified: t.verificationStatus === 'verified' || t.user.isVerified,
-            skills: t.skills || [],
-            bio: t.bio || '',
+            name: t.professionalName || t.user.fullName,
+            avatar: t.user.profileImage?.url || '',
+            rating: t.averageRating || 5.0,
+            completedRepairs: t.completedRepairCount || 0,
+            isVerified: t.verificationStatus === 'verified' || t.verificationStatus === 'approved' || Boolean(t.user.isVerified),
+            skills: (t.skills || []).map((s) => (typeof s === 'object' ? s.name : s)),
+            bio: t.biography || '',
+            city: t.user.city || '',
           }))
           .slice(0, 3);
       }

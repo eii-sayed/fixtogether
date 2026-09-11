@@ -1,6 +1,6 @@
-const { Inspection, RepairJob, RepairRequest, Quotation, RepairStatusHistory, Warranty,
+ const { Inspection, RepairJob, RepairRequest, Quotation, RepairStatusHistory, Warranty,
   Review, Dispute, Notification: NotificationModel, Part, DonationOffer, DonationNeed,
-  OrganizationProfile, ImpactRecord } = require('../models');
+  OrganizationProfile, ImpactRecord, ReviewQueueItem } = require('../models');
 const { REPAIR_JOB_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, WARRANTY_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta, generateCode } = require('../utils/helpers');
 const { createNotification } = require('../services/notificationService');
@@ -712,16 +712,90 @@ const updateWarrantyClaimStatus = asyncHandler(async (req, res) => {
 
 // ===== DONATIONS =====
 const createDonation = asyncHandler(async (req, res) => {
-  const { Item: ItemModel } = require('../models');
-  const item = await ItemModel.findOne({ _id: req.body.itemId, owner: req.user.userId });
-  if (!item) return errorResponse(res, 'Item not found.', 404);
+  const { Item: ItemModel, DonationNeed: NeedModel, OrganizationProfile: OrgModel } = require('../models');
+  const { calculateDonationMatch } = require('../services/donationMatchingService');
+
+  let item = null;
+  if (req.body.itemId) {
+    item = await ItemModel.findOne({ _id: req.body.itemId, owner: req.user.userId });
+    if (!item) return errorResponse(res, 'Item not found.', 404);
+  } else if (req.body.title && req.body.category) {
+    item = await ItemModel.create({
+      owner: req.user.userId,
+      title: req.body.title,
+      category: req.body.category,
+      subcategory: req.body.subcategory,
+      brand: req.body.brand || 'Other',
+      model: req.body.model || '',
+      condition: req.body.itemCondition || req.body.condition || 'fair',
+      images: req.body.images || [],
+      description: req.body.description || '',
+      currentPathway: 'donation',
+      ownershipDeclaration: true,
+    });
+  } else {
+    return errorResponse(res, 'Item selection or new item details (title and category) are required.', 400);
+  }
+
+  let matchingNeed = null;
+  if (req.body.matchingNeedId) {
+    matchingNeed = await NeedModel.findById(req.body.matchingNeedId);
+  }
+
+  const orgProfiles = await OrgModel.find({ verificationStatus: 'approved', activeStatus: true })
+    .populate('acceptedItemCategories')
+    .populate('neededItemCategories')
+    .populate('rejectedCategories');
+
+  const offerDataForMatch = {
+    category: req.body.category || item.category,
+    itemCondition: req.body.itemCondition || item.condition || 'fair',
+    preferredHandover: req.body.preferredHandover || 'either',
+  };
+
+  const matchedOrganizations = [];
+  for (const org of orgProfiles) {
+    const analysis = calculateDonationMatch(offerDataForMatch, org, matchingNeed);
+    if (analysis && analysis.totalScore >= 30) {
+      matchedOrganizations.push({
+        organization: org._id,
+        matchScore: analysis.totalScore,
+        matchedAt: new Date(),
+        explanation: analysis,
+      });
+    }
+  }
+
+  matchedOrganizations.sort((a, b) => b.matchScore - a.matchScore);
+  const selectedOrganization = req.body.selectedOrganization || (matchingNeed ? matchingNeed.organization : null);
 
   const donation = await DonationOffer.create({
-    item: item._id, owner: req.user.userId, ...req.body, status: 'published',
+    item: item._id,
+    owner: req.user.userId,
+    category: req.body.category || item.category,
+    title: req.body.title || item.title,
+    description: req.body.description || item.description || '',
+    itemCondition: req.body.itemCondition || item.condition || 'fair',
+    quantity: req.body.quantity || 1,
+    estimatedWeight: req.body.estimatedWeight || 1,
+    preferredHandover: req.body.preferredHandover || 'either',
+    pickupLocation: req.body.pickupLocation || { approximateArea: req.body.city || '', city: req.body.city || 'Dhaka' },
+    matchingNeed: matchingNeed ? matchingNeed._id : null,
+    selectedOrganization,
+    matchedOrganizations,
+    status: selectedOrganization ? 'matched' : 'published',
   });
+
   item.currentPathway = 'donation';
   await item.save();
-  return successResponse(res, { donation }, 'Donation offer created', 201);
+
+  await donation.populate([
+    { path: 'item', select: 'title images category condition' },
+    { path: 'category', select: 'name icon' },
+    { path: 'selectedOrganization', select: 'organizationName locations' },
+  ]);
+
+  return successResponse(res, { donation, offer: donation }, 'Donation offer created successfully', 201);
 });
 
 const getDonations = asyncHandler(async (req, res) => {
@@ -730,16 +804,27 @@ const getDonations = asyncHandler(async (req, res) => {
   if (req.user.role === 'owner') query.owner = req.user.userId;
   else if (req.user.role === 'organization') {
     const orgProfile = await OrganizationProfile.findOne({ user: req.user.userId });
-    if (orgProfile) query.matchedOrganizations = { $elemMatch: { organization: orgProfile._id } };
+    if (orgProfile) {
+      query.$or = [
+        { selectedOrganization: orgProfile._id },
+        { matchedOrganizations: { $elemMatch: { organization: orgProfile._id } } },
+      ];
+    }
   }
   if (req.query.status) query.status = req.query.status;
 
   const [donations, total] = await Promise.all([
-    DonationOffer.find(query).populate('item', 'title images category')
-      .populate('owner', 'fullName').sort({ createdAt: -1 }).skip(skip).limit(limit),
+    DonationOffer.find(query)
+      .populate('item', 'title images category condition')
+      .populate('category', 'name icon')
+      .populate('owner', 'fullName email')
+      .populate('selectedOrganization', 'organizationName locations')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
     DonationOffer.countDocuments(query),
   ]);
-  return successResponse(res, { donations, pagination: paginationMeta(total, page, limit) });
+  return successResponse(res, { donations, offers: donations, pagination: paginationMeta(total, page, limit) });
 });
 
 const getDonationById = asyncHandler(async (req, res) => {
@@ -786,6 +871,18 @@ const rejectDonation = asyncHandler(async (req, res) => {
   donation.status = 'rejected';
   await donation.save();
   return successResponse(res, { donation }, 'Donation rejected');
+});
+
+const cancelDonationOffer = asyncHandler(async (req, res) => {
+  const { transitionDonationStatus } = require('../services/donationTransitionService');
+  const { DONATION_STATUS } = require('../constants');
+  const updatedOffer = await transitionDonationStatus({
+    donationId: req.params.id,
+    targetStatus: DONATION_STATUS.CANCELLED,
+    actor: req.user,
+    reason: req.body.reason || 'Offer cancelled by donor',
+  });
+  return successResponse(res, { offer: updatedOffer, donation: updatedOffer }, 'Donation offer cancelled successfully');
 });
 
 const scheduleDonationPickup = asyncHandler(async (req, res) => {
@@ -876,12 +973,21 @@ const reservePart = asyncHandler(async (req, res) => {
 // ===== NOTIFICATIONS =====
 const getNotifications = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
+  const { unreadOnly } = req.query;
+  const baseQuery = { user: req.user.userId };
+  const fetchQuery = unreadOnly === 'true' ? { ...baseQuery, read: false } : baseQuery;
+
   const [notifications, total, unreadCount] = await Promise.all([
-    NotificationModel.find({ user: req.user.userId }).sort({ createdAt: -1 }).skip(skip).limit(limit),
-    NotificationModel.countDocuments({ user: req.user.userId }),
+    NotificationModel.find(fetchQuery).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    NotificationModel.countDocuments(fetchQuery),
     NotificationModel.countDocuments({ user: req.user.userId, read: false }),
   ]);
   return successResponse(res, { notifications, unreadCount, pagination: paginationMeta(total, page, limit) });
+});
+
+const getNotificationUnreadCount = asyncHandler(async (req, res) => {
+  const count = await NotificationModel.countDocuments({ user: req.user.userId, read: false });
+  return successResponse(res, { count });
 });
 
 const markNotificationRead = asyncHandler(async (req, res) => {
@@ -931,6 +1037,7 @@ module.exports = {
   getDonationMatches,
   acceptDonation,
   rejectDonation,
+  cancelDonationOffer,
   scheduleDonationPickup,
   confirmHandover,
   createPart,
@@ -939,6 +1046,7 @@ module.exports = {
   updatePart,
   reservePart,
   getNotifications,
+  getNotificationUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
 };
