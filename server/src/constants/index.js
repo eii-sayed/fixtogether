@@ -543,6 +543,9 @@ const NOTIFICATION_TYPES = {
   DISPUTE_OPENED: 'dispute_opened',
   DISPUTE_RESOLVED: 'dispute_resolved',
   NEW_MESSAGE: 'new_message',
+  FORUM_REPLY: 'forum_reply',
+  FORUM_ACCEPTED: 'forum_accepted',
+  FORUM_REPORT_UPDATED: 'forum_report_updated',
 };
 
 const MODERATION_STATUS = {

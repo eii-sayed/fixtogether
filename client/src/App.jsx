@@ -1,34 +1,42 @@
-import { Routes, Route } from 'react-router-dom';
-import MainLayout from './components/layout/MainLayout';
-import AdminLayout from './components/layout/AdminLayout';
-import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
+import { Routes, Route } from "react-router-dom";
+import MainLayout from "./components/layout/MainLayout";
+import AdminLayout from "./components/layout/AdminLayout";
+import { ProtectedRoute, GuestRoute } from "./components/auth/ProtectedRoute";
 
 // Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import ItemsPage from './pages/items/ItemsPage';
-import NewItemPage from './pages/items/NewItemPage';
-import EditItemPage from './pages/items/EditItemPage';
-import RepairRequestsPage from './pages/repairs/RepairRequestsPage';
-import RepairRequestDetailPage from './pages/repairs/RepairRequestDetailPage';
-import NewRepairRequestPage from './pages/repairs/NewRepairRequestPage';
-import RepairJobsPage from './pages/repairs/RepairJobsPage';
-import DonationsPage from './pages/donations/DonationsPage';
-import ConversationsPage from './pages/messages/ConversationsPage';
-import ProfilePage from './pages/profile/ProfilePage';
-import TechnicianProfilePage from './pages/profile/TechnicianProfilePage';
-import OrganizationProfilePage from './pages/profile/OrganizationProfilePage';
-import NotificationsPage from './pages/notifications/NotificationsPage';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
-import AdminSafetyPage from './pages/admin/AdminSafetyPage';
-import AdminReviewQueuePage from './pages/admin/AdminReviewQueuePage';
-import AdminDisputesPage from './pages/admin/AdminDisputesPage';
-import AdminTaxonomyPage from './pages/admin/AdminTaxonomyPage';
-import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
-import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage';
+import LandingPage from "./pages/LandingPage";
+import LoginPage from "./pages/auth/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import ItemsPage from "./pages/items/ItemsPage";
+import NewItemPage from "./pages/items/NewItemPage";
+import EditItemPage from "./pages/items/EditItemPage";
+import RepairRequestsPage from "./pages/repairs/RepairRequestsPage";
+import RepairRequestDetailPage from "./pages/repairs/RepairRequestDetailPage";
+import NewRepairRequestPage from "./pages/repairs/NewRepairRequestPage";
+import RepairJobsPage from "./pages/repairs/RepairJobsPage";
+import DonationsPage from "./pages/donations/DonationsPage";
+import ConversationsPage from "./pages/messages/ConversationsPage";
+import ProfilePage from "./pages/profile/ProfilePage";
+import TechnicianProfilePage from "./pages/profile/TechnicianProfilePage";
+import OrganizationProfilePage from "./pages/profile/OrganizationProfilePage";
+import NotificationsPage from "./pages/notifications/NotificationsPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminVerificationsPage from "./pages/admin/AdminVerificationsPage";
+import AdminSafetyPage from "./pages/admin/AdminSafetyPage";
+import AdminReviewQueuePage from "./pages/admin/AdminReviewQueuePage";
+import AdminDisputesPage from "./pages/admin/AdminDisputesPage";
+import AdminTaxonomyPage from "./pages/admin/AdminTaxonomyPage";
+import AdminAuditLogsPage from "./pages/admin/AdminAuditLogsPage";
+import RepairRequestMessagesPage from "./pages/repairs/RepairRequestMessagesPage";
+import ForumHomePage from "./pages/forum/ForumHomePage";
+import ThreadListPage from "./pages/forum/ThreadListPage";
+import CreateThreadPage from "./pages/forum/CreateThreadPage";
+import EditThreadPage from "./pages/forum/EditThreadPage";
+import ThreadDetailsPage from "./pages/forum/ThreadDetailsPage";
+import MyThreadsPage from "./pages/forum/MyThreadsPage";
+import BookmarkedThreadsPage from "./pages/forum/BookmarkedThreadsPage";
+import ForumModerationPage from "./pages/forum/ForumModerationPage";
 
 export default function App() {
   return (
@@ -36,7 +44,7 @@ export default function App() {
       {/* Admin Command Center & Workspaces (Dedicated Left-Side Panel Layout) */}
       <Route
         element={
-          <ProtectedRoute roles={['admin']}>
+          <ProtectedRoute roles={["admin"]}>
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -44,7 +52,10 @@ export default function App() {
         <Route path="/admin" element={<DashboardPage />} />
         <Route path="/admin/review-queue" element={<AdminReviewQueuePage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
-        <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
+        <Route
+          path="/admin/verifications"
+          element={<AdminVerificationsPage />}
+        />
         <Route path="/admin/safety" element={<AdminSafetyPage />} />
         <Route path="/admin/disputes" element={<AdminDisputesPage />} />
         <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
@@ -55,44 +66,235 @@ export default function App() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<LandingPage />} />
 
-        <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
-        <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+        <Route
+          path="/login"
+          element={
+            <GuestRoute>
+              <LoginPage />
+            </GuestRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <GuestRoute>
+              <RegisterPage />
+            </GuestRoute>
+          }
+        />
 
         {/* Authenticated routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/technicians/:id" element={<ProtectedRoute><TechnicianProfilePage /></ProtectedRoute>} />
-        <Route path="/organizations/:id" element={<ProtectedRoute><OrganizationProfilePage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/technicians/:id"
+          element={
+            <ProtectedRoute>
+              <TechnicianProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizations/:id"
+          element={
+            <ProtectedRoute>
+              <OrganizationProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Items */}
-        <Route path="/items" element={<ProtectedRoute roles={['owner']}><ItemsPage /></ProtectedRoute>} />
-        <Route path="/items/new" element={<ProtectedRoute roles={['owner']}><NewItemPage /></ProtectedRoute>} />
-        <Route path="/items/:id/edit" element={<ProtectedRoute roles={['owner']}><EditItemPage /></ProtectedRoute>} />
+        <Route
+          path="/items"
+          element={
+            <ProtectedRoute roles={["owner"]}>
+              <ItemsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/items/new"
+          element={
+            <ProtectedRoute roles={["owner"]}>
+              <NewItemPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/items/:id/edit"
+          element={
+            <ProtectedRoute roles={["owner"]}>
+              <EditItemPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Repair Requests */}
-        <Route path="/repair-requests" element={<ProtectedRoute><RepairRequestsPage /></ProtectedRoute>} />
-        <Route path="/repair-requests/new" element={<ProtectedRoute roles={['owner']}><NewRepairRequestPage /></ProtectedRoute>} />
-        <Route path="/repair-requests/:id" element={<ProtectedRoute><RepairRequestDetailPage /></ProtectedRoute>} />
-        <Route path="/repair-requests/:id/messages" element={<ProtectedRoute><RepairRequestMessagesPage /></ProtectedRoute>} />
+        <Route
+          path="/repair-requests"
+          element={
+            <ProtectedRoute>
+              <RepairRequestsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair-requests/new"
+          element={
+            <ProtectedRoute roles={["owner"]}>
+              <NewRepairRequestPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair-requests/:id"
+          element={
+            <ProtectedRoute>
+              <RepairRequestDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repair-requests/:id/messages"
+          element={
+            <ProtectedRoute>
+              <RepairRequestMessagesPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Repair Jobs */}
-        <Route path="/repair-jobs" element={<ProtectedRoute><RepairJobsPage /></ProtectedRoute>} />
+        <Route
+          path="/repair-jobs"
+          element={
+            <ProtectedRoute>
+              <RepairJobsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Donations */}
-        <Route path="/donations" element={<ProtectedRoute><DonationsPage /></ProtectedRoute>} />
+        <Route
+          path="/donations"
+          element={
+            <ProtectedRoute>
+              <DonationsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Messages */}
-        <Route path="/messages" element={<ProtectedRoute><ConversationsPage /></ProtectedRoute>} />
+        <Route
+          path="/messages"
+          element={
+            <ProtectedRoute>
+              <ConversationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Community Forum */}
+        <Route
+          path="/forum"
+          element={
+            <ProtectedRoute>
+              <ForumHomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/threads"
+          element={
+            <ProtectedRoute>
+              <ThreadListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/new"
+          element={
+            <ProtectedRoute>
+              <CreateThreadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/my-threads"
+          element={
+            <ProtectedRoute>
+              <MyThreadsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/bookmarks"
+          element={
+            <ProtectedRoute>
+              <BookmarkedThreadsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/threads/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditThreadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/forum/threads/:id"
+          element={
+            <ProtectedRoute>
+              <ThreadDetailsPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* 404 */}
-        <Route path="*" element={
-          <div className="page-container text-center py-24">
-            <h1 className="text-6xl font-black text-gray-200">404</h1>
-            <p className="text-lg text-gray-500 mt-4">Page not found</p>
-            <a href="/" className="btn-primary mt-6 inline-flex">Go Home</a>
-          </div>
-        } />
+        <Route
+          path="*"
+          element={
+            <div className="page-container text-center py-24">
+              <h1 className="text-6xl font-black text-gray-200">404</h1>
+              <p className="text-lg text-gray-500 mt-4">Page not found</p>
+              <a href="/" className="btn-primary mt-6 inline-flex">
+                Go Home
+              </a>
+            </div>
+          }
+        />
+      </Route>
+      <Route
+        element={
+          <ProtectedRoute roles={["admin"]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/admin/forum" element={<ForumModerationPage />} />
       </Route>
     </Routes>
   );

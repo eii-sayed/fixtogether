@@ -27,6 +27,11 @@ const ImpactRecord = require('./ImpactRecord');
 const ReviewQueueItem = require('./ReviewQueueItem');
 
 const OutboxEvent = require('./OutboxEvent');
+const ForumThread = require('./ForumThread');
+const ForumReply = require('./ForumReply');
+const ForumBookmark = require('./ForumBookmark');
+const ForumLike = require('./ForumLike');
+const ForumReport = require('./ForumReport');
 
 module.exports = {
   User,
@@ -57,4 +62,9 @@ module.exports = {
   Message,
   ReviewQueueItem,
   OutboxEvent,
+  ForumThread,
+  ForumReply,
+  ForumBookmark,
+  ForumLike,
+  ForumReport,
 };

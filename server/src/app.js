@@ -25,6 +25,7 @@ const { donationRoutes, partsRoutes, warrantyRoutes, warrantyClaimsRoutes,
   reviewRoutes, disputeRoutes, notificationRoutes } = require('./routes/additionalRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const forumRoutes = require('./routes/forumRoutes');
 
 const app = express();
 
@@ -93,6 +94,7 @@ app.use(`${API_PREFIX}/disputes`, disputeRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
 app.use(`${API_PREFIX}/ai`, aiRoutes);
+app.use(`${API_PREFIX}/forum`, forumRoutes);
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 
 // Error handling
