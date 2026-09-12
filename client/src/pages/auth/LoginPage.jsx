@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(loginSchema),
   });
 
@@ -89,9 +89,11 @@ export default function LoginPage() {
                 { label: 'Admin', email: 'admin@fixtogether.com', pass: 'Admin123!' },
                 { label: 'Owner', email: 'rahim@example.com', pass: 'Owner123!' },
                 { label: 'Technician', email: 'sumon@example.com', pass: 'Tech123!' },
-                { label: 'Organization', email: 'hope@example.com', pass: 'Org123!' },
+                { label: 'Organization', email: 'hope@example.com', pass: 'Org1234!' },
               ].map((demo) => (
                 <button key={demo.label} type="button" onClick={() => {
+                  setValue('email', demo.email);
+                  setValue('password', demo.pass);
                   onSubmit({ email: demo.email, password: demo.pass });
                 }}
                   className="border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 text-left transition-colors">

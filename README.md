@@ -29,7 +29,7 @@ The platform comes pre-seeded with verified test accounts across all key roles:
 |---|---|---|---|
 | **Administrator** | `admin@fixtogether.com` | `Admin123!` | Platform Command Center, Review Queue, Safety Engine, Disputes, User Moderation |
 | **Technician** | `sumon@example.com` | `Tech123!` | Quotation Engine, Diagnostic Inspections, Active Repair Jobs, Milestone Tracking |
-| **Organization** | `greenrepair@example.com` | `Org1234!` | Donation Offers, Community Needs, Collections, Refurbishment, Impact Tracking |
+| **Organization** | `hope@example.com` / `greenrepair@example.com` | `Org1234!` (or `Org123!`) | Donation Offers, Community Needs, Collections, Refurbishment, Impact Tracking |
 | **Item Owner** | `rahim@example.com` | `Owner123!` | Digital Garage, AI Repair Diagnostic Assistant, Request Lifecycle, Forum Q&A |
 
 > **Tip**: Quick-login buttons are available directly on the `/login` page for instant role switching during review.
