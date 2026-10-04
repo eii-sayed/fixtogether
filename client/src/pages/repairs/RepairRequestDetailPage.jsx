@@ -44,6 +44,7 @@ import {
   CheckSquare,
   PackageCheck,
   UserCheck,
+  Zap,
 } from 'lucide-react';
 import RepairConversation from '../../components/chat/RepairConversation';
 import QuotationBuilderModal from '../../components/quotations/QuotationBuilderModal';
@@ -71,6 +72,18 @@ export default function RepairRequestDetailPage() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [selectedQuoteForAccept, setSelectedQuoteForAccept] = useState(null);
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
+
+  // Inline Quick Quote state for technicians
+  const [quickQuote, setQuickQuote] = useState({ estimatedTotal: '', estimatedDays: '3', notes: '' });
+  const [quickQuoteError, setQuickQuoteError] = useState(null);
+
+  // Technician 1-click Direct Accept state
+  const [showAcceptJobModal, setShowAcceptJobModal] = useState(false);
+  const [acceptJobForm, setAcceptJobForm] = useState({ estimatedCost: '', estimatedDays: '3', notes: '' });
+
+  // Technician 1-Step Quick Solve state
+  const [showQuickSolveModal, setShowQuickSolveModal] = useState(false);
+  const [quickSolveForm, setQuickSolveForm] = useState({ notes: '', finalCost: '' });
 
   // Review Form state
   const [reviewRating, setReviewRating] = useState(5);
@@ -192,6 +205,79 @@ export default function RepairRequestDetailPage() {
       toast.success('Quotation accepted! Proceed to schedule handover.');
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to accept quotation'),
+  });
+
+  // Quick Quote mutation for technicians
+  const quickQuoteMutation = useMutation({
+    mutationFn: (payload) => api.post(`/repair-requests/${id}/quick-quote`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['repair-request', id]);
+      queryClient.invalidateQueries(['quotations', id]);
+      setQuickQuote({ estimatedTotal: '', estimatedDays: '3', notes: '' });
+      setQuickQuoteError(null);
+      toast.success('Quick quote submitted successfully!');
+    },
+    onError: (err) => {
+      setQuickQuoteError(err.response?.data?.message || 'Failed to submit quick quote');
+      toast.error(err.response?.data?.message || 'Failed to submit quick quote');
+    },
+  });
+
+  const handleInlineQuickQuote = () => {
+    setQuickQuoteError(null);
+    const total = Number(quickQuote.estimatedTotal);
+    const days = Number(quickQuote.estimatedDays);
+    if (!total || total <= 0) { setQuickQuoteError('Enter a valid total cost'); return; }
+    if (!days || days < 1) { setQuickQuoteError('Enter valid days'); return; }
+    quickQuoteMutation.mutate({ estimatedTotal: total, estimatedDays: days, notes: quickQuote.notes || '' });
+  };
+
+  // 1-Click Accept Job mutation for technicians
+  const acceptJobMutation = useMutation({
+    mutationFn: (payload) => api.post(`/repair-requests/${id}/accept-job`, payload),
+    onSuccess: (resp) => {
+      queryClient.invalidateQueries(['repair-request', id]);
+      queryClient.invalidateQueries(['quotations', id]);
+      queryClient.invalidateQueries(['repair-jobs', id]);
+      queryClient.invalidateQueries(['repair-requests']);
+      setShowAcceptJobModal(false);
+      toast.success(resp.data?.message || '🎉 Repair job accepted! You are now assigned.');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to accept repair job'),
+  });
+
+  const handleInlineAcceptJob = () => {
+    const total = Number(quickQuote.estimatedTotal) || rr?.budgetMaximum || 1000;
+    const days = Number(quickQuote.estimatedDays) || 3;
+    acceptJobMutation.mutate({
+      estimatedCost: total,
+      estimatedDays: days,
+      notes: quickQuote.notes || '',
+    });
+  };
+
+  // 1-Click Quick Start Repair Work
+  const quickStartJobMutation = useMutation({
+    mutationFn: (jobId) => api.post(`/repair-jobs/${jobId}/quick-start`),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['repair-request', id]);
+      queryClient.invalidateQueries(['repair-jobs', id]);
+      toast.success('Started repair work!');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to start repair'),
+  });
+
+  // 1-Step Quick Solve & Complete Job
+  const quickSolveJobMutation = useMutation({
+    mutationFn: ({ jobId, payload }) => api.post(`/repair-jobs/${jobId}/quick-solve`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['repair-request', id]);
+      queryClient.invalidateQueries(['repair-jobs', id]);
+      queryClient.invalidateQueries(['repair-jobs']);
+      setShowQuickSolveModal(false);
+      toast.success('Problem marked solved! Customer notified for collection.');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to complete repair'),
   });
 
   const confirmCompletionMutation = useMutation({
@@ -451,22 +537,72 @@ export default function RepairRequestDetailPage() {
                 )}
 
                 {/* Technician Actions */}
-                {isTechnician && !activeJob && (
-                  <button
-                    onClick={() => setShowQuotationModal(true)}
-                    className="btn-primary btn-sm flex items-center gap-1.5 shadow-sm shadow-primary-500/20 active:scale-95"
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    <span>Submit Quotation Proposal</span>
-                  </button>
+                {isTechnician && !activeJob && ['published', 'matching_technicians', 'awaiting_quotations', 'quotations_received'].includes(rr?.requestStatus) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        setAcceptJobForm({
+                          estimatedCost: rr?.budgetMaximum || rr?.budgetMinimum || '',
+                          estimatedDays: '3',
+                          notes: '',
+                        });
+                        setShowAcceptJobModal(true);
+                      }}
+                      className="btn-primary btn-sm flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 active:scale-95 bg-emerald-600 hover:bg-emerald-700 border-emerald-600 font-bold"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                      <span>⚡ Accept This Job</span>
+                    </button>
+                    <button
+                      onClick={() => setShowQuotationModal(true)}
+                      className="btn-outline btn-sm bg-white hover:bg-gray-50 flex items-center gap-1.5"
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      <span>Submit Custom Quote</span>
+                    </button>
+                  </div>
                 )}
 
                 {isTechnician && activeJob && (
                   <div className="flex items-center gap-2 flex-wrap">
+                    {/* Quick 1-Click Start if not yet started */}
+                    {['pending_inspection', 'inspecting'].includes(activeJob.currentStatus) && (
+                      <button
+                        onClick={() => quickStartJobMutation.mutate(activeJob._id)}
+                        disabled={quickStartJobMutation.isPending}
+                        className="btn-secondary btn-sm flex items-center gap-1.5 font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border-primary-200 active:scale-95"
+                      >
+                        {quickStartJobMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Zap className="w-4 h-4 text-primary-600" />
+                        )}
+                        <span>Start Work</span>
+                      </button>
+                    )}
+
+                    {/* Quick 1-Step Mark Solved & Complete for all active states */}
+                    {!['ready_for_collection', 'collected', 'completed', 'cancelled'].includes(activeJob.currentStatus) && (
+                      <button
+                        onClick={() => {
+                          setQuickSolveForm({
+                            notes: '',
+                            finalCost: activeJob.finalTotalCost || activeJob.acceptedQuotation?.estimatedTotalMaximum || '',
+                          });
+                          setShowQuickSolveModal(true);
+                        }}
+                        className="btn-primary btn-sm flex items-center gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95"
+                      >
+                        <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                        <span>⚡ Mark Solved & Complete</span>
+                      </button>
+                    )}
+
+                    {/* Secondary detailed workflows */}
                     {activeJob.currentStatus === 'pending_inspection' && (
                       <button
                         onClick={() => setShowInspectionModal(true)}
-                        className="btn-primary btn-sm flex items-center gap-1.5"
+                        className="btn-outline btn-sm flex items-center gap-1.5 text-gray-600 hover:bg-gray-50"
                       >
                         <Wrench className="w-4 h-4" /> Record Inspection
                       </button>
@@ -490,7 +626,7 @@ export default function RepairRequestDetailPage() {
                     {['in_progress', 'quality_check'].includes(activeJob.currentStatus) && (
                       <button
                         onClick={() => setShowQualityCheckModal(true)}
-                        className="btn-primary btn-sm flex items-center gap-1.5"
+                        className="btn-outline btn-sm flex items-center gap-1.5 text-gray-600 hover:bg-gray-50"
                       >
                         <CheckSquare className="w-4 h-4" /> Quality Check
                       </button>
@@ -543,6 +679,85 @@ export default function RepairRequestDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Inline Quick Quote Card for Technicians */}
+          {isTechnician && !activeJob && ['published', 'matching_technicians', 'awaiting_quotations', 'quotations_received'].includes(rr?.requestStatus) && (
+            <div className="card card-body bg-gradient-to-r from-emerald-50/60 via-white to-primary-50/40 border-emerald-200 space-y-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-gray-900 text-sm">Quick Quote</h3>
+                <span className="text-[10px] text-gray-400 font-medium ml-auto">
+                  or <button onClick={() => setShowQuotationModal(true)} className="text-primary-600 hover:underline font-semibold">open detailed builder →</button>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1 block">Total Cost (৳) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={quickQuote.estimatedTotal}
+                    onChange={(e) => setQuickQuote((p) => ({ ...p, estimatedTotal: e.target.value }))}
+                    className="input text-sm font-semibold"
+                    placeholder="1500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1 block">Days *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={quickQuote.estimatedDays}
+                    onChange={(e) => setQuickQuote((p) => ({ ...p, estimatedDays: e.target.value }))}
+                    className="input text-sm font-semibold"
+                    placeholder="3"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1 block">Notes</label>
+                  <input
+                    type="text"
+                    value={quickQuote.notes}
+                    onChange={(e) => setQuickQuote((p) => ({ ...p, notes: e.target.value }))}
+                    className="input text-xs"
+                    placeholder="Optional..."
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1 flex items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleInlineAcceptJob}
+                    disabled={acceptJobMutation.isPending || quickQuoteMutation.isPending}
+                    className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm bg-emerald-600 hover:bg-emerald-700 border-emerald-600"
+                  >
+                    {acceptJobMutation.isPending ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Accepting...</>
+                    ) : (
+                      <><Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" /> ⚡ Accept Job</>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleInlineQuickQuote}
+                    disabled={acceptJobMutation.isPending || quickQuoteMutation.isPending}
+                    className="btn-outline py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-1 bg-white hover:bg-gray-50"
+                  >
+                    {quickQuoteMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Quote</span>
+                  </button>
+                </div>
+              </div>
+
+              {quickQuoteError && (
+                <p className="text-xs text-red-600 font-medium">{quickQuoteError}</p>
+              )}
+            </div>
+          )}
 
           {/* Mobile / Tablet Quick Chat Banner (< xl screens) */}
           {showConversation && (
@@ -1347,7 +1562,206 @@ export default function RepairRequestDetailPage() {
           quotations={quotations}
         />
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: TECHNICIAN DIRECT JOB ACCEPTANCE (1-CLICK) */}
+      {/* ========================================================================= */}
+      {showAcceptJobModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-700 font-bold text-base">
+                <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                <span>Accept Repair Job</span>
+              </div>
+              <button onClick={() => setShowAcceptJobModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-primary-50 rounded-xl border border-emerald-200 text-xs space-y-1.5">
+              <div className="font-bold text-gray-900 text-sm">{rr?.item?.title || 'Repair Request'}</div>
+              <div className="text-gray-600 line-clamp-2">{rr?.problemDescription}</div>
+              {rr?.budgetMaximum && (
+                <div className="text-emerald-800 font-semibold pt-1">
+                  Owner's Budget: ৳{rr.budgetMinimum || 0} – ৳{rr.budgetMaximum}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label font-semibold text-gray-700">Your Total Service Charge (৳) *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={acceptJobForm.estimatedCost}
+                    onChange={(e) => setAcceptJobForm((p) => ({ ...p, estimatedCost: e.target.value }))}
+                    className="input pl-7 text-sm font-bold text-gray-900"
+                    placeholder={rr?.budgetMaximum ? String(rr.budgetMaximum) : '1200'}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Estimated total labor/repair charge.</p>
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Estimated Turnaround (Days) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={acceptJobForm.estimatedDays}
+                  onChange={(e) => setAcceptJobForm((p) => ({ ...p, estimatedDays: e.target.value }))}
+                  className="input text-sm font-semibold text-gray-900"
+                  placeholder="3"
+                />
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Note to Owner (Optional)</label>
+                <input
+                  type="text"
+                  value={acceptJobForm.notes}
+                  onChange={(e) => setAcceptJobForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="input text-xs"
+                  placeholder="e.g. Can start today, diagnostic test included..."
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                By accepting, you commit to this repair request. You will be instantly assigned and work can begin immediately.
+              </span>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowAcceptJobModal(false)}
+                className="btn-outline btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  acceptJobMutation.mutate({
+                    estimatedCost: acceptJobForm.estimatedCost ? Number(acceptJobForm.estimatedCost) : undefined,
+                    estimatedDays: Number(acceptJobForm.estimatedDays) || 3,
+                    notes: acceptJobForm.notes || undefined,
+                  })
+                }
+                disabled={acceptJobMutation.isPending}
+                className="btn-primary btn-sm flex items-center gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
+              >
+                {acceptJobMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Accepting Job...</>
+                ) : (
+                  <><Zap className="w-4 h-4 text-amber-300 fill-amber-300" /> Confirm & Start Job</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* MODAL: TECHNICIAN 1-STEP QUICK SOLVE */}
+      {/* ========================================================================= */}
+      {showQuickSolveModal && activeJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-700 font-bold text-base">
+                <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                <span>Mark Problem Solved & Complete</span>
+              </div>
+              <button onClick={() => setShowQuickSolveModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-primary-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+              <div className="font-bold text-gray-900 text-sm">{rr?.item?.title || 'Repair Job'}</div>
+              <div className="text-gray-600 line-clamp-1">{rr?.problemDescription}</div>
+              <div className="text-emerald-800 font-medium pt-0.5">
+                Accepted Quote / Cost: ৳{(activeJob.finalTotalCost || activeJob.acceptedQuotation?.estimatedTotalMaximum || 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label font-semibold text-gray-700">Final Bill / Total Cost (৳)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={quickSolveForm.finalCost}
+                    onChange={(e) => setQuickSolveForm((p) => ({ ...p, finalCost: e.target.value }))}
+                    className="input pl-7 text-sm font-bold text-gray-900"
+                    placeholder="e.g. 1200"
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Will update final invoice amount for customer.</p>
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Problem Resolution & Repair Notes</label>
+                <textarea
+                  rows="3"
+                  value={quickSolveForm.notes}
+                  onChange={(e) => setQuickSolveForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="input text-xs"
+                  placeholder="e.g. Diagnosed power failure, replaced charging port and tested device completely."
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                This will immediately mark the repair job as solved and notify the customer that their item is ready for pickup/delivery.
+              </span>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowQuickSolveModal(false)}
+                className="btn-outline btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  quickSolveJobMutation.mutate({
+                    jobId: activeJob._id,
+                    payload: {
+                      notes: quickSolveForm.notes,
+                      finalCost: quickSolveForm.finalCost ? Number(quickSolveForm.finalCost) : undefined,
+                    },
+                  })
+                }
+                disabled={quickSolveJobMutation.isPending}
+                className="btn-primary btn-sm flex items-center gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm text-white"
+              >
+                {quickSolveJobMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Saving & Notifying...</>
+                ) : (
+                  <><Check className="w-4 h-4" /> Mark Solved & Ready</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 

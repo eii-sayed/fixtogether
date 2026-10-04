@@ -125,7 +125,7 @@ export const REPAIR_STATUS_CONFIG = {
     description: 'Request is live on the technician discovery wall.',
     requiredAction: {
       owner: 'Technicians are reviewing your request. You can also invite recommended technicians.',
-      technician: 'Submit a quotation proposal for this repair.',
+      technician: 'Accept this repair job with 1 click or submit a custom quote.',
       admin: 'Active published listing.',
     },
     contextualHelp: 'Most technicians respond with quotes within 2 to 6 hours.',
@@ -139,7 +139,6 @@ export const REPAIR_STATUS_CONFIG = {
   },
   matching_technicians: {
     label: 'Matching Technicians',
-    shortLabel: 'Matching',
     stageGroup: 'quotations',
     stageIndex: 1,
     badgeClass: 'badge-blue',
@@ -148,7 +147,7 @@ export const REPAIR_STATUS_CONFIG = {
     description: 'Matching qualified verified technicians based on category and proximity.',
     requiredAction: {
       owner: 'Browse matched specialists and invite them for fast quotes.',
-      technician: 'Submit a proposal if matched.',
+      technician: 'Accept this job with 1 click or submit a proposal.',
       admin: 'Matching active.',
     },
     contextualHelp: 'Top matches have verified experience with this exact item category.',
@@ -171,7 +170,7 @@ export const REPAIR_STATUS_CONFIG = {
     description: 'Invitations sent. Waiting for technician cost proposals.',
     requiredAction: {
       owner: 'Waiting for technicians to submit proposals.',
-      technician: 'Submit your quotation breakdown.',
+      technician: 'Accept this job with 1 click or submit your proposal.',
       admin: 'In quotation stage.',
     },
     contextualHelp: 'You will receive an in-app notification the moment a new quotation arrives.',

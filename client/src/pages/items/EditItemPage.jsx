@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -221,7 +221,30 @@ export default function EditItemPage() {
   if (itemLoading) return <PageLoader />;
   if (itemError) return <ErrorState error={itemError} />;
 
-  const parentCategories = categories?.filter((c) => !c.parent) || [];
+  const categoryGroups = useMemo(() => {
+    if (!categories || !Array.isArray(categories)) return [];
+    const parents = categories.filter((c) => !c.parent);
+    return parents.map((parent) => {
+      const children = categories.filter((c) => {
+        const pId = c.parent?._id || c.parent;
+        return pId && String(pId) === String(parent._id);
+      });
+      return { parent, children };
+    });
+  }, [categories]);
+
+  const onFormError = (errs) => {
+    const errorKeys = Object.keys(errs);
+    if (errorKeys.length > 0) {
+      const msg = errs[errorKeys[0]]?.message || 'Please check the required fields.';
+      toast.error(msg);
+      const element = document.querySelector(`[name="${errorKeys[0]}"]`) || document.getElementById(errorKeys[0]);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
+      }
+    }
+  };
 
   return (
     <div className="page-container max-w-2xl">
@@ -240,7 +263,7 @@ export default function EditItemPage() {
       </div>
 
       <div className="card card-body">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-6">
           {/* Title */}
           <div>
             <label className="label" htmlFor="title">
@@ -266,11 +289,18 @@ export default function EditItemPage() {
                 id="category"
                 className={`input ${errors.category ? 'input-error' : ''}`}
               >
-                <option value="">Select category</option>
-                {parentCategories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
+                <option value="">Select category or device type</option>
+                {categoryGroups.map((group) => (
+                  <optgroup key={group.parent._id} label={group.parent.name}>
+                    <option value={group.parent._id}>
+                      All {group.parent.name} (General)
+                    </option>
+                    {group.children.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        &nbsp;&nbsp;• {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               {errors.category && (

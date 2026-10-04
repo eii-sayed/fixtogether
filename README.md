@@ -15,11 +15,14 @@ Built on the MERN stack (MongoDB, Express, React 18, Node.js) with real-time Soc
 
 ## 🌐 Live Deployment & Endpoints
 
-| Service | URL | Notes |
-|---|---|---|
-| **Frontend Web App** | [fixtogether.vercel.app](https://fixtogether.vercel.app/) | Single Page Application deployed on Vercel |
-| **Backend API** | [fixtogether-api.onrender.com/api/v1](https://fixtogether-api.onrender.com/api/health) | REST API & Socket.IO server deployed on Render |
-| **Health Check** | `/api/health` | High-priority unthrottled uptime heartbeat |
+| Service | URL (Prod) | Local (Dev) | Notes |
+|---|---|---|---|
+| **Public Client App** | [app.fixtogether.com](https://app.fixtogether.com/) | `http://localhost:5173` | Single Page Application for owners, techs, and NGOs |
+| **Admin Command Center** | [admin.fixtogether.com](https://admin.fixtogether.com/) | `http://localhost:5174` | Dedicated standalone admin portal (Dark Command Center) |
+| **Backend API** | [api.fixtogether.com/api/v1](https://api.fixtogether.com/api/health) | `http://localhost:5000/api/v1` | Multi-origin REST API & Socket.IO server |
+| **Health Check** | `/api/health` | `http://localhost:5000/api/health` | High-priority unthrottled uptime heartbeat |
+
+> 📖 **Production Deployment Guide:** See [DEPLOYMENT.md](file:///d:/Projects/FixTogether/DEPLOYMENT.md) for full DNS, Vercel, Docker Compose, and Nginx reverse proxy instructions.
 
 ### 🔑 Verified Demonstration Accounts
 

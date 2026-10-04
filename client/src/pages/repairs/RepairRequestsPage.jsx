@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { ErrorState, EmptyState, StatusBadge, Pagination, CardSkeleton } from '../../components/ui';
+import { toast } from 'sonner';
 import {
   ClipboardList,
   Plus,
@@ -16,6 +17,10 @@ import {
   Layers,
   Wrench,
   CheckCircle2,
+  Zap,
+  X,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
@@ -65,6 +70,20 @@ export default function RepairRequestsPage() {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // 1-Click Accept Job modal state for technicians
+  const [selectedReqForAccept, setSelectedReqForAccept] = useState(null);
+  const [acceptForm, setAcceptForm] = useState({ estimatedCost: '', estimatedDays: '3', notes: '' });
+
+  const acceptJobMutation = useMutation({
+    mutationFn: ({ requestId, payload }) => api.post(`/repair-requests/${requestId}/accept-job`, payload),
+    onSuccess: (resp) => {
+      queryClient.invalidateQueries({ queryKey: ['repair-requests'] });
+      setSelectedReqForAccept(null);
+      toast.success(resp.data?.message || '🎉 Repair job accepted! You are assigned.');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to accept repair job'),
+  });
 
   // 300ms debounce on search
   useEffect(() => {
@@ -136,7 +155,7 @@ export default function RepairRequestsPage() {
             to="/repair-requests/new"
             className="btn-primary shrink-0 flex items-center gap-2 shadow-sm active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Request a Repair
+            <Plus className="w-4 h-4" /> Request a Repair (1-Click)
           </Link>
         )}
       </div>
@@ -198,7 +217,7 @@ export default function RepairRequestsPage() {
           action={
             userRole === 'owner' && (
               <Link to="/repair-requests/new" className="btn-primary text-xs">
-                <Plus className="w-4 h-4" /> Request a Repair
+                <Plus className="w-4 h-4" /> Request a Repair (1-Click)
               </Link>
             )
           }
@@ -273,6 +292,25 @@ export default function RepairRequestsPage() {
 
                 {/* Right: Action Hint & Arrow */}
                 <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                  {userRole === 'technician' && ['published', 'matching_technicians', 'awaiting_quotations', 'quotations_received'].includes(rr.requestStatus) && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedReqForAccept(rr);
+                        setAcceptForm({
+                          estimatedCost: rr.budgetMaximum || rr.budgetMinimum || '',
+                          estimatedDays: '3',
+                          notes: '',
+                        });
+                      }}
+                      className="btn-primary btn-xs flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 border-emerald-600 font-bold shadow-xs active:scale-95 text-[11px] py-1.5 px-3"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                      <span>⚡ Accept Job</span>
+                    </button>
+                  )}
                   <span className="text-xs font-semibold text-primary-700 sm:hidden">
                     {statusCfg.requiredAction.owner}
                   </span>
@@ -287,6 +325,114 @@ export default function RepairRequestsPage() {
           <Pagination pagination={data?.pagination} onPageChange={setPage} />
         </div>
       )}
+
+      {/* 1-Click Accept Job Modal for Technicians on List Page */}
+      {selectedReqForAccept && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-700 font-bold text-base">
+                <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                <span>Accept Repair Job</span>
+              </div>
+              <button onClick={() => setSelectedReqForAccept(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-primary-50 rounded-xl border border-emerald-200 text-xs space-y-1.5">
+              <div className="font-bold text-gray-900 text-sm">{selectedReqForAccept.item?.title || 'Repair Request'}</div>
+              <div className="text-gray-600 line-clamp-2">{selectedReqForAccept.problemDescription}</div>
+              {selectedReqForAccept.budgetMaximum && (
+                <div className="text-emerald-800 font-semibold pt-1">
+                  Owner's Budget: ৳{selectedReqForAccept.budgetMinimum || 0} – ৳{selectedReqForAccept.budgetMaximum}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label font-semibold text-gray-700">Your Service Charge (৳) *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={acceptForm.estimatedCost}
+                    onChange={(e) => setAcceptForm((p) => ({ ...p, estimatedCost: e.target.value }))}
+                    className="input pl-7 text-sm font-bold text-gray-900"
+                    placeholder={selectedReqForAccept.budgetMaximum ? String(selectedReqForAccept.budgetMaximum) : '1200'}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Estimated total labor/repair charge.</p>
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Estimated Turnaround (Days) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="90"
+                  value={acceptForm.estimatedDays}
+                  onChange={(e) => setAcceptForm((p) => ({ ...p, estimatedDays: e.target.value }))}
+                  className="input text-sm font-semibold text-gray-900"
+                  placeholder="3"
+                />
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Note to Owner (Optional)</label>
+                <input
+                  type="text"
+                  value={acceptForm.notes}
+                  onChange={(e) => setAcceptForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="input text-xs"
+                  placeholder="e.g. Can start today, standard diagnostics included..."
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                You will be immediately assigned to this repair. Competing quotes are closed and you can contact the owner.
+              </span>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setSelectedReqForAccept(null)}
+                className="btn-outline btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  acceptJobMutation.mutate({
+                    requestId: selectedReqForAccept._id,
+                    payload: {
+                      estimatedCost: acceptForm.estimatedCost ? Number(acceptForm.estimatedCost) : undefined,
+                      estimatedDays: Number(acceptForm.estimatedDays) || 3,
+                      notes: acceptForm.notes || undefined,
+                    },
+                  })
+                }
+                disabled={acceptJobMutation.isPending}
+                className="btn-primary btn-sm flex items-center gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm"
+              >
+                {acceptJobMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Accepting Job...</>
+                ) : (
+                  <><Zap className="w-4 h-4 text-amber-300 fill-amber-300" /> Confirm & Start Job</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

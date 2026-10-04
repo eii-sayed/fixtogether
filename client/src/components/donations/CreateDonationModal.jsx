@@ -282,32 +282,52 @@ export default function CreateDonationModal({
                       <div
                         key={item._id}
                         onClick={() => setSelectedItemId(item._id)}
-                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-center gap-3 ${
+                        className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between gap-3 ${
                           isSelected
                             ? 'border-pink-500 bg-pink-50/50 ring-2 ring-pink-500/20'
                             : 'border-gray-200 hover:border-gray-300 bg-white'
                         }`}
                       >
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                          {item.images?.length > 0 ? (
-                            <img
-                              src={item.images[0].url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Package className="w-6 h-6 text-gray-400" />
-                          )}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                            {item.images?.length > 0 ? (
+                              <img
+                                src={item.images[0].url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Package className="w-5 h-5 text-gray-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-gray-900 truncate">{item.title}</p>
+                            <p className="text-[10px] text-gray-500 truncate">
+                              {item.category?.name || 'Item'} • {item.condition}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-gray-900 truncate">{item.title}</p>
-                          <p className="text-[10px] text-gray-500 truncate">
-                            {item.category?.name || 'Item'} • {item.condition}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <CheckCircle className="w-5 h-5 text-pink-600 shrink-0" />
-                        )}
+
+                        <button
+                          type="button"
+                          disabled={createMutation.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            createMutation.mutate({
+                              itemId: item._id,
+                              matchingNeedId: selectedNeedId || undefined,
+                              preferredHandover: 'either',
+                              estimatedWeight: 1,
+                              pickupLocation: { approximateArea: 'Central', city: 'Dhaka' },
+                              description: `Donation offer for ${item.title}`,
+                            });
+                          }}
+                          className="btn-primary !text-[11px] !py-1 !px-2 shrink-0 flex items-center gap-1 shadow-xs"
+                          title="Donate this item in 1 click"
+                        >
+                          <Heart className="w-3 h-3 fill-white" />
+                          <span>Donate (1-Click)</span>
+                        </button>
                       </div>
                     );
                   })}
@@ -318,186 +338,194 @@ export default function CreateDonationModal({
 
           {/* Mode B: Enter Item Details Inline */}
           {mode === 'new' && (
-            <div className="space-y-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Item Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Dell Latitude 7490 Laptop or Philips Steam Iron"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="input text-xs w-full"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-4">
+              <div className="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Category <span className="text-red-500">*</span>
+                    Item Title <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
+                  <input
+                    type="text"
                     required
-                    className="input text-xs w-full"
-                  >
-                    <option value="">-- Select Category --</option>
-                    {categories.map((c) => (
-                      <option key={c._id} value={c._id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Condition <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={condition}
-                    onChange={(e) => setCondition(e.target.value)}
-                    className="input text-xs w-full"
-                  >
-                    <option value="new">Brand New / Sealed</option>
-                    <option value="good">Good (Fully functional, light cosmetic wear)</option>
-                    <option value="fair">Fair (Working, visible wear or minor glitch)</option>
-                    <option value="poor">Poor (Needs minor repair or cleaning)</option>
-                    <option value="broken">Broken (Requires technician repair before reuse)</option>
-                    <option value="for_parts">For Parts / E-waste Recycling</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Brand</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dell, Sony, LG"
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="e.g. Dell Latitude 7490 Laptop or Philips Steam Iron"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                     className="input text-xs w-full"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Model / Specs</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Core i5, 8GB RAM"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    className="input text-xs w-full"
-                  />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      required
+                      className="input text-xs w-full"
+                    >
+                      <option value="">-- Select Category --</option>
+                      {categories.map((c) => (
+                        <option key={c._id} value={c._id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Condition <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={condition}
+                      onChange={(e) => setCondition(e.target.value)}
+                      className="input text-xs w-full"
+                    >
+                      <option value="new">Brand New / Sealed</option>
+                      <option value="good">Good (Fully functional, light cosmetic wear)</option>
+                      <option value="fair">Fair (Working, visible wear or minor glitch)</option>
+                      <option value="poor">Poor (Needs minor repair or cleaning)</option>
+                      <option value="broken">Broken (Requires technician repair before reuse)</option>
+                      <option value="for_parts">For Parts / E-waste Recycling</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Photo Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="input text-xs w-full"
-                />
-              </div>
+              {/* Collapsible Secondary Details & Logistics */}
+              <details className="group border border-gray-200 rounded-2xl p-3.5 bg-gray-50/50 transition-all">
+                <summary className="text-xs font-semibold text-gray-700 cursor-pointer flex items-center justify-between list-none select-none">
+                  <span className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-indigo-600" />
+                    <span>+ Handover Logistics & Additional Specs (Optional)</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Item Description & Operational Status
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Mention any known quirks, cosmetic condition, included cables or adapters..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="input text-xs w-full"
-                />
-              </div>
+                <div className="pt-4 space-y-4 border-t border-gray-100 mt-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Brand</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Dell, Sony, LG"
+                        value={brand}
+                        onChange={(e) => setBrand(e.target.value)}
+                        className="input text-xs w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Model / Specs</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Core i5, 8GB RAM"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="input text-xs w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Photo Image URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/..."
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="input text-xs w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Item Description & Operational Status
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Mention any known quirks, cosmetic condition, included cables or adapters..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="input text-xs w-full"
+                    />
+                  </div>
+
+                  {/* Handover logistics */}
+                  <div className="space-y-3 pt-2 border-t border-gray-200/60">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                        Preferred Handover Method
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: 'either', label: 'Any / Flexible', desc: 'Dropoff or Pickup' },
+                          { id: 'dropoff', label: 'Drop-off at Hub', desc: 'You visit drop-off location' },
+                          { id: 'pickup', label: 'Courier Pickup', desc: 'Org picks up from your area' },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setPreferredHandover(opt.id)}
+                            className={`p-2 rounded-xl border text-left transition-all ${
+                              preferredHandover === opt.id
+                                ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-bold'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            <p className="text-xs">{opt.label}</p>
+                            <p className="text-[10px] text-gray-500 font-normal mt-0.5">{opt.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Estimated Weight (kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          max="100"
+                          value={estimatedWeight}
+                          onChange={(e) => setEstimatedWeight(e.target.value)}
+                          className="input text-xs w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Location / City
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Mirpur, Dhaka"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="input text-xs w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Pickup Address / Handover Notes (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Near Mirpur 10 roundabout, available after 4 PM"
+                        value={approximateArea}
+                        onChange={(e) => setApproximateArea(e.target.value)}
+                        className="input text-xs w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </details>
             </div>
           )}
-
-          {/* Handover Logistics & Preferences */}
-          <div className="space-y-4 pt-2 border-t border-gray-100">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-              <Truck className="w-4 h-4 text-gray-500" /> Handover Logistics & Preferences
-            </h4>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                Preferred Handover Method
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'either', label: 'Any / Flexible', desc: 'Dropoff or Pickup' },
-                  { id: 'dropoff', label: 'Drop-off at Hub', desc: 'You visit drop-off location' },
-                  { id: 'pickup', label: 'Courier Pickup', desc: 'Org picks up from your area' },
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setPreferredHandover(opt.id)}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                      preferredHandover === opt.id
-                        ? 'border-indigo-600 bg-indigo-50/50 text-indigo-900 font-bold'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    <p className="text-xs">{opt.label}</p>
-                    <p className="text-[10px] text-gray-500 font-normal mt-0.5">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Estimated Weight (kg)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  max="100"
-                  value={estimatedWeight}
-                  onChange={(e) => setEstimatedWeight(e.target.value)}
-                  className="input text-xs w-full"
-                />
-                <span className="text-[10px] text-gray-400 mt-0.5 block">
-                  Used for verified carbon & e-waste diversion metrics
-                </span>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Location / City
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Mirpur, Dhaka"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="input text-xs w-full"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Pickup Address / Handover Notes (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Near Mirpur 10 roundabout, available after 4 PM"
-                value={approximateArea}
-                onChange={(e) => setApproximateArea(e.target.value)}
-                className="input text-xs w-full"
-              />
-            </div>
-          </div>
         </form>
 
         {/* Footer actions */}

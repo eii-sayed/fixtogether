@@ -34,13 +34,25 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// CORS
-const corsOrigin = config.clientUrl.replace(/\/+$/, '');
+// CORS (supports both Client and Admin web origins)
+const allowedOrigins = [
+  config.clientUrl.replace(/\/+$/, ''),
+  config.adminUrl ? config.adminUrl.replace(/\/+$/, '') : null,
+  'http://localhost:5173',
+  'http://localhost:5174',
+].filter(Boolean);
+
 app.use(cors({
-  origin: corsOrigin,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-bypass-rate-limit'],
 }));
 
 // Body parsing

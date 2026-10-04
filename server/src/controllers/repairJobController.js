@@ -3,7 +3,7 @@
   OrganizationProfile, ImpactRecord, ReviewQueueItem } = require('../models');
 const { REPAIR_JOB_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, WARRANTY_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta, generateCode } = require('../utils/helpers');
-const { createNotification } = require('../services/notificationService');
+const { createNotification, resolveNotificationLink } = require('../services/notificationService');
 const uploadService = require('../services/uploadService');
 const { createAuditLog } = require('../middleware/auditLog');
 
@@ -368,7 +368,128 @@ const submitCompletion = asyncHandler(async (req, res) => {
   return successResponse(res, { repairJob: job }, 'Completion submitted');
 });
 
+/**
+ * POST /repair-jobs/:id/quick-solve
+ *
+ * 1-Step problem resolution for technicians.
+ * Marks the problem as solved/fixed from ANY active state,
+ * sets final cost, sets status to ready_for_collection, and notifies the owner.
+ */
+const quickSolve = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.technician.toString() !== req.user.userId.toString() && req.user.role !== 'admin') {
+    return errorResponse(res, 'Access denied. You are not the assigned technician.', 403);
+  }
+
+  const { notes, finalCost, paymentMethod } = req.body;
+
+  job.completionReport = notes || job.completionReport || 'Problem resolved successfully by technician.';
+  if (finalCost !== undefined && finalCost !== null && finalCost !== '') {
+    const costNum = Math.max(0, Number(finalCost));
+    job.finalLaborCost = costNum;
+    job.finalTotalCost = costNum;
+  } else if (!job.finalTotalCost) {
+    const quote = await Quotation.findById(job.acceptedQuotation);
+    job.finalTotalCost = quote?.estimatedTotalMaximum || 0;
+  }
+  if (paymentMethod) job.paymentMethod = paymentMethod;
+  job.technicianConfirmedCompletion = true;
+
+  if (req.files?.length > 0) {
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/completions' });
+    job.completionImages = uploaded.map((u) => ({ url: u.url, publicId: u.publicId }));
+  }
+
+  const previousStatus = job.currentStatus;
+  job.currentStatus = REPAIR_JOB_STATUS.READY_FOR_COLLECTION;
+  await job.save();
+
+  // Record history
+  await RepairStatusHistory.create({
+    repairJob: job._id,
+    previousStatus: previousStatus || REPAIR_JOB_STATUS.IN_PROGRESS,
+    newStatus: REPAIR_JOB_STATUS.READY_FOR_COLLECTION,
+    changedBy: req.user.userId,
+    note: notes || 'Technician marked problem solved and ready for pickup.',
+  });
+
+  // Update request status
+  const request = await RepairRequest.findById(job.repairRequest);
+  if (request) {
+    request.requestStatus = REPAIR_REQUEST_STATUS.READY_FOR_COLLECTION;
+    await request.save();
+  }
+
+  // Notify owner
+  await createNotification({
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.REPAIR_COMPLETED,
+    title: 'Repair Completed & Problem Solved!',
+    message: `Your technician has resolved the problem for "${request?.item?.title || 'your item'}". The item is ready for collection / return!`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
+  });
+
+  const { getIO } = require('../services/notificationService');
+  const io = getIO();
+  if (io) {
+    io.to(`chat:${job.repairRequest}`).emit('repair-job:updated', { jobId: job._id, status: job.currentStatus });
+    io.to(`user:${job.owner}`).emit('notification', {
+      title: 'Problem Solved!',
+      message: 'Technician has completed your repair.',
+    });
+  }
+
+  return successResponse(res, { job, repairJob: job }, 'Problem marked as solved! Item is ready for collection.');
+});
+
+/**
+ * POST /repair-jobs/:id/quick-start
+ *
+ * 1-Step transition from pending_inspection / inspecting to in_progress.
+ * Starts repair work without forcing multi-step diagnostic paperwork.
+ */
+const quickStart = asyncHandler(async (req, res) => {
+  const job = await RepairJob.findById(req.params.id);
+  if (!job) return errorResponse(res, 'Repair job not found.', 404);
+  if (job.technician.toString() !== req.user.userId.toString() && req.user.role !== 'admin') {
+    return errorResponse(res, 'Access denied. You are not the assigned technician.', 403);
+  }
+
+  const previousStatus = job.currentStatus;
+  job.currentStatus = REPAIR_JOB_STATUS.IN_PROGRESS;
+  await job.save();
+
+  // Record history
+  await RepairStatusHistory.create({
+    repairJob: job._id,
+    previousStatus: previousStatus || REPAIR_JOB_STATUS.PENDING_INSPECTION,
+    newStatus: REPAIR_JOB_STATUS.IN_PROGRESS,
+    changedBy: req.user.userId,
+    note: 'Technician started active repair work.',
+  });
+
+  const request = await RepairRequest.findById(job.repairRequest);
+  if (request) {
+    request.requestStatus = REPAIR_REQUEST_STATUS.REPAIR_IN_PROGRESS;
+    await request.save();
+  }
+
+  await createNotification({
+    userId: job.owner.toString(),
+    type: NOTIFICATION_TYPES.JOB_STATUS_UPDATED,
+    title: 'Repair In Progress',
+    message: `The technician has started repair work on "${request?.item?.title || 'your item'}".`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: job._id,
+  });
+
+  return successResponse(res, { job, repairJob: job }, 'Repair work started!');
+});
+
 const ownerConfirmCompletion = asyncHandler(async (req, res) => {
+
   const job = await RepairJob.findById(req.params.id);
   if (!job) return errorResponse(res, 'Not found.', 404);
   if (job.owner.toString() !== req.user.userId.toString()) return errorResponse(res, 'Access denied.', 403);
@@ -382,7 +503,7 @@ const ownerConfirmCompletion = asyncHandler(async (req, res) => {
   await job.save();
 
   const { transitionRepairJob } = require('../services/stateTransitionService');
-  await transitionRepairJob(job._id, REPAIR_JOB_STATUS.COMPLETED, req.user, {
+  const { job: updatedJob } = await transitionRepairJob(job._id, REPAIR_JOB_STATUS.COMPLETED, req.user, {
     note: 'Owner confirmed completion and received item.',
     req,
   });
@@ -403,17 +524,22 @@ const ownerConfirmCompletion = asyncHandler(async (req, res) => {
     });
   }
 
-  // Create impact record
+  // Create impact record & update parent request status
   const request = await RepairRequest.findById(job.repairRequest).populate('item');
-  if (request?.item) {
-    const existingImpact = await ImpactRecord.findOne({ item: request.item._id, outcome: 'repaired' });
-    if (!existingImpact) {
-      await ImpactRecord.create({
-        item: request.item._id,
-        outcome: 'repaired',
-        repairCost: job.finalTotalCost,
-        verified: true,
-      });
+  if (request) {
+    request.requestStatus = REPAIR_REQUEST_STATUS.COMPLETED;
+    await request.save();
+
+    if (request.item) {
+      const existingImpact = await ImpactRecord.findOne({ item: request.item._id, outcome: 'repaired' });
+      if (!existingImpact) {
+        await ImpactRecord.create({
+          item: request.item._id,
+          outcome: 'repaired',
+          repairCost: job.finalTotalCost,
+          verified: true,
+        });
+      }
     }
   }
 
@@ -426,7 +552,7 @@ const ownerConfirmCompletion = asyncHandler(async (req, res) => {
     relatedEntityId: job._id,
   });
 
-  return successResponse(res, { repairJob: job, warranty }, 'Completion confirmed');
+  return successResponse(res, { job: updatedJob || job, repairJob: updatedJob || job, warranty }, 'Completion confirmed');
 });
 
 // ===== REVIEWS =====
@@ -439,8 +565,21 @@ const createReview = asyncHandler(async (req, res) => {
   const existing = await Review.findOne({ repairJob: job._id, reviewer: req.user.userId });
   if (existing) return errorResponse(res, 'You have already reviewed this repair.', 409);
 
+  const rating = Number(req.body.rating || req.body.overallRating);
+  const reviewText = req.body.reviewText || req.body.comment || '';
+  const communicationRating = Number(req.body.communicationRating || rating || 3);
+  const serviceQualityRating = Number(req.body.serviceQualityRating || req.body.qualityRating || rating || 3);
+  const valueRating = Number(req.body.valueRating || rating || 3);
+
   const review = await Review.create({
-    repairJob: job._id, reviewer: req.user.userId, technician: job.technician, ...req.body,
+    repairJob: job._id,
+    reviewer: req.user.userId,
+    technician: job.technician,
+    rating,
+    reviewText,
+    communicationRating,
+    serviceQualityRating,
+    valueRating,
   });
 
   // Update technician stats
@@ -982,7 +1121,16 @@ const getNotifications = asyncHandler(async (req, res) => {
     NotificationModel.countDocuments(fetchQuery),
     NotificationModel.countDocuments({ user: req.user.userId, read: false }),
   ]);
-  return successResponse(res, { notifications, unreadCount, pagination: paginationMeta(total, page, limit) });
+
+  const formattedNotifications = notifications.map((n) => {
+    const doc = n.toObject();
+    if (!doc.link) {
+      doc.link = resolveNotificationLink(doc.type, doc.relatedEntityType, doc.relatedEntityId);
+    }
+    return doc;
+  });
+
+  return successResponse(res, { notifications: formattedNotifications, unreadCount, pagination: paginationMeta(total, page, limit) });
 });
 
 const getNotificationUnreadCount = asyncHandler(async (req, res) => {
@@ -1049,4 +1197,6 @@ module.exports = {
   getNotificationUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  quickSolve,
+  quickStart,
 };

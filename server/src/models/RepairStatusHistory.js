@@ -8,6 +8,11 @@ const repairStatusHistorySchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    repairRequest: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'RepairRequest',
+      required: false,
+    },
     previousStatus: { type: String, required: true },
     newStatus: { type: String, required: true },
     changedBy: {
@@ -26,6 +31,16 @@ const repairStatusHistorySchema = new mongoose.Schema(
   },
   { timestamps: false }
 );
+
+repairStatusHistorySchema.pre('validate', function (next) {
+  if (!this.previousStatus && (this.fromStatus || this.get('fromStatus'))) {
+    this.previousStatus = this.fromStatus || this.get('fromStatus');
+  }
+  if (!this.newStatus && (this.toStatus || this.get('toStatus'))) {
+    this.newStatus = this.toStatus || this.get('toStatus');
+  }
+  next();
+});
 
 repairStatusHistorySchema.index({ repairJob: 1, timestamp: 1 });
 

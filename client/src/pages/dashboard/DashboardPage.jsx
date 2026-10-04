@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { StatCard, PageLoader, ErrorState, StatusBadge } from '../../components/ui';
+import QuickAddItemModal from '../../components/items/QuickAddItemModal';
 import {
   Package,
   Wrench,
@@ -29,6 +31,7 @@ import {
 import { getStatusConfig } from '../../utils/repairStatusConfig';
 
 function OwnerDashboard() {
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { data: statsData } = useQuery({
     queryKey: ['my-stats'],
     queryFn: () => api.get('/users/me/stats').then((r) => r.data.data?.stats),
@@ -67,11 +70,15 @@ function OwnerDashboard() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <Link to="/items/new" className="btn-outline btn-sm">
-            <Package className="w-4 h-4" /> Register Item
-          </Link>
+          <button
+            type="button"
+            onClick={() => setShowQuickAdd(true)}
+            className="btn-outline btn-sm flex items-center gap-1.5"
+          >
+            <Package className="w-4 h-4" /> 1-Click Add Item
+          </button>
           <Link to="/repair-requests/new" className="btn-primary btn-sm flex items-center gap-1.5 shadow-sm">
-            <Plus className="w-4 h-4" /> Request Repair
+            <Sparkles className="w-4 h-4 text-amber-300" /> 1-Click Request Repair
           </Link>
         </div>
       </div>
@@ -239,6 +246,9 @@ function OwnerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* 1-Click Quick Add Item Modal */}
+      <QuickAddItemModal open={showQuickAdd} onClose={() => setShowQuickAdd(false)} />
     </div>
   );
 }

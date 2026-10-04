@@ -223,4 +223,73 @@ describe('Repair Requests API', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('POST /api/v1/repair-requests/:id/accept-job', () => {
+    it('allows a technician to accept an active repair request in 1 click', async () => {
+      const rr = await createDraftRequest(ownerToken);
+      await request(app).post(`/api/v1/repair-requests/${rr._id}/publish`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+
+      const res = await request(app)
+        .post(`/api/v1/repair-requests/${rr._id}/accept-job`)
+        .set('Authorization', `Bearer ${techToken}`)
+        .send({
+          estimatedCost: 1500,
+          estimatedDays: 3,
+          notes: 'Can start right away',
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.repairJob).toBeDefined();
+      expect(res.body.data.quotation).toBeDefined();
+    });
+  });
+
+  describe('POST /api/v1/repair-jobs/:id/quick-solve & quick-start', () => {
+    it('allows a technician to start work and mark problem solved cleanly without schema errors', async () => {
+      const rr = await createDraftRequest(ownerToken);
+      await request(app).post(`/api/v1/repair-requests/${rr._id}/publish`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+
+      const acceptRes = await request(app)
+        .post(`/api/v1/repair-requests/${rr._id}/accept-job`)
+        .set('Authorization', `Bearer ${techToken}`)
+        .send({ estimatedCost: 1500, estimatedDays: 3 });
+
+      const jobId = acceptRes.body.data.repairJob._id;
+
+      // 1. Quick start repair
+      const startRes = await request(app)
+        .post(`/api/v1/repair-jobs/${jobId}/quick-start`)
+        .set('Authorization', `Bearer ${techToken}`);
+      expect(startRes.status).toBe(200);
+
+      // 2. Quick solve problem
+      const solveRes = await request(app)
+        .post(`/api/v1/repair-jobs/${jobId}/quick-solve`)
+        .set('Authorization', `Bearer ${techToken}`)
+        .send({
+          finalCost: 1250,
+          notes: 'Replaced cracked screen and restored touch response.',
+        });
+
+      expect(solveRes.status).toBe(200);
+      expect(solveRes.body.success).toBe(true);
+      expect(solveRes.body.data.repairJob.currentStatus).toBe('ready_for_collection');
+      expect(solveRes.body.data.repairJob.finalTotalCost).toBe(1250);
+
+      // 3. Owner confirms completion & activates warranty
+      const confirmRes = await request(app)
+        .post(`/api/v1/repair-jobs/${jobId}/confirm-completion`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ paymentStatus: 'paid' });
+
+      expect(confirmRes.status).toBe(200);
+      expect(confirmRes.body.success).toBe(true);
+      expect(confirmRes.body.data.repairJob.currentStatus).toBe('completed');
+      expect(confirmRes.body.data.warranty).toBeDefined();
+      expect(confirmRes.body.data.warranty.status).toBe('active');
+    });
+  });
 });

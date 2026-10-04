@@ -23,6 +23,11 @@ const isParticipant = async (userId, userRole, repairRequest) => {
   const ownerId = repairRequest.owner?._id || repairRequest.owner;
   if (ownerId && ownerId.toString() === userId.toString()) return true;
 
+  // Any technician can view and participate in conversations on published/active repair requests
+  if (userRole === 'technician' && !['draft', 'cancelled'].includes(repairRequest.requestStatus)) {
+    return true;
+  }
+
   // Technician invited via selectedTechnicians
   if (repairRequest.selectedTechnicians?.length > 0) {
     const isInvited = repairRequest.selectedTechnicians.some(
@@ -303,6 +308,12 @@ const getMessages = async (req, res) => {
 
     // Build query
     const query = { repairRequest: repairRequestId };
+    if (req.user.role === 'technician') {
+      query.$or = [
+        { sender: req.user.userId },
+        { recipient: req.user.userId },
+      ];
+    }
     if (before && mongoose.Types.ObjectId.isValid(before)) {
       query._id = { $lt: before };
     }

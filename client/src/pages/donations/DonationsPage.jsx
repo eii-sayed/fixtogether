@@ -937,7 +937,7 @@ export default function DonationsPage() {
                         <HelpCircle className="w-3.5 h-3.5" /> Why Match?
                       </button>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         {offer.status === 'published' || offer.status === 'matched' ? (
                           <>
                             <button
@@ -948,9 +948,31 @@ export default function DonationsPage() {
                                 setDonorExplanation('');
                                 setInternalNote('');
                               }}
-                              className="btn-danger py-1 px-2.5 text-xs font-semibold"
+                              className="btn-danger py-1 px-2 text-xs font-semibold"
+                              title="Decline this offer"
                             >
                               Decline
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!isOrgVerified) {
+                                  toast.error('You must have an Approved organization verification to accept donations.');
+                                  return;
+                                }
+                                decisionMutation.mutate({
+                                  id: offer._id,
+                                  payload: {
+                                    action: 'accept',
+                                    decisionReason: 'Accepted hardware donation for community reuse initiative.',
+                                    expectedVersion: offer.version,
+                                  },
+                                });
+                              }}
+                              disabled={decisionMutation.isPending}
+                              className="btn-primary py-1 px-2.5 text-xs font-semibold shadow-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700"
+                              title="Accept offer immediately in 1 click"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" /> Accept (1-Click)
                             </button>
                             <button
                               onClick={() => {
@@ -964,9 +986,10 @@ export default function DonationsPage() {
                                 setDonorExplanation('');
                                 setInternalNote('');
                               }}
-                              className="btn-primary py-1 px-3 text-xs font-semibold shadow-xs"
+                              className="btn-outline py-1 px-2 text-xs font-semibold"
+                              title="Review custom options and notes"
                             >
-                              Accept Offer
+                              Custom...
                             </button>
                           </>
                         ) : offer.status === 'accepted' ? (
@@ -981,27 +1004,73 @@ export default function DonationsPage() {
                             <Truck className="w-3.5 h-3.5 inline mr-1" /> Schedule Handover
                           </button>
                         ) : offer.status === 'handover_scheduled' || offer.status === 'pickup_scheduled' ? (
-                          <button
-                            onClick={() => {
-                              setReceiveModalOffer(offer);
-                              setHandoverConfirmationCode('');
-                            }}
-                            className="btn-primary py-1 px-3 text-xs font-semibold bg-teal-600 hover:bg-teal-700"
-                          >
-                            <Package className="w-3.5 h-3.5 inline mr-1" /> Confirm Receipt
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                receiveMutation.mutate({
+                                  id: offer._id,
+                                  confirmationCode: offer.handover?.confirmationCode,
+                                });
+                              }}
+                              disabled={receiveMutation.isPending}
+                              className="btn-primary py-1 px-2.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 flex items-center gap-1"
+                              title="Confirm receipt directly"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Received (1-Click)
+                            </button>
+                            <button
+                              onClick={() => {
+                                setReceiveModalOffer(offer);
+                                setHandoverConfirmationCode('');
+                              }}
+                              className="btn-outline py-1 px-2 text-xs font-semibold"
+                            >
+                              Code...
+                            </button>
+                          </>
                         ) : offer.status === 'received' || offer.status === 'inspection_pending' ? (
-                          <button
-                            onClick={() => {
-                              setInspectModalOffer(offer);
-                              setInspectOutcome('accepted_working');
-                              setInspectPublicNotes('');
-                              setInspectInternalNotes('');
-                            }}
-                            className="btn-primary py-1 px-3 text-xs font-semibold bg-amber-600 hover:bg-amber-700"
-                          >
-                            <Wrench className="w-3.5 h-3.5 inline mr-1" /> Inspect Hardware
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                inspectMutation.mutate({
+                                  id: offer._id,
+                                  payload: {
+                                    checklist: {
+                                      itemIdentityVerified: true,
+                                      quantityVerified: true,
+                                      physicalCondition: 'good',
+                                      powerStateWorking: true,
+                                      functionalityTested: true,
+                                      missingAccessoriesChecked: true,
+                                      dataComponentsChecked: true,
+                                      safetyClearance: true,
+                                      refurbishmentRequired: false,
+                                    },
+                                    outcome: 'accepted_working',
+                                    publicNotes: 'Passed testing, certified ready for community reuse.',
+                                    internalNotes: '1-Click quick pass verification',
+                                    expectedVersion: offer.version,
+                                  },
+                                });
+                              }}
+                              disabled={inspectMutation.isPending}
+                              className="btn-primary py-1 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1"
+                              title="Pass technical inspection and prepare for redistribution"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Pass Inspection (1-Click)
+                            </button>
+                            <button
+                              onClick={() => {
+                                setInspectModalOffer(offer);
+                                setInspectOutcome('accepted_working');
+                                setInspectPublicNotes('');
+                                setInspectInternalNotes('');
+                              }}
+                              className="btn-outline py-1 px-2 text-xs font-semibold"
+                            >
+                              Checklist...
+                            </button>
+                          </>
                         ) : offer.status === 'inspected' ? (
                           <button
                             onClick={() => {
@@ -1810,44 +1879,55 @@ export default function DonationsPage() {
         </div>
       )}
 
-      {/* 5-STEP GUIDED COMMUNITY NEED BUILDER */}
+      {/* STREAMLINED 1-STEP COMMUNITY NEED BUILDER */}
       {showNeedBuilder && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-xl text-xs">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h3 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-primary-600" /> Post Community Hardware Need (Step {needStep} of 5)
-              </h3>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-1.5">
+                  <Package className="w-4 h-4 text-primary-600" /> Post Community Hardware Need
+                </h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Reach donors across the platform with a single direct request.
+                </p>
+              </div>
               <button onClick={() => setShowNeedBuilder(false)} className="text-gray-400 hover:text-gray-600">
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Step Indicators */}
-            <div className="grid grid-cols-5 gap-1 text-center font-bold text-[9px] uppercase tracking-wider text-gray-400">
-              <div className={needStep >= 1 ? 'text-primary-600' : ''}>1. Basic</div>
-              <div className={needStep >= 2 ? 'text-primary-600' : ''}>2. Specs</div>
-              <div className={needStep >= 3 ? 'text-primary-600' : ''}>3. Program</div>
-              <div className={needStep >= 4 ? 'text-primary-600' : ''}>4. Logistics</div>
-              <div className={needStep >= 5 ? 'text-primary-600' : ''}>5. Publish</div>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!needFormData.title || !needFormData.category) {
+                  toast.error('Please enter a title and select a category.');
+                  return;
+                }
+                createNeedMutation.mutate({
+                  ...needFormData,
+                  requiredSpecifications: needFormData.requiredSpecifications
+                    ? [needFormData.requiredSpecifications]
+                    : [],
+                });
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="font-semibold text-gray-700 block mb-1">
+                  Need Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={needFormData.title}
+                  onChange={(e) => setNeedFormData((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. 10 Working Laptops for STEM Youth Center"
+                  className="input text-xs w-full"
+                  required
+                />
+              </div>
 
-            {/* Step 1: Basic Info */}
-            {needStep === 1 && (
-              <div className="space-y-3">
-                <div>
-                  <label className="font-semibold text-gray-700 block mb-1">
-                    Need Title <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={needFormData.title}
-                    onChange={(e) => setNeedFormData((p) => ({ ...p, title: e.target.value }))}
-                    placeholder="e.g. 10 Working Laptops for STEM Youth Center"
-                    className="input text-xs w-full"
-                    required
-                  />
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-gray-700 block mb-1">
                     Item Category <span className="text-red-500">*</span>
@@ -1866,39 +1946,34 @@ export default function DonationsPage() {
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="font-semibold text-gray-700 block mb-1">Urgency</label>
-                    <select
-                      value={needFormData.urgency}
-                      onChange={(e) => setNeedFormData((p) => ({ ...p, urgency: e.target.value }))}
-                      className="input text-xs w-full"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical (Immediate Need)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-semibold text-gray-700 block mb-1">Quantity Needed</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={needFormData.quantityRequested}
-                      onChange={(e) => setNeedFormData((p) => ({ ...p, quantityRequested: Number(e.target.value) }))}
-                      className="input text-xs w-full font-bold"
-                    />
-                  </div>
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Quantity Needed</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={needFormData.quantityRequested}
+                    onChange={(e) => setNeedFormData((p) => ({ ...p, quantityRequested: Number(e.target.value) }))}
+                    className="input text-xs w-full font-bold"
+                  />
                 </div>
               </div>
-            )}
 
-            {/* Step 2: Item Specs */}
-            {needStep === 2 && (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-gray-700 block mb-1">Minimum Condition Acceptable</label>
+                  <label className="font-semibold text-gray-700 block mb-1">Urgency</label>
+                  <select
+                    value={needFormData.urgency}
+                    onChange={(e) => setNeedFormData((p) => ({ ...p, urgency: e.target.value }))}
+                    className="input text-xs w-full"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical (Immediate Need)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-gray-700 block mb-1">Minimum Condition</label>
                   <select
                     value={needFormData.minimumCondition}
                     onChange={(e) => setNeedFormData((p) => ({ ...p, minimumCondition: e.target.value }))}
@@ -1910,111 +1985,84 @@ export default function DonationsPage() {
                     <option value="broken">Broken (Parts recovery)</option>
                   </select>
                 </div>
-                <div>
-                  <label className="font-semibold text-gray-700 block mb-1">Required Specifications / Notes</label>
-                  <textarea
-                    rows={3}
-                    value={needFormData.requiredSpecifications}
-                    onChange={(e) => setNeedFormData((p) => ({ ...p, requiredSpecifications: e.target.value }))}
-                    placeholder="e.g. Core i3 or equivalent, 8GB RAM minimum, charging adapter preferred..."
-                    className="input text-xs w-full"
-                  />
+              </div>
+
+              {/* Collapsible details for specs, beneficiary & logistics */}
+              <details className="group border border-gray-200 rounded-xl p-3 bg-gray-50/50">
+                <summary className="font-semibold text-gray-700 cursor-pointer flex items-center justify-between list-none select-none">
+                  <span>+ Specifications, Program & Logistics (Optional)</span>
+                  <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+
+                <div className="pt-3 space-y-3 border-t border-gray-100 mt-2">
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">Required Specifications / Notes</label>
+                    <textarea
+                      rows={2}
+                      value={needFormData.requiredSpecifications}
+                      onChange={(e) => setNeedFormData((p) => ({ ...p, requiredSpecifications: e.target.value }))}
+                      placeholder="e.g. Core i3 or equivalent, 8GB RAM minimum, charging adapter preferred..."
+                      className="input text-xs w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">Beneficiary & Program Context</label>
+                    <textarea
+                      rows={2}
+                      value={needFormData.beneficiaryContext}
+                      onChange={(e) => setNeedFormData((p) => ({ ...p, beneficiaryContext: e.target.value }))}
+                      placeholder="e.g. Distributed to students in the Mirpur coding initiative..."
+                      className="input text-xs w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-gray-700 block mb-1">Target Date</label>
+                    <input
+                      type="date"
+                      value={needFormData.targetDate}
+                      onChange={(e) => setNeedFormData((p) => ({ ...p, targetDate: e.target.value }))}
+                      className="input text-xs w-full"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={needFormData.pickupAvailable}
+                      onChange={(e) => setNeedFormData((p) => ({ ...p, pickupAvailable: e.target.checked }))}
+                      className="rounded text-primary-600"
+                    />
+                    <span className="font-semibold text-gray-700">We can arrange volunteer pickup for bulk donations</span>
+                  </label>
                 </div>
-              </div>
-            )}
+              </details>
 
-            {/* Step 3: Beneficiary Program */}
-            {needStep === 3 && (
-              <div className="space-y-3">
-                <div>
-                  <label className="font-semibold text-gray-700 block mb-1">Beneficiary & Program Context</label>
-                  <textarea
-                    rows={4}
-                    value={needFormData.beneficiaryContext}
-                    onChange={(e) => setNeedFormData((p) => ({ ...p, beneficiaryContext: e.target.value }))}
-                    placeholder="General description: Laptops will be distributed to underprivileged students in the Mirpur coding initiative..."
-                    className="input text-xs w-full"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Logistics */}
-            {needStep === 4 && (
-              <div className="space-y-3">
-                <div>
-                  <label className="font-semibold text-gray-700 block mb-1">Target Date</label>
-                  <input
-                    type="date"
-                    value={needFormData.targetDate}
-                    onChange={(e) => setNeedFormData((p) => ({ ...p, targetDate: e.target.value }))}
-                    className="input text-xs w-full"
-                  />
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer pt-2">
-                  <input
-                    type="checkbox"
-                    checked={needFormData.pickupAvailable}
-                    onChange={(e) => setNeedFormData((p) => ({ ...p, pickupAvailable: e.target.checked }))}
-                    className="rounded text-primary-600"
-                  />
-                  <span className="font-semibold">We can arrange volunteer pickup for bulk donations</span>
-                </label>
-              </div>
-            )}
-
-            {/* Step 5: Review & Publish */}
-            {needStep === 5 && (
-              <div className="p-4 bg-gray-50 rounded-xl space-y-2 text-xs">
-                <p>
-                  <strong>Title:</strong> {needFormData.title}
-                </p>
-                <p>
-                  <strong>Target Quantity:</strong> {needFormData.quantityRequested} units
-                </p>
-                <p>
-                  <strong>Min Condition:</strong> {needFormData.minimumCondition}
-                </p>
-                <p>
-                  <strong>Urgency:</strong> {needFormData.urgency.toUpperCase()}
-                </p>
-              </div>
-            )}
-
-            {/* Navigation buttons */}
-            <div className="flex justify-between pt-3 border-t border-gray-100">
-              {needStep > 1 ? (
-                <button onClick={() => setNeedStep((s) => s - 1)} className="btn-secondary text-xs">
-                  Back
-                </button>
-              ) : (
-                <div />
-              )}
-
-              {needStep < 5 ? (
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
-                  onClick={() => setNeedStep((s) => s + 1)}
-                  disabled={needStep === 1 && (!needFormData.title || !needFormData.category)}
-                  className="btn-primary text-xs font-semibold"
+                  type="button"
+                  onClick={() => setShowNeedBuilder(false)}
+                  className="btn-secondary text-xs"
                 >
-                  Continue Next Step
+                  Cancel
                 </button>
-              ) : (
                 <button
-                  onClick={() =>
-                    createNeedMutation.mutate({
-                      ...needFormData,
-                      requiredSpecifications: needFormData.requiredSpecifications
-                        ? [needFormData.requiredSpecifications]
-                        : [],
-                    })
-                  }
-                  className="btn-primary text-xs font-semibold"
+                  type="submit"
+                  disabled={createNeedMutation.isPending}
+                  className="btn-primary text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                 >
-                  Publish Community Need
+                  {createNeedMutation.isPending ? (
+                    'Publishing...'
+                  ) : (
+                    <>
+                      <Package className="w-4 h-4" /> Publish Community Need (1-Click)
+                    </>
+                  )}
                 </button>
-              )}
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

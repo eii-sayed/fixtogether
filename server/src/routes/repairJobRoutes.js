@@ -16,7 +16,11 @@ router.post('/:id/cost-approval', authenticate, authorize(ROLES.TECHNICIAN), upl
 router.post('/:id/cost-approval/decision', authenticate, authorize(ROLES.OWNER), rjController.ownerCostApprovalDecision);
 router.post('/:id/quality-check', authenticate, authorize(ROLES.TECHNICIAN), uploadMultipleImages('images', 5), rjController.submitQualityCheck);
 router.post('/:id/completion', authenticate, authorize(ROLES.TECHNICIAN), uploadMultipleImages('images', 10), rjController.submitCompletion);
+router.post('/:id/quick-solve', authenticate, authorize(ROLES.TECHNICIAN), uploadMultipleImages('images', 5), rjController.quickSolve);
+router.post('/:id/quick-start', authenticate, authorize(ROLES.TECHNICIAN), rjController.quickStart);
 router.post('/:id/owner-confirmation', authenticate, authorize(ROLES.OWNER), rjController.ownerConfirmCompletion);
+router.post('/:id/confirm-completion', authenticate, authorize(ROLES.OWNER), rjController.ownerConfirmCompletion);
+
 
 // Inspection
 router.post('/:id/inspection', authenticate, authorize(ROLES.TECHNICIAN), uploadMultipleImages('images', 5), rjController.createInspection);

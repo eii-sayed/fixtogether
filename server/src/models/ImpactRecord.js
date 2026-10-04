@@ -10,12 +10,10 @@ const impactRecordSchema = new mongoose.Schema(
     sourceDonation: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'DonationOffer',
-      default: null,
     },
     organization: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'OrganizationProfile',
-      default: null,
     },
     outcome: {
       type: String,
@@ -88,7 +86,10 @@ const impactRecordSchema = new mongoose.Schema(
 
 impactRecordSchema.index({ outcome: 1 });
 impactRecordSchema.index({ organization: 1, recordedAt: -1 });
-impactRecordSchema.index({ sourceDonation: 1 }, { unique: true, sparse: true });
+impactRecordSchema.index(
+  { sourceDonation: 1 },
+  { unique: true, partialFilterExpression: { sourceDonation: { $exists: true, $type: 'objectId' } } }
+);
 impactRecordSchema.index({ item: 1 });
 
 const ImpactRecord = mongoose.model('ImpactRecord', impactRecordSchema);

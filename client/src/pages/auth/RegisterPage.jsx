@@ -53,6 +53,13 @@ export default function RegisterPage() {
     }
   };
 
+  const onFormError = (errs) => {
+    const firstKey = Object.keys(errs)[0];
+    if (firstKey) {
+      toast.error(errs[firstKey]?.message || 'Please fill in all required fields');
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
@@ -65,7 +72,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="card card-body">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-5">
             {/* Role Selection */}
             <div>
               <label className="label">I am a</label>

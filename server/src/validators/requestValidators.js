@@ -10,9 +10,9 @@ const createItemSchema = Joi.object({
     value: Joi.number().min(0).optional(),
     unit: Joi.string().valid('days', 'months', 'years').optional(),
   }).optional(),
-  condition: Joi.string().valid('new', 'good', 'fair', 'poor', 'broken', 'for_parts').required(),
+  condition: Joi.string().valid('new', 'good', 'fair', 'poor', 'broken', 'for_parts').default('good').optional(),
   serialNumberPrivate: Joi.string().allow('').optional(),
-  ownershipDeclaration: Joi.boolean().optional(),
+  ownershipDeclaration: Joi.boolean().default(true).optional(),
   approximateLocation: Joi.object({
     city: Joi.string().allow('').optional(),
     area: Joi.string().allow('').optional(),
@@ -157,6 +157,70 @@ const createPartSchema = Joi.object({
   quantity: Joi.number().min(1).default(1),
 });
 
+/**
+ * Quick repair request: combines item creation + repair request + auto-publish
+ * in a single call. Requires either existingItemId or (title + category + condition).
+ */
+const quickRepairRequestSchema = Joi.object({
+  // Existing item (optional — if omitted, new item fields are required)
+  existingItemId: Joi.string().allow('', null).optional(),
+
+  // Item fields (required when existingItemId is not provided)
+  title: Joi.string().trim().min(3).max(200).when('existingItemId', {
+    is: Joi.exist().not('', null),
+    then: Joi.optional(),
+    otherwise: Joi.required().messages({ 'any.required': 'Item title is required when not using an existing item' }),
+  }),
+  category: Joi.string().when('existingItemId', {
+    is: Joi.exist().not('', null),
+    then: Joi.optional(),
+    otherwise: Joi.required().messages({ 'any.required': 'Category is required when not using an existing item' }),
+  }),
+  brand: Joi.string().trim().max(100).allow('').optional(),
+  model: Joi.string().trim().max(100).allow('').optional(),
+  condition: Joi.string().valid('new', 'good', 'fair', 'poor', 'broken', 'for_parts').default('broken').optional(),
+  ownershipDeclaration: Joi.boolean().default(true).optional(),
+  approximateAge: Joi.object({
+    value: Joi.number().min(0).optional(),
+    unit: Joi.string().valid('days', 'months', 'years').optional(),
+  }).optional(),
+
+  // Repair fields
+  problemDescription: Joi.string().trim().min(5).max(5000).required()
+    .messages({ 'string.min': 'Please describe the problem in at least 5 characters' }),
+  eventBeforeIssue: Joi.string().trim().max(2000).allow('').optional(),
+  previousRepairAttempts: Joi.string().trim().max(2000).allow('').optional(),
+  budgetMinimum: Joi.number().min(0).optional(),
+  budgetMaximum: Joi.number().min(0).optional(),
+  preferredServiceMethod: Joi.string().valid('onsite', 'pickup', 'dropoff', 'remote', '').optional(),
+  availability: Joi.string().trim().max(500).allow('').optional(),
+
+  // Control
+  autoPublish: Joi.boolean().default(true),
+});
+
+/**
+ * Quick quote: simplified quotation requiring only total cost and duration.
+ * Server fills defaults for inspection fee, transport, warranty, etc.
+ */
+const quickQuoteSchema = Joi.object({
+  estimatedTotal: Joi.number().min(1).required()
+    .messages({ 'any.required': 'Estimated total cost is required' }),
+  estimatedDays: Joi.number().min(1).max(365).required()
+    .messages({ 'any.required': 'Estimated days is required' }),
+  notes: Joi.string().trim().max(2000).allow('').optional(),
+  warrantyDays: Joi.number().min(0).max(365).optional(),
+});
+
+/**
+ * Accept job: 1-click acceptance by technician.
+ */
+const acceptJobSchema = Joi.object({
+  estimatedCost: Joi.number().min(0).allow('', null).optional(),
+  estimatedDays: Joi.number().min(1).max(365).allow('', null).optional(),
+  notes: Joi.string().trim().max(2000).allow('', null).optional(),
+});
+
 module.exports = {
   createItemSchema,
   createRepairRequestSchema,
@@ -170,4 +234,7 @@ module.exports = {
   createDisputeSchema,
   createDonationSchema,
   createPartSchema,
+  quickRepairRequestSchema,
+  quickQuoteSchema,
+  acceptJobSchema,
 };

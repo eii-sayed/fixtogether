@@ -55,22 +55,50 @@
     @apply p-4 sm:p-6;
   }
 
-  /* Inputs */
-  .input {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-xl text-sm
-    focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
-    placeholder:text-gray-400 disabled:bg-gray-100 disabled:cursor-not-allowed
-    transition-all duration-200 min-h-[44px] bg-white;
+  /* Inputs & Form Controls */
+  .input, .input-field {
+    @apply w-full px-3.5 py-2.5 sm:py-3 border border-gray-200 rounded-xl text-sm text-gray-900
+    bg-white placeholder:text-gray-400
+    hover:border-gray-300
+    focus:outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-500/20
+    disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed
+    shadow-sm transition-all duration-150 min-h-[44px];
   }
-  .input-error {
-    @apply border-danger-500 focus:ring-danger-500 focus:border-danger-500 bg-danger-50/20;
+
+  /* Custom styled select with chevron */
+  select.input, select.input-field, select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1.25em 1.25em;
+    padding-right: 2.5rem;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  /* Textarea specifics */
+  textarea.input, textarea.input-field {
+    min-height: 100px;
+    line-height: 1.6;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .input-error, .input-field-error {
+    @apply border-danger-400 focus:border-danger-600 focus:ring-2 focus:ring-danger-500/20 bg-danger-50/20 text-danger-900;
   }
 
   .label {
-    @apply block text-sm font-semibold text-gray-800 mb-1.5;
+    @apply block text-xs sm:text-[13px] font-bold text-gray-700 mb-1.5 tracking-tight;
+  }
+  .label-required {
+    @apply text-danger-500 ml-0.5 font-bold;
+  }
+  .label-helper {
+    @apply text-[11px] font-normal text-gray-400 block mt-0.5 normal-case;
   }
   .error-text {
-    @apply text-xs text-danger-600 mt-1 font-medium;
+    @apply text-xs text-danger-600 mt-1 font-semibold flex items-center gap-1;
   }
 
   /* Badges */

@@ -8,10 +8,10 @@ import { toast } from 'sonner';
 import { Loader2, Star, X } from 'lucide-react';
 
 const schema = z.object({
-  rating: z.number().min(1, 'Please provide an overall rating').max(5),
-  communicationRating: z.number().min(1).max(5),
-  serviceQualityRating: z.number().min(1).max(5),
-  valueRating: z.number().min(1).max(5),
+  rating: z.number().min(1, 'Please select an overall star rating').max(5),
+  communicationRating: z.number().min(0).max(5).optional(),
+  serviceQualityRating: z.number().min(0).max(5).optional(),
+  valueRating: z.number().min(0).max(5).optional(),
   reviewText: z.string().max(2000).optional(),
 });
 
@@ -55,7 +55,14 @@ export default function WriteReviewModal({ open, onClose, repairJobId, technicia
           <button
             key={star}
             type="button"
-            onClick={() => setValue(name, star)}
+            onClick={() => {
+              setValue(name, star, { shouldValidate: true });
+              if (name === 'rating') {
+                if (!values.communicationRating) setValue('communicationRating', star);
+                if (!values.serviceQualityRating) setValue('serviceQualityRating', star);
+                if (!values.valueRating) setValue('valueRating', star);
+              }
+            }}
             onMouseEnter={() => setHoverRating(prev => ({ ...prev, [name]: star }))}
             onMouseLeave={() => setHoverRating(prev => ({ ...prev, [name]: 0 }))}
             className="focus:outline-none transition-transform hover:scale-110"
@@ -74,6 +81,13 @@ export default function WriteReviewModal({ open, onClose, repairJobId, technicia
     </div>
   );
 
+  const onFormError = (errs) => {
+    const firstKey = Object.keys(errs)[0];
+    if (firstKey) {
+      toast.error(errs[firstKey]?.message || 'Please provide required review details');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -84,7 +98,7 @@ export default function WriteReviewModal({ open, onClose, repairJobId, technicia
           </button>
         </div>
 
-        <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-6">
+        <form onSubmit={handleSubmit((d) => mutation.mutate(d), onFormError)} className="space-y-6">
           <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col items-center">
             <StarRating name="rating" label="Overall Rating *" size="w-8 h-8" />
           </div>

@@ -57,6 +57,24 @@ services:
     networks:
       - fixtogether-net
 
+  # Standalone Admin Portal
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: fixtogether-admin
+    ports:
+      - "5174:5174"
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000/api/v1
+      VITE_PUBLIC_CLIENT_URL: http://localhost:5173
+    depends_on:
+      - server
+    volumes:
+      - ./admin/src:/app/src
+    networks:
+      - fixtogether-net
+
 volumes:
   mongodb_data:
   server_uploads:

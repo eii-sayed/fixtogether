@@ -5,6 +5,9 @@
  */
 const validate = (schema, property = 'body') => {
   return (req, res, next) => {
+    if (!schema || typeof schema.validate !== 'function') {
+      return next();
+    }
     const { error, value } = schema.validate(req[property], {
       abortEarly: false,
       stripUnknown: true,

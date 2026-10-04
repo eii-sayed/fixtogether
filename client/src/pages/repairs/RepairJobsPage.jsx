@@ -19,7 +19,13 @@ import {
   Layers,
   MessageSquare,
   ShieldCheck,
+  Zap,
+  CheckCircle,
+  Loader2,
+  X,
+  Check,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import WriteReviewModal from '../../components/reviews/WriteReviewModal';
 import InspectionReportModal from '../../components/jobs/InspectionReportModal';
@@ -41,6 +47,10 @@ export default function RepairJobsPage() {
   const [qualityCheckJob, setQualityCheckJob] = useState(null);
   const [reviewJob, setReviewJob] = useState(null);
 
+  // Quick action states
+  const [quickSolveJob, setQuickSolveJob] = useState(null);
+  const [quickSolveForm, setQuickSolveForm] = useState({ notes: '', finalCost: '' });
+
   const isTechnician = user?.role === 'technician';
   const isOwner = user?.role === 'owner';
 
@@ -51,6 +61,39 @@ export default function RepairJobsPage() {
         .get(`/repair-jobs?page=${page}&limit=12${status ? `&status=${status}` : ''}`)
         .then((r) => r.data.data),
     staleTime: 30000,
+  });
+
+  const quickStartMutation = useMutation({
+    mutationFn: (jobId) => api.post(`/repair-jobs/${jobId}/quick-start`),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['repair-jobs']);
+      toast.success('Started repair work!');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to start repair'),
+  });
+
+  const quickSolveMutation = useMutation({
+    mutationFn: ({ jobId, payload }) => api.post(`/repair-jobs/${jobId}/quick-solve`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['repair-jobs']);
+      setQuickSolveJob(null);
+      toast.success('Problem marked solved! Customer notified for collection.');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to complete repair'),
+  });
+
+  const ownerConfirmMutation = useMutation({
+    mutationFn: ({ jobId, receivedConfirmed = true, satisfactionLevel = 'satisfied', notes = 'Item received in working condition.' }) =>
+      api.post(`/repair-jobs/${jobId}/confirm-completion`, { receivedConfirmed, satisfactionLevel, notes }),
+    onSuccess: (res, variables) => {
+      queryClient.invalidateQueries(['repair-jobs']);
+      toast.success('Repair confirmed completed and warranty activated!');
+      const job = data?.jobs?.find((j) => j._id === variables.jobId);
+      if (job) {
+        setReviewJob(job);
+      }
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to confirm completion'),
   });
 
   const statuses = [
@@ -90,6 +133,16 @@ export default function RepairJobsPage() {
     }
   };
 
+  const getSimplifiedStage = (currentStatus) => {
+    if (['ready_for_collection', 'collected', 'completed'].includes(currentStatus)) {
+      return { step: 3, label: 'Solved & Ready', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
+    }
+    if (['in_progress', 'waiting_for_parts', 'quality_check'].includes(currentStatus)) {
+      return { step: 2, label: 'Repairing & Testing', color: 'text-blue-600 bg-blue-50 border-blue-200' };
+    }
+    return { step: 1, label: 'Intake & Diagnostics', color: 'text-amber-600 bg-amber-50 border-amber-200' };
+  };
+
   if (isLoading) return <PageLoader />;
   if (error) return <ErrorState error={error} />;
 
@@ -103,7 +156,7 @@ export default function RepairJobsPage() {
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             {isTechnician
-              ? 'Complete lifecycle management: diagnostics, cost revisions, parts logs, and QA signoffs'
+              ? 'Fast 1-click workflows: start repairs, track progress, and mark problems solved'
               : 'Track workshop progress, approve revisions, and verify handover completion'}
           </p>
         </div>
@@ -142,6 +195,8 @@ export default function RepairJobsPage() {
             const config = JOB_STATUS_CONFIG[job.currentStatus] || JOB_STATUS_CONFIG.pending_inspection;
             const actionConfig = isTechnician ? config.technicianAction : config.ownerAction;
             const currentStageIdx = config.stageIndex || 0;
+            const simplified = getSimplifiedStage(job.currentStatus);
+            const isFinished = ['ready_for_collection', 'collected', 'completed', 'cancelled'].includes(job.currentStatus);
 
             return (
               <div
@@ -184,36 +239,52 @@ export default function RepairJobsPage() {
                   </div>
                 </div>
 
-                {/* 10-Stage Mini Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium">
-                    <span>
-                      Stage {currentStageIdx + 1} of 10: <strong>{config.label}</strong>
-                    </span>
-                    <span className="text-gray-400">
-                      {Math.round(((currentStageIdx + 1) / 10) * 100)}% Complete
+                {/* Simplified 3-Phase Progress Bar */}
+                <div className="space-y-1.5 bg-gray-50/70 p-2.5 rounded-xl border border-gray-100">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] border ${simplified.color}`}>
+                        Step {simplified.step} of 3: {simplified.label}
+                      </span>
+                      <span className="text-gray-500 font-medium text-[11px]">
+                        ({config.label})
+                      </span>
+                    </div>
+                    <span className="text-gray-400 text-[11px] font-semibold">
+                      {Math.round(((currentStageIdx + 1) / 10) * 100)}%
                     </span>
                   </div>
-                  <div className="grid grid-cols-10 gap-1">
-                    {ACTIVE_JOB_STAGES.map((st, i) => (
-                      <div
-                        key={st.id}
-                        title={st.label}
-                        className={`h-1.5 rounded-full transition-all ${
-                          i <= currentStageIdx ? 'bg-primary-600' : 'bg-gray-100'
-                        }`}
-                      />
-                    ))}
+
+                  {/* 3 Step Visual Blocks */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        simplified.step >= 1 ? 'bg-primary-500' : 'bg-gray-200'
+                      }`}
+                      title="Step 1: Diagnostics & Intake"
+                    />
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        simplified.step >= 2 ? 'bg-primary-500' : 'bg-gray-200'
+                      }`}
+                      title="Step 2: Repair & Testing"
+                    />
+                    <div
+                      className={`h-2 rounded-full transition-all ${
+                        simplified.step >= 3 ? 'bg-emerald-500' : 'bg-gray-200'
+                      }`}
+                      title="Step 3: Solved & Ready"
+                    />
                   </div>
                 </div>
 
                 {/* Bottom Action Footer */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
                   <p className="text-xs text-gray-500 italic line-clamp-1">
                     {config.description}
                   </p>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <Link
                       to={`/chat?repairId=${job.repairRequest?._id}`}
                       className="btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5"
@@ -233,11 +304,66 @@ export default function RepairJobsPage() {
                       </button>
                     )}
 
-                    {actionConfig?.primary && (
+                    {/* Fast 1-Click Technician Buttons */}
+                    {isTechnician && !isFinished && (
+                      <>
+                        {['pending_inspection', 'inspecting'].includes(job.currentStatus) && (
+                          <button
+                            type="button"
+                            onClick={() => quickStartMutation.mutate(job._id)}
+                            disabled={quickStartMutation.isPending}
+                            className="btn-secondary py-1.5 px-3 text-xs font-bold text-primary-700 bg-primary-50 hover:bg-primary-100 border-primary-200 flex items-center gap-1.5 active:scale-95"
+                          >
+                            {quickStartMutation.isPending ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Zap className="w-3.5 h-3.5 text-primary-600" />
+                            )}
+                            <span>Start Repair</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuickSolveForm({
+                              notes: 'Repaired and verified fully functional.',
+                              finalCost: job.finalTotalCost || job.acceptedQuotation?.estimatedTotalMaximum || '',
+                            });
+                            setQuickSolveJob(job);
+                          }}
+                          className="btn-primary py-1.5 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm shadow-emerald-500/20 flex items-center gap-1.5 active:scale-95 text-white"
+                        >
+                          <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                          <span>⚡ Mark Solved</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* Fast 1-Click Owner Confirm Received Button */}
+                    {isOwner && job.currentStatus === 'ready_for_collection' && (
+                      <button
+                        type="button"
+                        disabled={ownerConfirmMutation.isPending}
+                        onClick={() => ownerConfirmMutation.mutate({ jobId: job._id })}
+                        className="btn-primary py-1.5 px-3.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm text-white flex items-center gap-1.5 active:scale-95"
+                        title="Confirm you have received your fixed item and activate warranty"
+                      >
+                        {ownerConfirmMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-3.5 h-3.5" />
+                        )}
+                        <span>✅ Confirm Received (1-Click)</span>
+                      </button>
+                    )}
+
+                    {/* Detailed Secondary Form Action for Advanced Workflows */}
+                    {actionConfig?.primary && !isFinished && (
                       <button
                         type="button"
                         onClick={() => handleActionClick(job, actionConfig.primary.action)}
-                        className="btn-primary py-1.5 px-4 text-xs font-semibold shadow-sm shadow-primary-500/20 active:scale-95"
+                        className="btn-outline py-1.5 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50"
                       >
                         {actionConfig.primary.label}
                       </button>
@@ -262,7 +388,111 @@ export default function RepairJobsPage() {
         </div>
       )}
 
-      {/* Modals */}
+      {/* ========================================================================= */}
+      {/* MODAL: QUICK SOLVE & COMPLETE (1-STEP) */}
+      {/* ========================================================================= */}
+      {quickSolveJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2 text-emerald-700 font-bold text-base">
+                <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                <span>Mark Problem Solved & Complete</span>
+              </div>
+              <button
+                onClick={() => setQuickSolveJob(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-primary-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+              <div className="font-bold text-gray-900 text-sm">
+                {quickSolveJob.repairRequest?.item?.title || `Job #${quickSolveJob._id.slice(-6)}`}
+              </div>
+              <div className="text-gray-600">
+                Customer: <span className="font-semibold text-gray-800">{quickSolveJob.owner?.fullName || 'Customer'}</span>
+              </div>
+              <div className="text-emerald-800 font-medium">
+                Accepted Quote: ৳{(quickSolveJob.acceptedQuotation?.estimatedTotalMaximum || 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="label font-semibold text-gray-700">Final Bill / Total Cost (৳)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={quickSolveForm.finalCost}
+                    onChange={(e) => setQuickSolveForm((p) => ({ ...p, finalCost: e.target.value }))}
+                    className="input pl-7 text-sm font-bold text-gray-900"
+                    placeholder="e.g. 1200"
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">Will update the final bill for the customer.</p>
+              </div>
+
+              <div>
+                <label className="label font-semibold text-gray-700">Problem Resolution & Repair Notes</label>
+                <textarea
+                  rows="3"
+                  value={quickSolveForm.notes}
+                  onChange={(e) => setQuickSolveForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="input text-xs"
+                  placeholder="e.g. Cleaned motherboard contacts, replaced blown capacitor, fully tested device working properly."
+                />
+              </div>
+            </div>
+
+            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>
+                This will immediately mark the problem as resolved and notify the customer that their item is ready for pickup/delivery.
+              </span>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setQuickSolveJob(null)}
+                className="btn-outline btn-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  quickSolveMutation.mutate({
+                    jobId: quickSolveJob._id,
+                    payload: {
+                      notes: quickSolveForm.notes,
+                      finalCost: quickSolveForm.finalCost ? Number(quickSolveForm.finalCost) : undefined,
+                    },
+                  })
+                }
+                disabled={quickSolveMutation.isPending}
+                className="btn-primary btn-sm flex items-center gap-1.5 font-bold bg-emerald-600 hover:bg-emerald-700 border-emerald-600 shadow-sm text-white"
+              >
+                {quickSolveMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Saving & Notifying...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" /> Mark Solved & Ready
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Modals */}
       {inspectionJob && (
         <InspectionReportModal
           open={!!inspectionJob}
@@ -306,4 +536,3 @@ export default function RepairJobsPage() {
     </div>
   );
 }
-

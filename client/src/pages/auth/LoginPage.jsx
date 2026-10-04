@@ -40,6 +40,13 @@ export default function LoginPage() {
     }
   };
 
+  const onFormError = (errs) => {
+    const firstKey = Object.keys(errs)[0];
+    if (firstKey) {
+      toast.error(errs[firstKey]?.message || 'Please check your email and password');
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
@@ -52,7 +59,7 @@ export default function LoginPage() {
         </div>
 
         <div className="card card-body">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-5">
             <div>
               <label className="label" htmlFor="email">Email</label>
               <input {...register('email')} type="email" id="email"

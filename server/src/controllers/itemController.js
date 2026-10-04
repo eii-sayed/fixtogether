@@ -4,6 +4,10 @@ const uploadService = require('../services/uploadService');
 
 const createItem = asyncHandler(async (req, res) => {
   const itemData = { ...req.body, owner: req.user.userId };
+  if (req.files && req.files.length > 0) {
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/items' });
+    itemData.images = uploaded.map((u) => ({ url: u.url, publicId: u.publicId, uploadedAt: new Date() }));
+  }
   const item = await Item.create(itemData);
   return successResponse(res, { item }, 'Item created', 201);
 });

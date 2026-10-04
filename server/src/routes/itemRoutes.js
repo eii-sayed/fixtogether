@@ -8,7 +8,7 @@ const { validate } = require('../middleware/validate');
 const { createItemSchema } = require('../validators/requestValidators');
 const { ROLES } = require('../constants');
 
-router.post('/', authenticate, authorize(ROLES.OWNER), validate(createItemSchema), itemController.createItem);
+router.post('/', authenticate, authorize(ROLES.OWNER), uploadMultipleImages('images', 10), validate(createItemSchema), itemController.createItem);
 router.get('/', authenticate, itemController.getItems);
 router.get('/:id', authenticate, itemController.getItemById);
 router.patch('/:id', authenticate, authorize(ROLES.OWNER), itemController.updateItem);

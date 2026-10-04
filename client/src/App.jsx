@@ -1,6 +1,6 @@
-import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
-import AdminLayout from './components/layout/AdminLayout';
 import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
 
 // Pages
@@ -25,40 +25,47 @@ import TechniciansPage from './pages/profile/TechniciansPage';
 import UserProfilePage from './pages/profile/UserProfilePage';
 import OrganizationProfilePage from './pages/profile/OrganizationProfilePage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
-import AdminUsersPage from './pages/admin/AdminUsersPage';
-import AdminVerificationsPage from './pages/admin/AdminVerificationsPage';
-import AdminSafetyPage from './pages/admin/AdminSafetyPage';
-import AdminReviewQueuePage from './pages/admin/AdminReviewQueuePage';
-import AdminDisputesPage from './pages/admin/AdminDisputesPage';
-import AdminTaxonomyPage from './pages/admin/AdminTaxonomyPage';
-import AdminAuditLogsPage from './pages/admin/AdminAuditLogsPage';
 import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage';
 import ForumPage from './pages/forum/ForumPage';
 import ThreadDetailPage from './pages/forum/ThreadDetailPage';
 import NewThreadPage from './pages/forum/NewThreadPage';
 
+function AdminRedirectGateway() {
+  const location = useLocation();
+  const adminBaseUrl = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
+
+  useEffect(() => {
+    const subpath = location.pathname.replace(/^\/admin/, '') || '/';
+    const destination = `${adminBaseUrl}${subpath}${location.search}`;
+    window.location.href = destination;
+  }, [adminBaseUrl, location]);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-950 text-white text-center">
+      <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mb-4 shadow-lg shadow-purple-500/10">
+        <span className="text-2xl animate-spin">⚙️</span>
+      </div>
+      <h1 className="text-xl font-bold mb-2 tracking-tight">Redirecting to FixTogether Admin Command Center</h1>
+      <p className="text-xs text-gray-400 max-w-md mb-6 leading-relaxed">
+        The Administrator workspace is hosted at a dedicated web address:{' '}
+        <span className="text-purple-400 font-mono font-semibold">{adminBaseUrl}</span>
+      </p>
+      <a
+        href={adminBaseUrl}
+        className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-md active:scale-95"
+      >
+        Open Admin Portal Now &rarr;
+      </a>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
-      {/* Admin Command Center & Workspaces (Dedicated Left-Side Panel Layout) */}
-      <Route
-        element={
-          <ProtectedRoute roles={['admin']}>
-            <AdminLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/admin" element={<DashboardPage />} />
-        <Route path="/admin/review-queue" element={<AdminReviewQueuePage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
-        <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
-        <Route path="/admin/safety" element={<AdminSafetyPage />} />
-        <Route path="/admin/disputes" element={<AdminDisputesPage />} />
-        <Route path="/admin/taxonomy" element={<AdminTaxonomyPage />} />
-        <Route path="/admin/audit-logs" element={<AdminAuditLogsPage />} />
-        <Route path="/admin/repair-requests" element={<RepairRequestsPage />} />
-        <Route path="/admin/donations" element={<DonationsPage />} />
-      </Route>
+      {/* Standalone Admin Portal Redirect Gateway */}
+      <Route path="/admin/*" element={<AdminRedirectGateway />} />
+      <Route path="/admin" element={<AdminRedirectGateway />} />
 
       {/* Main Public & User Layout */}
       <Route element={<MainLayout />}>

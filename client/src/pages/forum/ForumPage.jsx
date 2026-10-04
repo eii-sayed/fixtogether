@@ -37,6 +37,8 @@ export default function ForumPage() {
 
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState(activeSearch);
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickCategory, setQuickCategory] = useState('');
 
   // Fetch Categories for filter dropdown
   const { data: categoriesData } = useQuery({
@@ -44,6 +46,47 @@ export default function ForumPage() {
     queryFn: () => api.get('/categories').then((r) => r.data.data),
     staleTime: 60000,
   });
+
+  const quickPostMutation = useMutation({
+    mutationFn: (payload) => api.post('/threads', payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['forum-threads']);
+      queryClient.invalidateQueries(['forum-stats']);
+      setQuickTitle('');
+      toast.success('Question published to community feed!');
+    },
+    onError: (err) => {
+      if (!isAuthenticated) {
+        toast.error('Please log in to ask a question');
+      } else {
+        toast.error(err.response?.data?.message || 'Failed to post question');
+      }
+    },
+  });
+
+  const handleQuickPost = (e) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.error('Please log in to post to the community forum');
+      return;
+    }
+    if (!quickTitle.trim()) {
+      toast.error('Please enter a question or problem title');
+      return;
+    }
+    const cat = quickCategory || categoriesData?.categories?.[0]?._id;
+    if (!cat) {
+      toast.error('Please select an item category');
+      return;
+    }
+
+    quickPostMutation.mutate({
+      title: quickTitle.trim(),
+      content: quickTitle.trim(),
+      category: cat,
+      type: 'question',
+    });
+  };
 
   // Fetch Community Forum Stats
   const { data: statsData } = useQuery({
@@ -252,6 +295,59 @@ export default function ForumPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Quick Question Inline Composer (1-Click) */}
+          <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-white p-4 rounded-2xl border border-blue-100 shadow-2xs space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-gray-900">Ask the Community in 1-Click</h3>
+                <p className="text-[11px] text-gray-500">Post a troubleshooting question or repair query directly to the feed</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleQuickPost} className="space-y-2.5">
+              <input
+                type="text"
+                required
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                placeholder="What problem are you trying to fix? (e.g. Dell laptop battery won't charge past 60%)..."
+                className="input text-xs w-full bg-white font-medium"
+              />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                <select
+                  value={quickCategory}
+                  onChange={(e) => setQuickCategory(e.target.value)}
+                  className="input text-xs sm:w-60 bg-white"
+                >
+                  <option value="">Select Category (Optional default)</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="submit"
+                  disabled={quickPostMutation.isPending}
+                  className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
+                >
+                  {quickPostMutation.isPending ? (
+                    'Posting...'
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Post Question (1-Click)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
 
           {/* Threads List Feed */}

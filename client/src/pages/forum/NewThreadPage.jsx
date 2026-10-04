@@ -46,6 +46,18 @@ export default function NewThreadPage() {
   const categories = categoriesData?.categories || [];
   const myItems = itemsData?.items || [];
 
+  const categoryGroups = React.useMemo(() => {
+    if (!categories || !Array.isArray(categories)) return [];
+    const parents = categories.filter((c) => !c.parent);
+    return parents.map((parent) => {
+      const children = categories.filter((c) => {
+        const pId = c.parent?._id || c.parent;
+        return pId && String(pId) === String(parent._id);
+      });
+      return { parent, children };
+    });
+  }, [categories]);
+
   // Create Thread Mutation
   const createMutation = useMutation({
     mutationFn: (payload) => api.post('/threads', payload),
@@ -201,11 +213,18 @@ export default function NewThreadPage() {
                 required
                 className="input text-xs w-full"
               >
-                <option value="">-- Choose Relevant Category --</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
+                <option value="">-- Choose Relevant Category or Device Type --</option>
+                {categoryGroups.map((group) => (
+                  <optgroup key={group.parent._id} label={group.parent.name}>
+                    <option value={group.parent._id}>
+                      All {group.parent.name} (General)
+                    </option>
+                    {group.children.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        &nbsp;&nbsp;• {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

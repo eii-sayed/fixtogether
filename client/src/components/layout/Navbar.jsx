@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import GlobalSearchModal from '../common/GlobalSearchModal';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 import {
   Menu,
   X,
@@ -25,6 +26,8 @@ import {
   Search,
   MessagesSquare,
 } from 'lucide-react';
+
+const ADMIN_PORTAL_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
 
 const roleNavItems = {
   owner: [
@@ -49,7 +52,7 @@ const roleNavItems = {
     { label: 'Messages', path: '/messages', icon: MessageCircle },
   ],
   admin: [
-    { label: 'Admin Console', path: '/admin', icon: LayoutDashboard },
+    { label: 'Admin Console', path: ADMIN_PORTAL_URL, icon: LayoutDashboard, isExternal: true },
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
     { label: 'Donation Network', path: '/donations', icon: Heart },
@@ -136,6 +139,18 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
+                if (item.isExternal) {
+                  return (
+                    <a
+                      key={item.path}
+                      href={item.path}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all text-purple-700 bg-purple-50 hover:bg-purple-100 shadow-xs"
+                    >
+                      <Icon className="w-4 h-4 text-purple-600" />
+                      {item.label}
+                    </a>
+                  );
+                }
                 const active =
                   location.pathname === item.path ||
                   (item.path !== '/dashboard' &&
@@ -185,17 +200,8 @@ export default function Navbar() {
 
             {isAuthenticated ? (
               <>
-                {/* Notification Icon */}
-                <Link
-                  to="/notifications"
-                  className="p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl relative active:scale-95 transition-all"
-                  aria-label="Notifications"
-                >
-                  <Bell className="w-5 h-5" />
-                  {unreadNotifCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-danger-500 rounded-full ring-2 ring-white animate-pulse" />
-                  )}
-                </Link>
+                {/* Notification Interactive Dropdown */}
+                <NotificationDropdown />
 
                 {/* Desktop Profile Dropdown */}
                 {/* Desktop Profile Dropdown with Full Accessibility */}
@@ -274,14 +280,14 @@ export default function Navbar() {
                           </Link>
 
                           {user?.role === 'admin' && (
-                            <Link
-                              to="/admin"
+                            <a
+                              href={ADMIN_PORTAL_URL}
                               role="menuitem"
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-primary-700 bg-primary-50/70 hover:bg-primary-100/80 transition-colors"
+                              className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-purple-700 bg-purple-50/70 hover:bg-purple-100/80 transition-colors"
                               onClick={() => setProfileOpen(false)}
                             >
-                              <LayoutDashboard className="w-4 h-4 text-primary-600" /> Admin Command Center
-                            </Link>
+                              <LayoutDashboard className="w-4 h-4 text-purple-600" /> Admin Command Center (Port 5174)
+                            </a>
                           )}
 
                           {(user?.role === 'technician' || user?.role === 'organization') && (
@@ -396,6 +402,19 @@ export default function Navbar() {
               </p>
               {navItems.map((item) => {
                 const Icon = item.icon;
+                if (item.isExternal) {
+                  return (
+                    <a
+                      key={item.path}
+                      href={item.path}
+                      onClick={() => setMobileDrawerOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 shadow-sm transition-all"
+                    >
+                      <Icon className="w-5 h-5 text-purple-600" />
+                      <span>{item.label}</span>
+                    </a>
+                  );
+                }
                 const active = location.pathname === item.path;
                 return (
                   <Link

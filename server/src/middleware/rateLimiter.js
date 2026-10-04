@@ -33,6 +33,7 @@ const createLimiter = (options) => {
     skip: (req) => {
       if (options.skip && options.skip(req)) return true;
       if (isTestEnv && !req.headers['x-test-rate-limit']) return true;
+      if (process.env.NODE_ENV === 'development' && req.headers['x-bypass-rate-limit']) return true;
       return false;
     },
   });

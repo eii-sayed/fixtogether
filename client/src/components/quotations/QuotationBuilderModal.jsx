@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
+import { toast } from 'sonner';
 import {
   X,
   Sparkles,
@@ -12,9 +13,13 @@ import {
   AlertTriangle,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Info,
   Wrench,
   Package,
+  Zap,
+  Loader2,
+  Send,
 } from 'lucide-react';
 
 const STEPS = [
@@ -33,6 +38,15 @@ export default function QuotationBuilderModal({
 }) {
   const queryClient = useQueryClient();
   const storageKey = `fixtogether_quote_draft_${repairRequest?._id}`;
+
+  // Quick quote mode — starts as default for new quotes
+  const [quickMode, setQuickMode] = useState(!existingQuotation);
+  const [quickData, setQuickData] = useState({
+    estimatedTotal: '',
+    estimatedDays: '3',
+    notes: '',
+    warrantyDays: '30',
+  });
 
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState({
@@ -56,6 +70,74 @@ export default function QuotationBuilderModal({
 
   const [submitError, setSubmitError] = useState(null);
   const [draftSaved, setDraftSaved] = useState(false);
+
+  // Quick quote mutation
+  const quickQuoteMutation = useMutation({
+    mutationFn: (payload) =>
+      api.post(`/repair-requests/${repairRequest._id}/quick-quote`, payload).then((r) => r.data),
+    onSuccess: () => {
+      sessionStorage.removeItem(storageKey);
+      queryClient.invalidateQueries({ queryKey: ['repair-request', repairRequest?._id] });
+      queryClient.invalidateQueries({ queryKey: ['repair-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['quotations', repairRequest?._id] });
+      queryClient.invalidateQueries({ queryKey: ['technician-workspace'] });
+      toast.success('Quick quote submitted!');
+      onClose();
+    },
+    onError: (err) => {
+      setSubmitError(err.response?.data?.message || 'Failed to submit quick quote.');
+    },
+  });
+
+  // 1-Click direct job acceptance mutation
+  const acceptJobMutation = useMutation({
+    mutationFn: (payload) =>
+      api.post(`/repair-requests/${repairRequest._id}/accept-job`, payload).then((r) => r.data),
+    onSuccess: (resp) => {
+      sessionStorage.removeItem(storageKey);
+      queryClient.invalidateQueries({ queryKey: ['repair-request', repairRequest?._id] });
+      queryClient.invalidateQueries({ queryKey: ['repair-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['quotations', repairRequest?._id] });
+      queryClient.invalidateQueries({ queryKey: ['technician-workspace'] });
+      queryClient.invalidateQueries({ queryKey: ['repair-jobs', repairRequest?._id] });
+      toast.success(resp.message || '🎉 Repair job accepted! You are now assigned.');
+      onClose();
+    },
+    onError: (err) => {
+      setSubmitError(err.response?.data?.message || 'Failed to accept job.');
+    },
+  });
+
+  const handleQuickQuoteSubmit = () => {
+    setSubmitError(null);
+    const total = Number(quickData.estimatedTotal);
+    const days = Number(quickData.estimatedDays);
+    if (!total || total <= 0) {
+      setSubmitError('Please enter a valid estimated total cost.');
+      return;
+    }
+    if (!days || days < 1) {
+      setSubmitError('Please enter a valid number of days.');
+      return;
+    }
+    quickQuoteMutation.mutate({
+      estimatedTotal: total,
+      estimatedDays: days,
+      notes: quickData.notes || '',
+      warrantyDays: Number(quickData.warrantyDays) || 30,
+    });
+  };
+
+  const handleQuickAcceptSubmit = () => {
+    setSubmitError(null);
+    const total = Number(quickData.estimatedTotal) || repairRequest?.budgetMaximum || 1000;
+    const days = Number(quickData.estimatedDays) || 3;
+    acceptJobMutation.mutate({
+      estimatedCost: total,
+      estimatedDays: days,
+      notes: quickData.notes || '',
+    });
+  };
 
   // Restore draft or populate existing quotation
   useEffect(() => {
@@ -200,7 +282,170 @@ export default function QuotationBuilderModal({
           </button>
         </div>
 
-        {/* Step Progress Tracker */}
+        {/* ─── Quick / Advanced Mode Toggle ─── */}
+        {!existingQuotation && (
+          <div className="flex border-b border-gray-100 bg-white">
+            <button
+              onClick={() => setQuickMode(true)}
+              className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border-b-2 ${
+                quickMode
+                  ? 'border-primary-600 text-primary-700 bg-primary-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Quick Quote
+            </button>
+            <button
+              onClick={() => setQuickMode(false)}
+              className={`flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border-b-2 ${
+                !quickMode
+                  ? 'border-primary-600 text-primary-700 bg-primary-50/50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Detailed Quote
+            </button>
+          </div>
+        )}
+
+        {/* ─── QUICK QUOTE MODE ─── */}
+        {quickMode && !existingQuotation ? (
+          <div className="p-6 overflow-y-auto flex-1 space-y-5">
+            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-900 flex items-start gap-2">
+              <Zap className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Quick Quote</span> — Submit a fast estimate with just the total cost and turnaround time.
+                Defaults are applied for inspection fee, transport, and other costs.
+              </div>
+            </div>
+
+            {/* Problem Summary */}
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Problem</h3>
+              <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">
+                {repairRequest?.problemDescription || 'No description provided.'}
+              </p>
+            </div>
+
+            {/* Quick Quote Form */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label" htmlFor="quickTotal">Total Cost Estimate (৳) *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">৳</span>
+                  <input
+                    id="quickTotal"
+                    type="number"
+                    min="0"
+                    value={quickData.estimatedTotal}
+                    onChange={(e) => setQuickData((p) => ({ ...p, estimatedTotal: e.target.value }))}
+                    className="input pl-8 text-sm font-semibold"
+                    placeholder="e.g. 1500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label" htmlFor="quickDays">Estimated Duration (Days) *</label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    id="quickDays"
+                    type="number"
+                    min="1"
+                    value={quickData.estimatedDays}
+                    onChange={(e) => setQuickData((p) => ({ ...p, estimatedDays: e.target.value }))}
+                    className="input pl-9 text-sm font-semibold"
+                    placeholder="e.g. 3"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="quickNotes">Notes for Owner (Optional)</label>
+              <textarea
+                id="quickNotes"
+                rows={2}
+                value={quickData.notes}
+                onChange={(e) => setQuickData((p) => ({ ...p, notes: e.target.value }))}
+                className="input resize-y text-xs"
+                placeholder="e.g., I'll need to inspect the screen after disassembly..."
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="label" htmlFor="quickWarranty">Warranty (Days)</label>
+                <input
+                  id="quickWarranty"
+                  type="number"
+                  min="0"
+                  value={quickData.warrantyDays}
+                  onChange={(e) => setQuickData((p) => ({ ...p, warrantyDays: e.target.value }))}
+                  className="input text-xs"
+                />
+              </div>
+              {repairRequest?.budgetMaximum > 0 && (
+                <div className="flex-1 p-2.5 bg-blue-50/50 rounded-lg border border-blue-100 text-xs text-blue-800">
+                  <DollarSign className="w-3.5 h-3.5 inline text-blue-600" />{' '}
+                  Owner budget: <strong>৳{repairRequest.budgetMinimum || 0} – ৳{repairRequest.budgetMaximum}</strong>
+                </div>
+              )}
+            </div>
+
+            {submitError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+                {submitError}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={handleQuickAcceptSubmit}
+                disabled={acceptJobMutation.isPending || quickQuoteMutation.isPending}
+                className="btn-primary flex-1 py-3 text-sm font-bold flex items-center justify-center gap-1.5 shadow-md bg-emerald-600 hover:bg-emerald-700 border-emerald-600"
+              >
+                {acceptJobMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Accepting Job...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                    ⚡ Accept & Start Job Now
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleQuickQuoteSubmit}
+                disabled={acceptJobMutation.isPending || quickQuoteMutation.isPending}
+                className="btn-outline flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-2 bg-white hover:bg-gray-50"
+              >
+                {quickQuoteMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Submitting Quote...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Submit Quote{quickData.estimatedTotal ? ` (৳${quickData.estimatedTotal})` : ''}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+        <>
+        {/* Step Progress Tracker (Advanced mode) */}
         <div className="grid grid-cols-5 border-b border-gray-100 bg-white px-4 py-2 gap-1">
           {STEPS.map((s, idx) => (
             <button
@@ -228,7 +473,7 @@ export default function QuotationBuilderModal({
           ))}
         </div>
 
-        {/* Step Content */}
+        {/* Step Content (Advanced mode) */}
         <div className="p-6 overflow-y-auto flex-1 space-y-5">
           {/* STEP 0: Review Request */}
           {step === 0 && (
@@ -616,6 +861,8 @@ export default function QuotationBuilderModal({
             </button>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );

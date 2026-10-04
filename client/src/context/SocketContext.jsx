@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { getNotificationDestination } from '../utils/notificationLinks';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
@@ -8,6 +12,8 @@ const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
 
@@ -42,25 +48,42 @@ export function SocketProvider({ children }) {
     const onConnect = () => {
       setConnected(true);
       // NOTE: Server auto-joins user to `user:<userId>` room in the connection handler.
-      // No need to emit a redundant 'join' event here.
     };
 
     const onDisconnect = () => {
       setConnected(false);
     };
 
+    const onNotification = (notif) => {
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['notifications-unread-count']);
+      queryClient.invalidateQueries(['unread-notifications']);
+
+      const destination = getNotificationDestination(notif, user?.role);
+
+      toast(notif.title || 'New Notification', {
+        description: notif.message,
+        action: {
+          label: 'View',
+          onClick: () => navigate(destination),
+        },
+      });
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('notification', onNotification);
 
     return () => {
       // Clean up named listeners to prevent stacking on remount (React StrictMode)
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('notification', onNotification);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
     };
-  }, [isAuthenticated, user?.userId]);
+  }, [isAuthenticated, user?.userId, navigate, queryClient]);
 
   const joinChat = useCallback((repairRequestId) => {
     if (socketRef.current?.connected && repairRequestId) {

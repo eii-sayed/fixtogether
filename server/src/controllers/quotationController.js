@@ -241,5 +241,99 @@ const withdrawQuotation = asyncHandler(async (req, res) => {
   return successResponse(res, { quotation }, 'Quotation withdrawn');
 });
 
+/**
+ * POST /repair-requests/:id/quick-quote
+ *
+ * Simplified quotation endpoint: technicians provide just a total cost estimate
+ * and estimated days. Server fills sensible defaults for all other fields.
+ */
+const quickQuote = asyncHandler(async (req, res) => {
+  const request = await RepairRequest.findById(req.params.id);
+  if (!request) return errorResponse(res, 'Repair request not found.', 404);
+
+  // Check authorization — same logic as full quotation
+  const isInvited = request.selectedTechnicians?.some(
+    (t) => t.technician.toString() === req.user.userId.toString() && t.status !== 'declined'
+  );
+  const isPublished = [
+    REPAIR_REQUEST_STATUS.PUBLISHED,
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+    REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+  ].includes(request.requestStatus);
+
+  if (!isInvited && !isPublished) {
+    return errorResponse(res, 'You are not authorized to submit a quotation for this request.', 403);
+  }
+
+  // Check for existing active quotation
+  const existing = await Quotation.findOne({
+    repairRequest: req.params.id,
+    technician: req.user.userId,
+    status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED] },
+  });
+  if (existing) return errorResponse(res, 'You already have an active quotation for this repair request.', 409);
+
+  // Parse quick quote fields
+  const estimatedTotal = Math.max(0, Number(req.body.estimatedTotal) || 0);
+  const estimatedDays = Math.max(1, Math.round(Number(req.body.estimatedDays) || 3));
+  const warrantyDays = Math.max(0, Math.round(Number(req.body.warrantyDays) || 30));
+  const notes = req.body.notes || '';
+
+  // Auto-fill detailed fields from the single total
+  const quotation = await Quotation.create({
+    repairRequest: req.params.id,
+    technician: req.user.userId,
+    quotationType: 'initial',
+    inspectionFee: 0,
+    laborCostMinimum: estimatedTotal,
+    laborCostMaximum: estimatedTotal,
+    partsEstimate: 0,
+    transportFee: 0,
+    otherCosts: 0,
+    estimatedTotalMinimum: estimatedTotal,
+    estimatedTotalMaximum: estimatedTotal,
+    expectedDuration: { value: estimatedDays, unit: 'days' },
+    warrantyDays,
+    technicianNotes: notes,
+    status: QUOTATION_STATUS.SUBMITTED,
+  });
+
+  // Update request status if appropriate
+  if (
+    request.requestStatus === REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS ||
+    request.requestStatus === REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS ||
+    request.requestStatus === REPAIR_REQUEST_STATUS.PUBLISHED
+  ) {
+    const { transitionRepairRequest } = require('../services/stateTransitionService');
+    await transitionRepairRequest(request._id, REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED, req.user, {
+      reason: 'Quick quotation received from technician',
+      req,
+    });
+  }
+
+  // Update invitation status if invited
+  const inv = request.selectedTechnicians?.find(
+    (t) => t.technician.toString() === req.user.userId.toString()
+  );
+  if (inv) {
+    inv.status = 'accepted';
+    inv.respondedAt = new Date();
+    await request.save();
+  }
+
+  // Notify owner
+  await createNotification({
+    userId: request.owner.toString(),
+    type: NOTIFICATION_TYPES.QUOTATION_SUBMITTED,
+    title: 'New Quick Quote Received',
+    message: `A technician has submitted a quick quote of ৳${estimatedTotal} (${estimatedDays} days) for your repair request.`,
+    relatedEntityType: 'Quotation',
+    relatedEntityId: quotation._id,
+  });
+
+  return successResponse(res, { quotation }, 'Quick quote submitted successfully', 201);
+});
+
 module.exports = { createQuotation, getQuotationsForRequest, getQuotationById,
-  reviseQuotation, acceptQuotation, rejectQuotation, withdrawQuotation };
+  reviseQuotation, acceptQuotation, rejectQuotation, withdrawQuotation, quickQuote };

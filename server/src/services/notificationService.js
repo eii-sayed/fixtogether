@@ -13,6 +13,68 @@ const setSocketIO = (socketIO) => {
 };
 
 /**
+ * Resolve an appropriate route link based on notification metadata
+ */
+const resolveNotificationLink = (type, relatedEntityType, relatedEntityId) => {
+  if (relatedEntityType === 'RepairRequest' && relatedEntityId) {
+    return `/repair-requests/${relatedEntityId}`;
+  }
+  if (relatedEntityType === 'RepairJob') {
+    return '/repair-jobs';
+  }
+  if (relatedEntityType === 'Thread' && relatedEntityId) {
+    return `/forum/${relatedEntityId}`;
+  }
+  if (relatedEntityType === 'Appointment') {
+    return '/repair-jobs';
+  }
+  if (relatedEntityType === 'Dispute') {
+    return '/repair-jobs';
+  }
+  if (['DonationOffer', 'CommunityNeed', 'DonationItem'].includes(relatedEntityType)) {
+    return '/donations';
+  }
+  if (relatedEntityType === 'User' && relatedEntityId) {
+    return `/users/${relatedEntityId}`;
+  }
+  if (relatedEntityType === 'Technician' && relatedEntityId) {
+    return `/technicians/${relatedEntityId}`;
+  }
+
+  if (type) {
+    if (
+      type.startsWith('repair_') ||
+      type.startsWith('quotation_') ||
+      type === 'owner_approval_required' ||
+      type === 'part_required' ||
+      type === 'technician_match'
+    ) {
+      return relatedEntityId ? `/repair-requests/${relatedEntityId}` : '/repair-requests';
+    }
+    if (type.startsWith('donation_') || type.startsWith('impact_')) {
+      return '/donations';
+    }
+    if (type.startsWith('forum_')) {
+      return relatedEntityId ? `/forum/${relatedEntityId}` : '/forum';
+    }
+    if (type.startsWith('account_')) {
+      return '/profile';
+    }
+    if (type.startsWith('dispute_') || type.startsWith('warranty_')) {
+      return '/repair-jobs';
+    }
+    if (type === 'new_message') {
+      return relatedEntityId ? `/repair-requests/${relatedEntityId}` : '/messages';
+    }
+    if (type === 'review_received') {
+      return '/profile';
+    }
+  }
+
+  return '/notifications';
+};
+
+/**
  * Create and send a persistent notification with deduplication
  * @param {Object} params
  * @param {string} params.userId - Recipient user ID
@@ -35,6 +97,8 @@ const createNotification = async ({
   deduplicationKey = null,
 }) => {
   try {
+    const finalLink = link || resolveNotificationLink(type, relatedEntityType, relatedEntityId);
+
     const notification = await Notification.create({
       user: userId,
       type,
@@ -42,7 +106,7 @@ const createNotification = async ({
       message,
       relatedEntityType,
       relatedEntityId,
-      link,
+      link: finalLink,
       deduplicationKey: deduplicationKey || `${type}:${relatedEntityId || 'global'}:${userId}:${Date.now()}`,
     });
 
@@ -77,9 +141,18 @@ const createNotification = async ({
  * @param {Object} notificationData
  */
 const createBulkNotifications = async (userIds, notificationData) => {
+  const finalLink =
+    notificationData.link ||
+    resolveNotificationLink(
+      notificationData.type,
+      notificationData.relatedEntityType,
+      notificationData.relatedEntityId
+    );
+
   const notifications = userIds.map((userId) => ({
     user: userId,
     ...notificationData,
+    link: finalLink,
     deduplicationKey: `${notificationData.type}:${notificationData.relatedEntityId || 'global'}:${userId}:${Date.now()}`,
   }));
 
@@ -94,6 +167,8 @@ const createBulkNotifications = async (userIds, notificationData) => {
           type: notification.type,
           title: notification.title,
           message: notification.message,
+          relatedEntityType: notification.relatedEntityType,
+          relatedEntityId: notification.relatedEntityId,
           link: notification.link,
           read: false,
           createdAt: notification.createdAt,
@@ -142,6 +217,7 @@ const markAllAsRead = async (userId) => {
 module.exports = {
   setSocketIO,
   getIO: () => io,
+  resolveNotificationLink,
   createNotification,
   createBulkNotifications,
   getUnreadCount,

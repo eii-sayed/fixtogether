@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import GlobalSearchModal from '../common/GlobalSearchModal';
+import NotificationDropdown from '../notifications/NotificationDropdown';
 import {
   LayoutDashboard,
   ClipboardList,
@@ -221,14 +222,8 @@ export default function AdminLayout() {
             <span>Systems Normal</span>
           </div>
 
-          {/* Notification Quick Link */}
-          <Link
-            to="/notifications"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl relative active:scale-95 transition-all"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-          </Link>
+          {/* Notification Dropdown */}
+          <NotificationDropdown />
 
           {/* Exit Admin View to Public Site */}
           <Link

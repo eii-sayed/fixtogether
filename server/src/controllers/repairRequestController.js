@@ -989,6 +989,426 @@ const assignTechnician = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * POST /repair-requests/:id/accept-job
+ *
+ * 1-Step direct acceptance by a technician.
+ * Bypasses the multi-step quotation -> review -> accept dance.
+ * Instantly:
+ * - Creates an accepted quotation record
+ * - Assigns technician to the repair request
+ * - Moves request to QUOTATION_ACCEPTED
+ * - Creates the active RepairJob
+ * - Notifies the owner
+ */
+const acceptJob = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { estimatedCost: reqCost, estimatedDays: reqDays, notes } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return errorResponse(res, 'Invalid request ID format.', 400);
+  }
+
+  const request = await RepairRequest.findById(id).populate('item', 'title category');
+  if (!request) return errorResponse(res, 'Repair request not found.', 404);
+
+  // Must be in an open state
+  const openStatuses = [
+    REPAIR_REQUEST_STATUS.PUBLISHED,
+    REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+    REPAIR_REQUEST_STATUS.AWAITING_QUOTATIONS,
+    REPAIR_REQUEST_STATUS.QUOTATIONS_RECEIVED,
+  ];
+
+  if (!openStatuses.includes(request.requestStatus)) {
+    return errorResponse(
+      res,
+      `Cannot accept this request — it is currently ${request.requestStatus.replace('_', ' ')}.`,
+      400
+    );
+  }
+
+  // Prevent owner from accepting their own request
+  if (request.owner.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot accept your own repair request as a technician.', 400);
+  }
+
+  // Verify caller is a registered technician
+  const techUser = await User.findById(req.user.userId);
+  if (!techUser || techUser.role !== ROLES.TECHNICIAN) {
+    return errorResponse(res, 'Only registered technicians can accept repair jobs.', 403);
+  }
+
+  // Determine cost & timeline
+  const finalCost =
+    reqCost !== undefined && reqCost !== null && reqCost !== ''
+      ? Math.max(0, Number(reqCost))
+      : request.budgetMaximum > 0
+      ? request.budgetMaximum
+      : request.budgetMinimum > 0
+      ? request.budgetMinimum
+      : 1000;
+
+  const finalDays = Math.max(1, Math.round(Number(reqDays) || 3));
+
+  // Find existing quote from this technician or create a new accepted quote
+  let quotation = await Quotation.findOne({
+    repairRequest: request._id,
+    technician: techUser._id,
+  }).sort({ createdAt: -1 });
+
+  if (quotation) {
+    quotation.status = QUOTATION_STATUS.ACCEPTED;
+    quotation.ownerDecisionAt = new Date();
+    if (finalCost > 0) {
+      quotation.laborCostMinimum = finalCost;
+      quotation.laborCostMaximum = finalCost;
+      quotation.estimatedTotalMinimum = finalCost;
+      quotation.estimatedTotalMaximum = finalCost;
+    }
+    if (notes) {
+      quotation.technicianNotes = notes;
+    }
+    await quotation.save();
+  } else {
+    quotation = await Quotation.create({
+      repairRequest: request._id,
+      technician: techUser._id,
+      quotationType: 'initial',
+      laborCostMinimum: finalCost,
+      laborCostMaximum: finalCost,
+      estimatedTotalMinimum: finalCost,
+      estimatedTotalMaximum: finalCost,
+      expectedDuration: { value: finalDays, unit: 'days' },
+      warrantyDays: 30,
+      status: QUOTATION_STATUS.ACCEPTED,
+      ownerDecisionAt: new Date(),
+      technicianNotes: notes || 'Direct job acceptance by technician.',
+    });
+  }
+
+  // Mark competing quotes as NOT_SELECTED
+  await Quotation.updateMany(
+    {
+      repairRequest: request._id,
+      _id: { $ne: quotation._id },
+      status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED] },
+    },
+    { status: QUOTATION_STATUS.NOT_SELECTED, ownerDecisionAt: new Date() }
+  );
+
+  // Update selectedTechnicians array
+  if (!request.selectedTechnicians) request.selectedTechnicians = [];
+  const existingIndex = request.selectedTechnicians.findIndex(
+    (t) => t.technician?.toString() === techUser._id.toString()
+  );
+  if (existingIndex >= 0) {
+    request.selectedTechnicians[existingIndex].status = 'accepted';
+    request.selectedTechnicians[existingIndex].respondedAt = new Date();
+  } else {
+    request.selectedTechnicians.push({
+      technician: techUser._id,
+      status: 'accepted',
+      invitedAt: new Date(),
+      respondedAt: new Date(),
+    });
+  }
+
+  request.selectedQuotation = quotation._id;
+  request.requestStatus = REPAIR_REQUEST_STATUS.QUOTATION_ACCEPTED;
+  await request.save();
+
+  // Find or create RepairJob
+  let repairJob = await RepairJob.findOne({ repairRequest: request._id });
+  if (!repairJob) {
+    repairJob = await RepairJob.create({
+      repairRequest: request._id,
+      owner: request.owner,
+      technician: techUser._id,
+      acceptedQuotation: quotation._id,
+      currentStatus: REPAIR_JOB_STATUS.PENDING_INSPECTION,
+    });
+  } else {
+    repairJob.technician = techUser._id;
+    repairJob.acceptedQuotation = quotation._id;
+    await repairJob.save();
+  }
+
+  // Create audit log
+  await createAuditLog({
+    action: 'JOB_ACCEPTED_BY_TECHNICIAN',
+    entityType: 'RepairRequest',
+    entityId: request._id,
+    performedBy: req.user.userId,
+    details: {
+      technicianId: techUser._id,
+      technicianName: techUser.fullName,
+      estimatedCost: finalCost,
+      estimatedDays: finalDays,
+      jobId: repairJob._id,
+    },
+    req,
+  });
+
+  // Notify owner
+  await createNotification({
+    userId: request.owner.toString(),
+    type: NOTIFICATION_TYPES.QUOTATION_ACCEPTED,
+    title: 'Repair Job Accepted!',
+    message: `${techUser.fullName || 'A verified technician'} has accepted your repair job for "${request.item?.title || 'item'}". Work can begin!`,
+    relatedEntityType: 'RepairJob',
+    relatedEntityId: repairJob._id,
+  });
+
+  // Broadcast Socket.IO events
+  const io = getIO();
+  if (io) {
+    io.to(`repair-request:${request._id}`).emit('repair-request:updated', {
+      id: request._id,
+      requestStatus: request.requestStatus,
+    });
+    io.to(`user:${request.owner}`).emit('notification', {
+      title: 'Job Accepted',
+      message: `${techUser.fullName} accepted your repair request.`,
+    });
+  }
+
+  return successResponse(
+    res,
+    {
+      repairRequest: request,
+      repairJob,
+      quotation,
+    },
+    `You have successfully accepted this repair job for ৳${finalCost}!`,
+    200
+  );
+});
+
+/**
+ * POST /repair-requests/quick
+ *
+ * Combined endpoint that performs item creation (or reuse), image upload,
+ * repair request creation, safety + AI analysis, and publishing — all in
+ * a single call. Reduces the previous 5-6 step flow to one request.
+ *
+ * Accepts multipart/form-data (for images) with JSON fields in the body.
+ */
+const quickRepairRequest = asyncHandler(async (req, res) => {
+  const {
+    existingItemId,
+    title, category, brand, model, condition, ownershipDeclaration, approximateAge,
+    problemDescription, eventBeforeIssue, previousRepairAttempts,
+    budgetMinimum, budgetMaximum, preferredServiceMethod, availability,
+    autoPublish = true,
+  } = req.body;
+
+  let itemId;
+
+  // ── Step 1: Create or reuse item ──────────────────────────────────────
+  if (existingItemId) {
+    const existing = await Item.findOne({ _id: existingItemId, owner: req.user.userId });
+    if (!existing) return errorResponse(res, 'Item not found or you are not the owner.', 404);
+    itemId = existing._id;
+  } else {
+    const itemPayload = {
+      owner: req.user.userId,
+      title,
+      category,
+      condition: condition || 'broken',
+      brand: brand || '',
+      model: model || '',
+      ownershipDeclaration: ownershipDeclaration === 'false' || ownershipDeclaration === false ? false : true,
+    };
+    if (approximateAge) {
+      itemPayload.approximateAge = approximateAge;
+    }
+    const item = await Item.create(itemPayload);
+    itemId = item._id;
+  }
+
+  // ── Step 2: Upload images if provided ─────────────────────────────────
+  if (req.files && req.files.length > 0) {
+    const uploadService = require('../services/uploadService');
+    const uploaded = await uploadService.uploadMultiple(req.files, { folder: 'fixtogether/items' });
+    const newImages = uploaded.map((u) => ({ url: u.url, publicId: u.publicId, uploadedAt: new Date() }));
+    await Item.findByIdAndUpdate(itemId, { $push: { images: { $each: newImages } } });
+  }
+
+  // ── Step 3: Create repair request ─────────────────────────────────────
+  const repairRequest = await RepairRequest.create({
+    item: itemId,
+    owner: req.user.userId,
+    problemDescription,
+    eventBeforeIssue: eventBeforeIssue || '',
+    previousRepairAttempts: previousRepairAttempts || '',
+    budgetMinimum: budgetMinimum ? Number(budgetMinimum) : 0,
+    budgetMaximum: budgetMaximum ? Number(budgetMaximum) : 0,
+    preferredServiceMethod: preferredServiceMethod || '',
+    availability: availability || '',
+    requestStatus: autoPublish === false
+      ? REPAIR_REQUEST_STATUS.DRAFT
+      : REPAIR_REQUEST_STATUS.DRAFT, // will be transitioned below
+  });
+
+  // ── Step 4: Run safety screening ──────────────────────────────────────
+  const textToCheck = [problemDescription, eventBeforeIssue, previousRepairAttempts]
+    .filter(Boolean).join(' ');
+  const safetyFlags = await safetyService.checkSafetyRules(textToCheck, category || null);
+
+  repairRequest.safetyFlags = safetyFlags.map((f) => ({
+    type: f.type, severity: f.severity, reason: f.reason, detectedBy: 'rule',
+  }));
+  await repairRequest.save();
+
+  // ── Step 5: Auto-publish if requested ─────────────────────────────────
+  let published = false;
+  if (autoPublish !== false) {
+    const { transitionRepairRequest } = require('../services/stateTransitionService');
+    try {
+      await transitionRepairRequest(repairRequest._id, REPAIR_REQUEST_STATUS.PUBLISHED, req.user, {
+        reason: 'Quick repair request — auto-published',
+        req,
+      });
+      published = true;
+
+      // Populate for notifications and Socket.IO
+      const populatedRequest = await RepairRequest.findById(repairRequest._id)
+        .populate({ path: 'item', populate: { path: 'category' } })
+        .populate('owner', 'fullName');
+
+      // Send notifications to technicians & admins (skip if already notified)
+      const existingNotification = await Notification.findOne({
+        relatedEntityId: repairRequest._id,
+        type: NOTIFICATION_TYPES.REPAIR_REQUEST_PUBLISHED,
+      });
+
+      if (!existingNotification) {
+        const [technicians, admins] = await Promise.all([
+          User.find({ role: ROLES.TECHNICIAN, accountStatus: 'active' }).select('_id').lean(),
+          User.find({ role: ROLES.ADMIN, accountStatus: 'active' }).select('_id').lean(),
+        ]);
+        const recipientIds = [...technicians.map((t) => t._id), ...admins.map((a) => a._id)];
+        if (recipientIds.length > 0) {
+          await createBulkNotifications(recipientIds, {
+            type: NOTIFICATION_TYPES.REPAIR_REQUEST_PUBLISHED,
+            title: 'New Repair Request Published',
+            message: `A new repair request for "${populatedRequest.item?.title || 'an item'}" has been published.`,
+            relatedEntityType: 'RepairRequest',
+            relatedEntityId: repairRequest._id,
+          });
+        }
+      }
+
+      // Emit Socket.IO event
+      const io = getIO();
+      if (io) {
+        io.emit('repair-request:published', {
+          repairRequest: {
+            _id: populatedRequest._id,
+            item: populatedRequest.item,
+            owner: populatedRequest.owner,
+            requestStatus: populatedRequest.requestStatus,
+            publishedAt: populatedRequest.publishedAt,
+            problemDescription: populatedRequest.problemDescription,
+          },
+        });
+      }
+
+      // Trigger matching in background
+      try {
+        const matches = await matchingService.matchTechnicians(populatedRequest);
+        if (matches.length > 0) {
+          await matchingService.saveMatches(repairRequest._id, matches);
+          await RepairRequest.findByIdAndUpdate(repairRequest._id, {
+            requestStatus: REPAIR_REQUEST_STATUS.MATCHING_TECHNICIANS,
+          });
+        }
+      } catch (matchErr) {
+        logger.error('Quick request — matching failed:', matchErr.message);
+      }
+    } catch (transitionErr) {
+      logger.error('Quick request — publish failed:', transitionErr.message);
+      // Request stays as draft; not fatal
+    }
+  }
+
+  // ── Step 6: Kick off AI analysis asynchronously (don't block response) ─
+  const blockAI = safetyService.shouldBlockAIAdvice(safetyFlags);
+  if (!blockAI) {
+    // Fire and forget — results appear on the detail page later
+    const populatedItem = await Item.findById(itemId)
+      .populate('category', 'name riskLevel prohibitedAIAdvice defaultQuestions');
+
+    setImmediate(async () => {
+      try {
+        const result = await aiService.analyzeRepairRequest({
+          title: populatedItem?.title || '',
+          description: problemDescription,
+          category: populatedItem?.category?.name || '',
+          brand: populatedItem?.brand || '',
+          condition: populatedItem?.condition || '',
+          eventBefore: eventBeforeIssue || '',
+          previousAttempts: previousRepairAttempts || '',
+        });
+
+        const analysis = await AIAnalysis.create({
+          repairRequest: repairRequest._id,
+          provider: result.provider,
+          model: result.model,
+          promptVersion: '1.0',
+          ...result.analysis,
+          processingTime: result.processingTime,
+        });
+
+        const rr = await RepairRequest.findById(repairRequest._id);
+        if (rr) {
+          rr.aiAnalysis = analysis._id;
+          if (result.analysis.clarificationQuestions?.length > 0) {
+            rr.clarificationQuestions = result.analysis.clarificationQuestions.map((q) => ({
+              question: q, source: 'ai', required: false, answered: false,
+            }));
+          }
+          if (populatedItem?.category?.defaultQuestions?.length > 0) {
+            const catQuestions = populatedItem.category.defaultQuestions.map((q) => ({
+              question: q.question, source: 'category', required: q.required, answered: false,
+            }));
+            rr.clarificationQuestions.push(...catQuestions);
+          }
+          if (result.analysis.safetyFlags?.length > 0) {
+            for (const flag of result.analysis.safetyFlags) {
+              if (!rr.safetyFlags.some((f) => f.type === flag.type)) {
+                rr.safetyFlags.push({ ...flag, detectedBy: 'ai' });
+              }
+            }
+          }
+          await rr.save();
+        }
+      } catch (aiErr) {
+        logger.error('Quick request — async AI analysis failed:', aiErr.message);
+      }
+    });
+  }
+
+  // ── Response ──────────────────────────────────────────────────────────
+  const finalRequest = await RepairRequest.findById(repairRequest._id)
+    .populate({ path: 'item', populate: { path: 'category', select: 'name icon' } })
+    .populate('owner', 'fullName');
+
+  const item = await Item.findById(itemId);
+
+  return successResponse(res, {
+    item,
+    repairRequest: finalRequest,
+    published,
+    safetyFlags,
+    safetyWarning: safetyService.generateSafetyWarning(safetyFlags),
+  }, published
+    ? 'Item registered and repair request published! AI diagnosis is running in the background.'
+    : 'Item registered and repair request saved as draft.',
+  201);
+});
+
 module.exports = {
   createRepairRequest,
   getRepairRequests,
@@ -1002,4 +1422,6 @@ module.exports = {
   getMatches,
   sendInvitations,
   assignTechnician,
+  acceptJob,
+  quickRepairRequest,
 };

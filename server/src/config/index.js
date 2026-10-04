@@ -19,8 +19,9 @@ const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   },
 
-  // Client
+  // Client & Admin Web Addresses
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  adminUrl: process.env.ADMIN_URL || 'http://localhost:5174',
 
   // Cloudinary
   cloudinary: {
