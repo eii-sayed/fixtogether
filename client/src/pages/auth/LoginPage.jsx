@@ -93,7 +93,6 @@ export default function LoginPage() {
             <p className="text-xs text-gray-500 mb-3 text-center">Demo accounts</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               {[
-                { label: 'Admin', email: 'admin@fixtogether.com', pass: 'Admin123!' },
                 { label: 'Owner', email: 'rahim@example.com', pass: 'Owner123!' },
                 { label: 'Technician', email: 'sumon@example.com', pass: 'Tech123!' },
                 { label: 'Organization', email: 'hope@example.com', pass: 'Org1234!' },
