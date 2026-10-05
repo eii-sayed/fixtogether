@@ -32,7 +32,11 @@ import NewThreadPage from './pages/forum/NewThreadPage';
 
 function AdminRedirectGateway() {
   const location = useLocation();
-  const adminBaseUrl = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
+  const adminBaseUrl =
+    import.meta.env.VITE_ADMIN_URL ||
+    (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+      ? 'https://fixtogether-admin.vercel.app'
+      : 'http://localhost:5174');
 
   useEffect(() => {
     const subpath = location.pathname.replace(/^\/admin/, '') || '/';

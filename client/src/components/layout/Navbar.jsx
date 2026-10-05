@@ -27,7 +27,17 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 
-const ADMIN_PORTAL_URL = import.meta.env.VITE_ADMIN_URL || 'http://localhost:5174';
+const getAdminUrl = () => {
+  if (import.meta.env.VITE_ADMIN_URL) {
+    return import.meta.env.VITE_ADMIN_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return 'https://fixtogether-admin.vercel.app';
+  }
+  return 'http://localhost:5174';
+};
+
+const ADMIN_PORTAL_URL = getAdminUrl();
 
 const roleNavItems = {
   owner: [

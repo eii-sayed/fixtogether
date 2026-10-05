@@ -17,7 +17,20 @@ const startServer = async () => {
   // Setup Socket.IO
   const io = new Server(server, {
     cors: {
-      origin: config.clientUrl,
+      origin: (origin, callback) => {
+        if (
+          !origin ||
+          origin.endsWith('.vercel.app') ||
+          origin.includes('localhost') ||
+          origin.includes('127.0.0.1') ||
+          (config.clientUrl && origin.startsWith(config.clientUrl)) ||
+          (config.adminUrl && origin.startsWith(config.adminUrl))
+        ) {
+          callback(null, true);
+        } else {
+          callback(null, true);
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },

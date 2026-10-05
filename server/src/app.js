@@ -36,15 +36,24 @@ app.use(helmet({
 
 // CORS (supports both Client and Admin web origins)
 const allowedOrigins = [
-  config.clientUrl.replace(/\/+$/, ''),
+  config.clientUrl ? config.clientUrl.replace(/\/+$/, '') : null,
   config.adminUrl ? config.adminUrl.replace(/\/+$/, '') : null,
+  'https://fixtogether.vercel.app',
+  'https://fixtogether-admin.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const cleanOrigin = origin ? origin.replace(/\/+$/, '') : '';
+    if (
+      !origin ||
+      allowedOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith('.vercel.app') ||
+      cleanOrigin.includes('localhost') ||
+      cleanOrigin.includes('127.0.0.1')
+    ) {
       callback(null, true);
     } else {
       callback(new Error(`Origin ${origin} not allowed by CORS`));

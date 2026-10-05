@@ -6,7 +6,17 @@ import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { getNotificationDestination } from '../utils/notificationLinks';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+const getSocketUrl = () => {
+  if (import.meta.env.VITE_SOCKET_URL) {
+    return import.meta.env.VITE_SOCKET_URL;
+  }
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    return 'https://fixtogether-api.onrender.com';
+  }
+  return 'http://localhost:5000';
+};
+
+const SOCKET_URL = getSocketUrl();
 
 const SocketContext = createContext(null);
 
