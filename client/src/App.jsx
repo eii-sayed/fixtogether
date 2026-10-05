@@ -29,6 +29,7 @@ import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage
 import ForumPage from './pages/forum/ForumPage';
 import ThreadDetailPage from './pages/forum/ThreadDetailPage';
 import NewThreadPage from './pages/forum/NewThreadPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function AdminRedirectGateway() {
   const location = useLocation();
@@ -126,13 +127,7 @@ export default function App() {
         <Route path="/messages" element={<ProtectedRoute><ConversationsPage /></ProtectedRoute>} />
 
         {/* 404 */}
-        <Route path="*" element={
-          <div className="page-container text-center py-24">
-            <h1 className="text-6xl font-black text-gray-200">404</h1>
-            <p className="text-lg text-gray-500 mt-4">Page not found</p>
-            <a href="/" className="btn-primary mt-6 inline-flex">Go Home</a>
-          </div>
-        } />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );
