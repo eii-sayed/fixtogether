@@ -103,16 +103,16 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
-  // Generate Email Verification Token
-  const verifyToken = crypto.randomBytes(32).toString('hex');
-  const hashedVerifyToken = crypto.createHash('sha256').update(verifyToken).digest('hex');
+  // Generate 6-digit Email Verification OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
   
   await User.findByIdAndUpdate(user._id, {
-    emailVerificationToken: hashedVerifyToken,
+    emailVerificationToken: hashedOtp,
   });
 
   // Send Verification Email
-  await emailService.sendVerificationEmail(user.email, verifyToken, user.fullName);
+  await emailService.sendVerificationEmail(user.email, otp, user.fullName);
   logger.info(`Verification email sent to ${user.email}`);
 
   return successResponse(res, {
@@ -395,18 +395,18 @@ const getMe = asyncHandler(async (req, res) => {
  * POST /auth/verify-email
  */
 const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.body;
+  const { email, otp } = req.body;
 
-  if (!token) {
-    return errorResponse(res, 'Verification token is required.', 400);
+  if (!email || !otp) {
+    return errorResponse(res, 'Email and OTP are required.', 400);
   }
 
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-  const user = await User.findOne({ emailVerificationToken: hashedToken });
+  const user = await User.findOne({ email, emailVerificationToken: hashedOtp });
 
   if (!user) {
-    return errorResponse(res, 'Invalid or expired verification token.', 400);
+    return errorResponse(res, 'Invalid or expired OTP code.', 400);
   }
 
   user.emailVerified = true;

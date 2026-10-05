@@ -44,8 +44,8 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await registerUser(data);
-      toast.success('Account created successfully!');
-      navigate('/dashboard');
+      toast.success('Account created! Please check your email for the verification code.');
+      navigate('/verify-email', { state: { email: data.email } });
     } catch (error) {
       toast.error(error.response?.data?.message || 'Registration failed');
     } finally {
