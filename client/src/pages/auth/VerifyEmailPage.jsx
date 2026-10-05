@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Loader2, ShieldCheck } from 'lucide-react';
-import api from '../../../api/axios';
-import SEO from '../../common/SEO';
+import api from '../../api/axios';
+import SEO from '../../components/common/SEO';
 
 export default function VerifyEmailPage() {
   const navigate = useNavigate();

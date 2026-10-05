@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
-import api from '../../../api/axios';
-import SEO from '../../common/SEO';
+import api from '../../api/axios';
+import SEO from '../../components/common/SEO';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
