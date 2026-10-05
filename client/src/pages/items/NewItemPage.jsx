@@ -388,7 +388,7 @@ export default function NewItemPage() {
             ) : (
               <>
                 <CheckCircle2 className="w-5 h-5" />
-                <span>Add Item to My Items (1-Click)</span>
+                <span>Add Item to My Items</span>
               </>
             )}
           </button>

@@ -326,7 +326,7 @@ export default function CreateDonationModal({
                           title="Donate this item in 1 click"
                         >
                           <Heart className="w-3 h-3 fill-white" />
-                          <span>Donate (1-Click)</span>
+                          <span>Donate</span>
                         </button>
                       </div>
                     );

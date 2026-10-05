@@ -75,10 +75,10 @@ function OwnerDashboard() {
             onClick={() => setShowQuickAdd(true)}
             className="btn-outline btn-sm flex items-center gap-1.5"
           >
-            <Package className="w-4 h-4" /> 1-Click Add Item
+            <Package className="w-4 h-4" /> Add Item
           </button>
           <Link to="/repair-requests/new" className="btn-primary btn-sm flex items-center gap-1.5 shadow-sm">
-            <Sparkles className="w-4 h-4 text-amber-300" /> 1-Click Request Repair
+            <Sparkles className="w-4 h-4 text-amber-300" /> Request Repair
           </Link>
         </div>
       </div>

@@ -52,7 +52,7 @@ export default function ItemsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">My Items</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage your registered items and post 1-click repair requests anytime
+            Manage your registered items and post repair requests anytime
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export default function ItemsPage() {
             className="btn-primary shadow-xs flex items-center gap-1.5"
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>+ Add Item (1-Click)</span>
+            <span>+ Add Item</span>
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function ItemsPage() {
               className="btn-primary flex items-center gap-1.5 shadow-sm"
             >
               <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>+ Add Item (1-Click)</span>
+              <span>+ Add Item</span>
             </button>
           }
         />
@@ -159,7 +159,7 @@ export default function ItemsPage() {
                       title="Post 1-click repair request"
                     >
                       <Wrench className="w-3.5 h-3.5" />
-                      <span>Repair (1-Click)</span>
+                      <span>Repair</span>
                     </button>
 
                     <Link

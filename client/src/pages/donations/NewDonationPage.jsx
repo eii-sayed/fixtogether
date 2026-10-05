@@ -333,7 +333,7 @@ export default function NewDonationPage() {
                             title="Donate this item in 1 click"
                           >
                             <Heart className="w-3.5 h-3.5 fill-white" />
-                            <span>Donate (1-Click)</span>
+                            <span>Donate</span>
                           </button>
                         </div>
                       );

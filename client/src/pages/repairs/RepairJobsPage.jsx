@@ -156,7 +156,7 @@ export default function RepairJobsPage() {
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             {isTechnician
-              ? 'Fast 1-click workflows: start repairs, track progress, and mark problems solved'
+              ? 'Fast workflows: start repairs, track progress, and mark problems solved'
               : 'Track workshop progress, approve revisions, and verify handover completion'}
           </p>
         </div>
@@ -354,7 +354,7 @@ export default function RepairJobsPage() {
                         ) : (
                           <CheckCircle className="w-3.5 h-3.5" />
                         )}
-                        <span>✅ Confirm Received (1-Click)</span>
+                        <span>✅ Confirm Received</span>
                       </button>
                     )}
 

@@ -304,7 +304,7 @@ export default function ForumPage() {
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-xs font-bold text-gray-900">Ask the Community in 1-Click</h3>
+                <h3 className="text-xs font-bold text-gray-900">Ask the Community</h3>
                 <p className="text-[11px] text-gray-500">Post a troubleshooting question or repair query directly to the feed</p>
               </div>
             </div>
@@ -342,7 +342,7 @@ export default function ForumPage() {
                   ) : (
                     <>
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Post Question (1-Click)</span>
+                      <span>Post Question</span>
                     </>
                   )}
                 </button>

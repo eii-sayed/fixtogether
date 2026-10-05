@@ -215,7 +215,7 @@ export default function NewRepairRequestPage() {
               Request a Repair
             </h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              1-Step, 1-Click posting. Verified technicians receive your request immediately.
+              Fast posting. Verified technicians receive your request immediately.
             </p>
           </div>
         </div>
@@ -394,7 +394,7 @@ export default function NewRepairRequestPage() {
             What is the problem? <span className="text-red-500">*</span>
           </label>
 
-          {/* 1-Click Symptom Chips */}
+          {/* Symptom Chips */}
           <div className="flex flex-wrap gap-1.5 mb-3">
             {QUICK_SYMPTOMS.map((symptom) => {
               const isSelected = problemDescription.includes(symptom);
@@ -572,7 +572,7 @@ export default function NewRepairRequestPage() {
             ) : (
               <>
                 <Sparkles className="w-5 h-5 text-amber-300 fill-amber-300" />
-                <span>Publish Repair Request (1-Click)</span>
+                <span>Publish Repair Request</span>
               </>
             )}
           </button>

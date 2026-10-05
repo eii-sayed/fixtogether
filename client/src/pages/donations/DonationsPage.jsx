@@ -972,7 +972,7 @@ export default function DonationsPage() {
                               className="btn-primary py-1 px-2.5 text-xs font-semibold shadow-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700"
                               title="Accept offer immediately in 1 click"
                             >
-                              <Sparkles className="w-3.5 h-3.5" /> Accept (1-Click)
+                              <Sparkles className="w-3.5 h-3.5" /> Accept
                             </button>
                             <button
                               onClick={() => {
@@ -1016,7 +1016,7 @@ export default function DonationsPage() {
                               className="btn-primary py-1 px-2.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 flex items-center gap-1"
                               title="Confirm receipt directly"
                             >
-                              <CheckCircle className="w-3.5 h-3.5" /> Received (1-Click)
+                              <CheckCircle className="w-3.5 h-3.5" /> Received
                             </button>
                             <button
                               onClick={() => {
@@ -1057,7 +1057,7 @@ export default function DonationsPage() {
                               className="btn-primary py-1 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 flex items-center gap-1"
                               title="Pass technical inspection and prepare for redistribution"
                             >
-                              <CheckCircle className="w-3.5 h-3.5" /> Pass Inspection (1-Click)
+                              <CheckCircle className="w-3.5 h-3.5" /> Pass Inspection
                             </button>
                             <button
                               onClick={() => {
@@ -2057,7 +2057,7 @@ export default function DonationsPage() {
                     'Publishing...'
                   ) : (
                     <>
-                      <Package className="w-4 h-4" /> Publish Community Need (1-Click)
+                      <Package className="w-4 h-4" /> Publish Community Need
                     </>
                   )}
                 </button>

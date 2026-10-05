@@ -252,18 +252,6 @@ export default function FloatingAIHead() {
       {/* 1. FLOATING AI HEAD BUTTON (Trigger) */}
       {/* ========================================================================= */}
       <div className="fixed bottom-20 md:bottom-6 right-5 z-40 flex flex-col items-end">
-        {/* Callout Prompt Tooltip (Visible until clicked) */}
-        {!isOpen && !hasInteracted && (
-          <div
-            onClick={() => setIsOpen(true)}
-            className="mb-2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-full shadow-lg border border-emerald-200 text-xs font-semibold text-gray-800 flex items-center gap-1.5 cursor-pointer animate-bounce hover:bg-emerald-50 transition-all active:scale-95"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-spin [animation-duration:3s]" />
-            <span>Ask Fixie AI</span>
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          </div>
-        )}
-
         {/* The Animated Floating Head */}
         <button
           onClick={() => setIsOpen(!isOpen)}

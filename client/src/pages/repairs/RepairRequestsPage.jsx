@@ -155,7 +155,7 @@ export default function RepairRequestsPage() {
             to="/repair-requests/new"
             className="btn-primary shrink-0 flex items-center gap-2 shadow-sm active:scale-95"
           >
-            <Plus className="w-4 h-4" /> Request a Repair (1-Click)
+            <Plus className="w-4 h-4" /> Request a Repair
           </Link>
         )}
       </div>
@@ -217,7 +217,7 @@ export default function RepairRequestsPage() {
           action={
             userRole === 'owner' && (
               <Link to="/repair-requests/new" className="btn-primary text-xs">
-                <Plus className="w-4 h-4" /> Request a Repair (1-Click)
+                <Plus className="w-4 h-4" /> Request a Repair
               </Link>
             )
           }
