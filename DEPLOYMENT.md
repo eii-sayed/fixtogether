@@ -21,17 +21,17 @@ At your domain registrar or DNS provider (e.g., Cloudflare, Namecheap, GoDaddy, 
 
 ## 2. Environment Variables Matrix
 
-Before building or deploying, ensure each service has its production environment variables configured:
-
-### A. Backend Server (`server/.env`)
+### A. Backend Server (`server/.env` or Render Environment Variables)
 ```ini
 NODE_ENV=production
 PORT=5000
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/fixtogether?retryWrites=true&w=majority
 
 # Multi-Origin CORS (Permits both Client and Admin applications)
-CLIENT_URL=https://app.fixtogether.com
-ADMIN_URL=https://admin.fixtogether.com
+# For Vercel Free Tier:
+CLIENT_URL=https://fixtogether.vercel.app
+ADMIN_URL=https://fixtogether-admin.vercel.app
+# (Or if using custom domains: https://app.fixtogether.com and https://admin.fixtogether.com)
 
 # JWT Secrets (Generate strong random 64-char keys)
 JWT_ACCESS_SECRET=your_super_strong_production_access_secret_64chars
@@ -44,18 +44,20 @@ AI_PROVIDER=gemini
 GEMINI_API_KEY=your_production_google_gemini_api_key
 ```
 
-### B. Public Client Application (`client/.env.production`)
+### B. Public Client Application (`client/.env.production` or Vercel Environment Variables)
 ```ini
-VITE_API_BASE_URL=https://api.fixtogether.com/api/v1
-VITE_SOCKET_URL=https://api.fixtogether.com
-VITE_ADMIN_URL=https://admin.fixtogether.com
+# Defaults automatically when deployed on vercel.app, or configure manually:
+VITE_API_BASE_URL=https://fixtogether-api.onrender.com/api/v1
+VITE_SOCKET_URL=https://fixtogether-api.onrender.com
+VITE_ADMIN_URL=https://fixtogether-admin.vercel.app
 VITE_APP_NAME=FixTogether
 ```
 
-### C. Standalone Admin Application (`admin/.env.production`)
+### C. Standalone Admin Application (`admin/.env.production` or Vercel Environment Variables)
 ```ini
-VITE_API_BASE_URL=https://api.fixtogether.com/api/v1
-VITE_PUBLIC_CLIENT_URL=https://app.fixtogether.com
+# Defaults automatically when deployed on vercel.app, or configure manually:
+VITE_API_BASE_URL=https://fixtogether-api.onrender.com/api/v1
+VITE_PUBLIC_CLIENT_URL=https://fixtogether.vercel.app
 ```
 
 ---

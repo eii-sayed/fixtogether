@@ -32,11 +32,20 @@ import NewThreadPage from './pages/forum/NewThreadPage';
 
 function AdminRedirectGateway() {
   const location = useLocation();
-  const adminBaseUrl =
-    import.meta.env.VITE_ADMIN_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-      ? 'https://fixtogether-admin.vercel.app'
-      : 'http://localhost:5174');
+  const getAdminBaseUrl = () => {
+    const envUrl = import.meta.env.VITE_ADMIN_URL;
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      if (!envUrl || envUrl.includes('admin.fixtogether.com') || envUrl.includes('localhost')) {
+        return 'https://fixtogether-admin.vercel.app';
+      }
+    }
+    if (envUrl && !envUrl.includes('admin.fixtogether.com')) {
+      return envUrl;
+    }
+    return 'http://localhost:5174';
+  };
+
+  const adminBaseUrl = getAdminBaseUrl();
 
   useEffect(() => {
     const subpath = location.pathname.replace(/^\/admin/, '') || '/';

@@ -7,11 +7,14 @@ import { useAuth } from './AuthContext';
 import { getNotificationDestination } from '../utils/notificationLinks';
 
 const getSocketUrl = () => {
-  if (import.meta.env.VITE_SOCKET_URL) {
-    return import.meta.env.VITE_SOCKET_URL;
-  }
+  const envUrl = import.meta.env.VITE_SOCKET_URL;
   if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    return 'https://fixtogether-api.onrender.com';
+    if (!envUrl || envUrl.includes('api.fixtogether.com') || envUrl.includes('localhost')) {
+      return 'https://fixtogether-api.onrender.com';
+    }
+  }
+  if (envUrl && !envUrl.includes('api.fixtogether.com')) {
+    return envUrl;
   }
   return 'http://localhost:5000';
 };

@@ -86,14 +86,22 @@ export default function AdminLayout() {
     return location.pathname.startsWith(item.path);
   };
 
-  const publicUrl =
-    import.meta.env.VITE_PUBLIC_CLIENT_URL ||
-    import.meta.env.VITE_CLIENT_URL ||
-    (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
-      ? (window.location.hostname.includes('-admin')
+  const getPublicUrl = () => {
+    const envUrl = import.meta.env.VITE_PUBLIC_CLIENT_URL || import.meta.env.VITE_CLIENT_URL;
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      if (!envUrl || envUrl.includes('fixtogether.com') || envUrl.includes('localhost')) {
+        return window.location.hostname.includes('-admin')
           ? `https://${window.location.hostname.replace('-admin', '')}`
-          : 'https://fixtogether.vercel.app')
-      : 'http://localhost:5173');
+          : 'https://fixtogether.vercel.app';
+      }
+    }
+    if (envUrl && !envUrl.includes('fixtogether.com')) {
+      return envUrl;
+    }
+    return 'http://localhost:5173';
+  };
+
+  const publicUrl = getPublicUrl();
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col antialiased">
