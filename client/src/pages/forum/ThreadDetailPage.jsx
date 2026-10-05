@@ -28,6 +28,7 @@ import {
   Award,
   UserCheck,
 } from 'lucide-react';
+import SEO from '../../components/common/SEO';
 
 export default function ThreadDetailPage() {
   const { id } = useParams();
@@ -221,6 +222,11 @@ export default function ThreadDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-16">
+      <SEO 
+        title={thread?.title}
+        description={thread?.content?.substring(0, 150) + '...'}
+        type="article"
+      />
       {/* Navigation Breadcrumb */}
       <div className="flex items-center justify-between text-xs text-gray-500">
         <Link to="/forum" className="hover:text-gray-900 flex items-center gap-1 font-semibold">

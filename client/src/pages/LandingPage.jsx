@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Wrench, Shield, Users, Recycle, Zap, ArrowRight, Star, CheckCircle, Leaf, Heart } from 'lucide-react';
+import SEO from '../components/common/SEO';
 
 const features = [
   { icon: Zap, title: 'AI-Powered Diagnosis', desc: 'Upload your item details and get instant AI analysis with safety-first recommendations and technician matching.', color: 'bg-purple-100 text-purple-600' },
@@ -27,6 +28,7 @@ const stats = [
 export default function LandingPage() {
   return (
     <div className="overflow-hidden">
+      <SEO />
       {/* Hero */}
       <section className="relative bg-gradient-to-br from-primary-50 via-white to-secondary-50 py-24 sm:py-32">
         <div className="absolute inset-0 overflow-hidden">
