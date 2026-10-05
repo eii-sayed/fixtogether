@@ -7,6 +7,9 @@ import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import ItemsPage from './pages/items/ItemsPage';
 import NewItemPage from './pages/items/NewItemPage';
@@ -87,6 +90,9 @@ export default function App() {
 
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+        <Route path="/verify-email" element={<GuestRoute><VerifyEmailPage /></GuestRoute>} />
+        <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
+        <Route path="/reset-password" element={<GuestRoute><ResetPasswordPage /></GuestRoute>} />
 
         {/* Public profile and directory routes — accessible by anyone */}
         <Route path="/technicians" element={<TechniciansPage />} />

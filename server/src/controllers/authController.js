@@ -6,6 +6,7 @@ const { ROLES, ACCOUNT_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse } = require('../utils/helpers');
 const { createAuditLog } = require('../middleware/auditLog');
 const logger = require('../utils/logger');
+const emailService = require('../services/emailService');
 
 /**
  * Generate access token
@@ -102,6 +103,18 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
+  // Generate Email Verification Token
+  const verifyToken = crypto.randomBytes(32).toString('hex');
+  const hashedVerifyToken = crypto.createHash('sha256').update(verifyToken).digest('hex');
+  
+  await User.findByIdAndUpdate(user._id, {
+    emailVerificationToken: hashedVerifyToken,
+  });
+
+  // Send Verification Email
+  await emailService.sendVerificationEmail(user.email, verifyToken, user.fullName);
+  logger.info(`Verification email sent to ${user.email}`);
+
   return successResponse(res, {
     user: {
       _id: user._id,
@@ -129,6 +142,10 @@ const login = asyncHandler(async (req, res) => {
 
   if (user.accountStatus === ACCOUNT_STATUS.SUSPENDED) {
     return errorResponse(res, 'Your account has been suspended.', 403);
+  }
+
+  if (!user.emailVerified) {
+    return errorResponse(res, 'Please verify your email address before logging in.', 403);
   }
 
   let isMatch = await user.comparePassword(password);
@@ -328,8 +345,9 @@ const forgotPassword = asyncHandler(async (req, res) => {
     passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour
   });
 
-  // In a real app, send email here
-  logger.info(`Password reset token for ${email}: ${resetToken}`);
+  // Send the actual email
+  await emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName);
+  logger.info(`Password reset email triggered for ${email}`);
 
   return successResponse(res, { resetToken: config.env === 'development' ? resetToken : undefined },
     'If an account with that email exists, a reset link has been sent.');
@@ -373,6 +391,31 @@ const getMe = asyncHandler(async (req, res) => {
   return successResponse(res, { user });
 });
 
+/**
+ * POST /auth/verify-email
+ */
+const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+
+  if (!token) {
+    return errorResponse(res, 'Verification token is required.', 400);
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await User.findOne({ emailVerificationToken: hashedToken });
+
+  if (!user) {
+    return errorResponse(res, 'Invalid or expired verification token.', 400);
+  }
+
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  await user.save();
+
+  return successResponse(res, null, 'Email successfully verified. You can now log in.');
+});
+
 module.exports = {
   register,
   login,
@@ -380,5 +423,6 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
+  verifyEmail,
   getMe,
 };
