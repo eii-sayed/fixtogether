@@ -25,8 +25,6 @@ import {
   ShieldCheck,
   Search,
   MessagesSquare,
-  Moon,
-  Sun,
 } from 'lucide-react';
 
 const getAdminUrl = () => {
@@ -81,22 +79,6 @@ export default function Navbar() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark') ||
-        window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
-
-  // Toggle Dark Mode
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
 
   // Global Ctrl+K / Cmd+K listener
   useEffect(() => {
@@ -147,7 +129,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white/95 backdrop-blur-md border-b border-gray-200/80 sticky top-0 z-50 pt-[env(safe-area-inset-top)] shadow-sm dark:bg-gray-950/95 dark:border-gray-800 transition-colors">
+    <nav className="bg-white/95 backdrop-blur-md border-b border-gray-200/80 sticky top-0 z-50 pt-[env(safe-area-inset-top)] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo & Brand */}
@@ -207,15 +189,6 @@ export default function Navbar() {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-2">
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
-              aria-label="Toggle Dark Mode"
-            >
-              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-
             {/* Global Search Trigger */}
             <button
               onClick={() => setSearchModalOpen(true)}
