@@ -59,13 +59,13 @@ api.interceptors.response.use(
       return Promise.reject(rateLimitError);
     }
 
-    const isTokenExpired =
-      error.response?.status === 401 &&
-      (error.response?.data?.code === 'TOKEN_EXPIRED' ||
-       error.response?.data?.message?.toLowerCase().includes('token expired') ||
-       error.response?.data?.message?.toLowerCase().includes('jwt expired'));
+    const isUnauthorized = error.response?.status === 401;
 
-    if (isTokenExpired && !originalRequest._retry) {
+    if (isUnauthorized && !originalRequest._retry) {
+      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -101,12 +101,10 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        if (refreshError.response?.status === 401) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-        }
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
