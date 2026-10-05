@@ -36,6 +36,7 @@ import {
   ChevronRight,
   ShieldAlert,
   Globe2,
+  Leaf,
 } from 'lucide-react';
 import SEO from '../../components/common/SEO';
 
