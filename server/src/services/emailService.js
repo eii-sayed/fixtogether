@@ -12,6 +12,9 @@ const createTransporter = () => {
       user: config.email.user,
       pass: config.email.password,
     },
+    connectionTimeout: 5000, // 5s connection timeout to prevent hanging
+    greetingTimeout: 5000,   // 5s greeting timeout
+    socketTimeout: 8000,     // 8s socket timeout
   });
 };
 
@@ -21,7 +24,7 @@ const createTransporter = () => {
  */
 const sendEmail = async (options) => {
   if (!config.email.user || !config.email.password) {
-    logger.warn('Email service is not configured. Email will not be sent.', options.to);
+    logger.warn(`Email service is not configured. Email will not be sent to: ${options.to}`);
     return false;
   }
 
@@ -36,10 +39,10 @@ const sendEmail = async (options) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    logger.info(`Email sent: ${info.messageId}`);
+    logger.info(`Email sent successfully to ${options.to}: ${info.messageId}`);
     return true;
   } catch (error) {
-    logger.error('Error sending email:', error.message);
+    logger.error(`Error sending email to ${options.to}: ${error.message}`);
     return false;
   }
 };

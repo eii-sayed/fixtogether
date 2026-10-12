@@ -56,13 +56,26 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (formData) => {
     const { data } = await api.post('/auth/register', formData);
-    const { user: u, accessToken, refreshToken } = data.data;
-    const normalized = normalizeUser(u);
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
-    localStorage.setItem('user', JSON.stringify(normalized));
-    setUser(normalized);
-    return normalized;
+    
+    // When verification is required, clear any stale session tokens and return cleanly
+    if (data?.data?.requiresVerification) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      setUser(null);
+      return data.data;
+    }
+
+    const { user: u, accessToken, refreshToken } = data?.data || {};
+    if (accessToken && refreshToken && u) {
+      const normalized = normalizeUser(u);
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(normalized));
+      setUser(normalized);
+      return normalized;
+    }
+    return data?.data;
   }, []);
 
   const logout = useCallback(async () => {

@@ -65,8 +65,10 @@ const register = asyncHandler(async (req, res) => {
     if (password) existingUser.passwordHash = password;
     await existingUser.save();
 
-    await emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName);
-    logger.info(`Verification email resent to existing unverified user: ${existingUser.email}`);
+    logger.info(`[AUTH] Verification OTP generated for existing unverified user ${existingUser.email}: ${otp}`);
+    emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName).catch((err) => {
+      logger.error(`[AUTH] Failed to send verification email to ${existingUser.email}:`, err.message);
+    });
 
     return successResponse(
       res,
@@ -149,9 +151,13 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
-  // Send Verification Email
-  await emailService.sendVerificationEmail(user.email, otp, user.fullName);
-  logger.info(`Verification email sent to ${user.email}`);
+  // Log OTP for guaranteed server visibility and developer ease
+  logger.info(`[AUTH] Verification OTP generated for ${user.email}: ${otp}`);
+
+  // Send Verification Email asynchronously (non-blocking for instant client response)
+  emailService.sendVerificationEmail(user.email, otp, user.fullName).catch((err) => {
+    logger.error(`[AUTH] Failed to send verification email to ${user.email}:`, err.message);
+  });
 
   return successResponse(res, {
     user: {
@@ -570,8 +576,10 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   user.emailVerificationLastSentAt = new Date();
   await user.save();
 
-  await emailService.sendVerificationEmail(user.email, otp, user.fullName);
-  logger.info(`Verification OTP resent to ${user.email}`);
+  logger.info(`[AUTH] Verification OTP resent for ${user.email}: ${otp}`);
+  emailService.sendVerificationEmail(user.email, otp, user.fullName).catch((err) => {
+    logger.error(`[AUTH] Failed to resend verification email to ${user.email}:`, err.message);
+  });
 
   return successResponse(
     res,

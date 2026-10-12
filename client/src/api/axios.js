@@ -24,8 +24,18 @@ const api = axios.create({
 // Request interceptor - add auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (token && token !== 'undefined' && token !== 'null') {
+    const isPublicAuthRoute =
+      config.url?.includes('/auth/login') ||
+      config.url?.includes('/auth/register') ||
+      config.url?.includes('/auth/verify-email') ||
+      config.url?.includes('/auth/resend-verification') ||
+      config.url?.includes('/auth/forgot-password') ||
+      config.url?.includes('/auth/reset-password');
+
+    if (!isPublicAuthRoute) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -61,11 +71,21 @@ api.interceptors.response.use(
 
     const isUnauthorized = error.response?.status === 401;
 
-    if (isUnauthorized && !originalRequest._retry) {
-      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
-        return Promise.reject(error);
-      }
+    // Never attempt token refresh on public authentication routes
+    const isAuthRoute =
+      originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register') ||
+      originalRequest.url?.includes('/auth/refresh') ||
+      originalRequest.url?.includes('/auth/verify-email') ||
+      originalRequest.url?.includes('/auth/resend-verification') ||
+      originalRequest.url?.includes('/auth/forgot-password') ||
+      originalRequest.url?.includes('/auth/reset-password');
 
+    if (isUnauthorized && (isAuthRoute || originalRequest._retry)) {
+      return Promise.reject(error);
+    }
+
+    if (isUnauthorized && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -80,13 +100,22 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) {
+      if (!refreshToken || refreshToken === 'undefined' || refreshToken === 'null') {
         isRefreshing = false;
         processQueue(error, null);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/login') &&
+          !window.location.pathname.startsWith('/register') &&
+          !window.location.pathname.startsWith('/verify-email') &&
+          !window.location.pathname.startsWith('/forgot-password') &&
+          !window.location.pathname.startsWith('/reset-password')
+        ) {
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       }
 
@@ -104,7 +133,16 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/login') &&
+          !window.location.pathname.startsWith('/register') &&
+          !window.location.pathname.startsWith('/verify-email') &&
+          !window.location.pathname.startsWith('/forgot-password') &&
+          !window.location.pathname.startsWith('/reset-password')
+        ) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

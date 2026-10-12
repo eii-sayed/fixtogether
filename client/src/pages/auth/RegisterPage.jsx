@@ -47,7 +47,12 @@ export default function RegisterPage() {
       toast.success('Account created! Please check your email for the verification code.');
       navigate('/verify-email', { state: { email: data.email } });
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+      const serverMsg =
+        error.response?.data?.message ||
+        error.response?.data?.errors?.[0]?.message ||
+        error.message ||
+        'Registration failed. Please try again.';
+      toast.error(serverMsg);
     } finally {
       setLoading(false);
     }
