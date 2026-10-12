@@ -28,6 +28,7 @@ const ReviewQueueItem = require('./ReviewQueueItem');
 const OutboxEvent = require('./OutboxEvent');
 const Thread = require('./Thread');
 const ThreadComment = require('./ThreadComment');
+const PushSubscription = require('./PushSubscription');
 
 module.exports = {
   User,
@@ -60,4 +61,5 @@ module.exports = {
   OutboxEvent,
   Thread,
   ThreadComment,
+  PushSubscription,
 };

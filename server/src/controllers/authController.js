@@ -592,6 +592,102 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   );
 });
 
+// Single-use SSO ticket cache: ticket -> { userId, role, expiresAt }
+const ssoTicketCache = new Map();
+
+// Periodic cleanup of expired SSO tickets
+setInterval(() => {
+  const now = Date.now();
+  for (const [ticket, data] of ssoTicketCache.entries()) {
+    if (data.expiresAt < now) {
+      ssoTicketCache.delete(ticket);
+    }
+  }
+}, 60 * 1000).unref();
+
+/**
+ * POST /auth/sso-ticket
+ * Generates a short-lived (60s) single-use ticket for authenticated admins to jump to Admin Command Center
+ */
+const createSsoTicket = asyncHandler(async (req, res) => {
+  if (!req.user || req.user.role !== ROLES.ADMIN) {
+    return errorResponse(res, 'Administrator privileges are required to access the Admin Command Center.', 403);
+  }
+
+  const ticket = `sso_${crypto.randomBytes(24).toString('hex')}`;
+  ssoTicketCache.set(ticket, {
+    userId: req.user.userId,
+    role: req.user.role,
+    expiresAt: Date.now() + 60 * 1000, // 60 seconds
+  });
+
+  return successResponse(res, { ticket }, 'SSO ticket generated successfully');
+});
+
+/**
+ * POST /auth/sso-exchange
+ * Exchanges a single-use SSO ticket for active admin tokens
+ */
+const exchangeSsoTicket = asyncHandler(async (req, res) => {
+  const { ticket } = req.body;
+
+  if (!ticket || !ssoTicketCache.has(ticket)) {
+    return errorResponse(res, 'Invalid or expired SSO ticket.', 400);
+  }
+
+  const ticketData = ssoTicketCache.get(ticket);
+  ssoTicketCache.delete(ticket); // Immediately consume ticket (single-use)
+
+  if (ticketData.expiresAt < Date.now()) {
+    return errorResponse(res, 'SSO ticket has expired. Please launch the portal again.', 400);
+  }
+
+  const user = await User.findById(ticketData.userId);
+  if (!user || user.role !== ROLES.ADMIN || !user.isActive()) {
+    return errorResponse(res, 'Access denied. Valid administrator account required.', 403);
+  }
+
+  // Generate fresh tokens for Admin portal
+  const accessToken = generateAccessToken(user._id, user.role);
+  const refreshToken = generateRefreshToken(user._id);
+
+  const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
+  await User.findByIdAndUpdate(user._id, {
+    $push: {
+      refreshTokens: {
+        token: refreshToken,
+        expiresAt: refreshExpiry,
+        userAgent: req.headers['user-agent'] || 'Admin-SSO',
+      },
+    },
+    lastLoginAt: new Date(),
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: config.env === 'production',
+    sameSite: config.env === 'production' ? 'none' : 'strict',
+    maxAge: parseDuration(config.jwt.refreshExpiresIn),
+  });
+
+  return successResponse(
+    res,
+    {
+      user: {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        accountStatus: user.accountStatus,
+        profileImage: user.profileImage,
+      },
+      accessToken,
+      refreshToken,
+    },
+    'SSO exchange successful'
+  );
+});
+
 module.exports = {
   register,
   login,
@@ -601,5 +697,7 @@ module.exports = {
   resetPassword,
   verifyEmail,
   resendVerificationOtp,
+  createSsoTicket,
+  exchangeSsoTicket,
   getMe,
 };

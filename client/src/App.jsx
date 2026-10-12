@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
+import { useAuth } from './context/AuthContext';
+import api from './api/axios';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -36,6 +38,7 @@ import NotFoundPage from './pages/NotFoundPage';
 
 function AdminRedirectGateway() {
   const location = useLocation();
+  const { user } = useAuth();
   const getAdminBaseUrl = () => {
     const envUrl = import.meta.env.VITE_ADMIN_URL;
     if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
@@ -53,9 +56,25 @@ function AdminRedirectGateway() {
 
   useEffect(() => {
     const subpath = location.pathname.replace(/^\/admin/, '') || '/';
-    const destination = `${adminBaseUrl}${subpath}${location.search}`;
-    window.location.href = destination;
-  }, [adminBaseUrl, location]);
+    const launchAdmin = async () => {
+      if (user?.role === 'admin') {
+        try {
+          const { data } = await api.post('/auth/sso-ticket');
+          const ticket = data?.data?.ticket;
+          if (ticket) {
+            const separator = location.search ? '&' : '?';
+            window.location.href = `${adminBaseUrl}${subpath}${location.search}${separator}sso_ticket=${ticket}`;
+            return;
+          }
+        } catch {
+          // Fall back to direct navigation
+        }
+      }
+      window.location.href = `${adminBaseUrl}${subpath}${location.search}`;
+    };
+
+    launchAdmin();
+  }, [adminBaseUrl, location, user]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-950 text-white text-center">

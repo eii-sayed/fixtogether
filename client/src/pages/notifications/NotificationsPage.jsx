@@ -1,10 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { PageLoader, EmptyState } from '../../components/ui';
-import { Bell, Check, CheckCheck, ArrowRight, ExternalLink, Filter } from 'lucide-react';
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  ArrowRight,
+  ExternalLink,
+  Filter,
+  BellRing,
+  Radio,
+  Smartphone,
+  CheckCircle2,
+  Loader2,
+} from 'lucide-react';
+import {
+  isPushSupported,
+  getPushSubscription,
+  subscribeToWebPush,
+  unsubscribeFromWebPush,
+  sendTestPushNotification,
+} from '../../utils/pushManager';
 import {
   getNotificationDestination,
   getNotificationMeta,
@@ -16,6 +36,49 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('all');
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [isTestingPush, setIsTestingPush] = useState(false);
+
+  // Sync current Web Push subscription status
+  useEffect(() => {
+    if (isPushSupported()) {
+      getPushSubscription().then((sub) => {
+        setIsPushSubscribed(!!sub);
+      });
+    }
+  }, []);
+
+  const handleTogglePush = async () => {
+    setIsPushLoading(true);
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeFromWebPush();
+        setIsPushSubscribed(false);
+        toast.success('Background Web Push notifications disabled.');
+      } else {
+        await subscribeToWebPush();
+        setIsPushSubscribed(true);
+        toast.success('Background Web Push enabled! You will receive alerts even when FixTogether is closed.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to update push subscription');
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    setIsTestingPush(true);
+    try {
+      await sendTestPushNotification();
+      toast.success('Test notification dispatched! Check your desktop/mobile alerts.');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to dispatch test notification');
+    } finally {
+      setIsTestingPush(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -114,6 +177,81 @@ export default function NotificationsPage() {
           </button>
         )}
       </div>
+
+      {/* Background Web Push Notification Banner */}
+      {isPushSupported() && (
+        <div className="card p-4 sm:p-5 border border-primary-100 bg-gradient-to-r from-primary-50/60 to-emerald-50/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                isPushSubscribed
+                  ? 'bg-emerald-600 text-white shadow-emerald-500/20'
+                  : 'bg-primary-100 text-primary-700'
+              }`}
+            >
+              {isPushSubscribed ? <BellRing className="w-5 h-5 animate-pulse" /> : <Bell className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-gray-900">Background Web Push Notifications</h3>
+                {isPushSubscribed && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Active
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
+                {isPushSubscribed
+                  ? 'Active: You will receive real-time OS alerts for new repair bids, messages, and job updates when the browser is closed.'
+                  : 'Enable desktop & mobile push alerts to never miss critical repair bids or message replies when your tab is closed.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            {isPushSubscribed && (
+              <button
+                type="button"
+                onClick={handleTestPush}
+                disabled={isTestingPush}
+                className="btn-secondary btn-sm text-xs font-semibold"
+              >
+                {isTestingPush ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    Sending...
+                  </>
+                ) : (
+                  'Test Alert'
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleTogglePush}
+              disabled={isPushLoading}
+              className={`btn-sm text-xs font-bold ${
+                isPushSubscribed
+                  ? 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                  : 'btn-primary shadow-xs'
+              }`}
+            >
+              {isPushLoading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                  Updating...
+                </>
+              ) : isPushSubscribed ? (
+                'Disable'
+              ) : (
+                'Enable Push Alerts'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">

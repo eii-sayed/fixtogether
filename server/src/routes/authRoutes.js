@@ -21,6 +21,8 @@ router.post('/forgot-password', validate(forgotPasswordSchema), authController.f
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 router.post('/verify-email', validate(verifyEmailSchema), authController.verifyEmail);
 router.post('/resend-verification', authLimiter, validate(resendVerificationSchema), authController.resendVerificationOtp);
+router.post('/sso-ticket', authenticate, authController.createSsoTicket);
+router.post('/sso-exchange', authLimiter, authController.exchangeSsoTicket);
 router.get('/me', authenticate, authController.getMe);
 
 module.exports = router;

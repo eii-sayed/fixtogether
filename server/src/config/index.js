@@ -124,6 +124,17 @@ const config = {
     defaultLimit: 20,
     maxLimit: 100,
   },
+
+  // Web Push (VAPID)
+  push: {
+    publicKey:
+      process.env.VAPID_PUBLIC_KEY ||
+      'BCFrryc2ka-eX36FrZPtsoPMPIuOG-xpCBS2MwIvxkfrL4iXHv2t25-XL0puDndZL14ghtuS_NJ4d2uaaTOZ6Gw',
+    privateKey:
+      process.env.VAPID_PRIVATE_KEY ||
+      '1uSXBRkvTyn9j-smUksWcwaJNptcIyetx6sqLkDxBbQ',
+    subject: process.env.VAPID_SUBJECT || 'mailto:support@fixtogether.com',
+  },
 };
 
 // Validate required config in production

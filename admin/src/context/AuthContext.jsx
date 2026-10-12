@@ -18,13 +18,44 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(true);
 
-  // Sync freshest admin user data from backend
+  // Sync freshest admin user data from backend or exchange SSO ticket
   useEffect(() => {
-    const token = localStorage.getItem('adminAccessToken') || localStorage.getItem('accessToken');
-    if (token) {
-      api
-        .get('/auth/me')
-        .then(({ data }) => {
+    const handleAuthInit = async () => {
+      // 1. Process SSO ticket exchange if coming from Client Portal
+      const searchParams = new URLSearchParams(window.location.search);
+      const ssoTicket = searchParams.get('sso_ticket');
+
+      if (ssoTicket) {
+        try {
+          const { data } = await api.post('/auth/sso-exchange', { ticket: ssoTicket });
+          const { user: u, accessToken, refreshToken } = data.data;
+
+          if (u && u.role === 'admin') {
+            const normalized = normalizeUser(u);
+            localStorage.setItem('adminAccessToken', accessToken);
+            localStorage.setItem('adminRefreshToken', refreshToken);
+            localStorage.setItem('adminUser', JSON.stringify(normalized));
+            setUser(normalized);
+
+            // Clean sso_ticket from URL cleanly without reloading page
+            searchParams.delete('sso_ticket');
+            const cleanSearch = searchParams.toString();
+            const cleanUrl = `${window.location.pathname}${cleanSearch ? '?' + cleanSearch : ''}${window.location.hash}`;
+            window.history.replaceState({}, document.title, cleanUrl);
+
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error('SSO exchange failed:', err);
+        }
+      }
+
+      // 2. Check existing stored admin tokens
+      const token = localStorage.getItem('adminAccessToken') || localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const { data } = await api.get('/auth/me');
           const u = data?.data?.user;
           if (u && u.role === 'admin') {
             const normalized = normalizeUser(u);
@@ -32,23 +63,25 @@ export function AuthProvider({ children }) {
             localStorage.setItem('adminUser', JSON.stringify(normalized));
             localStorage.setItem('adminAccessToken', token);
           } else {
-            // Not an admin
             localStorage.removeItem('adminAccessToken');
             localStorage.removeItem('adminRefreshToken');
             localStorage.removeItem('adminUser');
             setUser(null);
           }
-        })
-        .catch(() => {
+        } catch {
           localStorage.removeItem('adminAccessToken');
           localStorage.removeItem('adminRefreshToken');
           localStorage.removeItem('adminUser');
           setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    handleAuthInit();
   }, []);
 
   const login = useCallback(async (email, password) => {

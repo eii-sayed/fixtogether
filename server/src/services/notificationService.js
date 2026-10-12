@@ -1,5 +1,6 @@
 const { Notification } = require('../models');
 const logger = require('../utils/logger');
+const pushNotificationService = require('./pushNotificationService');
 
 // Socket.IO instance reference (set during server startup)
 let io = null;
@@ -125,6 +126,21 @@ const createNotification = async ({
       });
     }
 
+    // Send Background Web Push notification to user's registered devices
+    pushNotificationService.sendPushNotification(userId, {
+      title: notification.title,
+      message: notification.message,
+      url: notification.link,
+      tag: notification.type,
+      data: {
+        notificationId: notification._id,
+        relatedEntityType: notification.relatedEntityType,
+        relatedEntityId: notification.relatedEntityId,
+      },
+    }).catch((err) => {
+      logger.warn(`Push dispatch failed for user ${userId}:`, err.message);
+    });
+
     return notification;
   } catch (error) {
     if (error.code === 11000) {
@@ -159,9 +175,9 @@ const createBulkNotifications = async (userIds, notificationData) => {
   try {
     const created = await Notification.insertMany(notifications, { ordered: false });
 
-    // Send real-time notifications
-    if (io) {
-      for (const notification of created) {
+    // Send real-time notifications and background web push
+    for (const notification of created) {
+      if (io) {
         io.to(`user:${notification.user}`).emit('notification', {
           _id: notification._id,
           type: notification.type,
@@ -174,6 +190,13 @@ const createBulkNotifications = async (userIds, notificationData) => {
           createdAt: notification.createdAt,
         });
       }
+
+      pushNotificationService.sendPushNotification(notification.user, {
+        title: notification.title,
+        message: notification.message,
+        url: notification.link,
+        tag: notification.type,
+      }).catch(() => {});
     }
 
     return created;
