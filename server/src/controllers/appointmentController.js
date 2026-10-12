@@ -44,11 +44,20 @@ const getAppointments = asyncHandler(async (req, res) => {
   else if (req.user.role === 'technician') query.technician = req.user.userId;
 
   const [appointments, total] = await Promise.all([
-    Appointment.find(query).populate('repairRequest', 'item').populate('owner', 'fullName')
-      .populate('technician', 'fullName').sort({ scheduledStart: 1 }).skip(skip).limit(limit),
+    Appointment.find(query)
+      .populate({
+        path: 'repairRequest',
+        select: 'title requestStatus item',
+        populate: { path: 'item', select: 'title category brand model images' },
+      })
+      .populate('owner', 'fullName email phone profileImage')
+      .populate('technician', 'fullName email phone profileImage')
+      .sort({ scheduledStart: 1 })
+      .skip(skip)
+      .limit(limit || 100),
     Appointment.countDocuments(query),
   ]);
-  return successResponse(res, { appointments, pagination: paginationMeta(total, page, limit) });
+  return successResponse(res, { appointments, pagination: paginationMeta(total, page, limit || 100) });
 });
 
 const getAppointmentById = asyncHandler(async (req, res) => {

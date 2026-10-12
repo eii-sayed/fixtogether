@@ -70,6 +70,9 @@ function OwnerDashboard() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <Link to="/calendar" className="btn-outline btn-sm flex items-center gap-1.5">
+            <Calendar className="w-4 h-4" /> Calendar
+          </Link>
           <button
             type="button"
             onClick={() => setShowQuickAdd(true)}
@@ -509,7 +512,12 @@ function TechnicianDashboard() {
                 <Calendar className="w-4 h-4 text-gray-600" />
                 <span>Today's Handover Schedule</span>
               </h3>
-              <span className="text-[11px] text-gray-400">{todayAppts.length} appointments</span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-[11px] text-gray-400">{todayAppts.length} appointments</span>
+                <Link to="/calendar" className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                  Open Calendar &rarr;
+                </Link>
+              </div>
             </div>
             <div className="divide-y divide-gray-100 p-2">
               {todayAppts.length > 0 ? (

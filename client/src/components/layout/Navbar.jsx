@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Search,
   MessagesSquare,
+  Calendar,
 } from 'lucide-react';
 
 const getAdminUrl = () => {
@@ -46,6 +47,7 @@ const roleNavItems = {
   owner: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'My Items', path: '/items', icon: Package },
+    { label: 'Calendar', path: '/calendar', icon: Calendar },
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
@@ -53,6 +55,7 @@ const roleNavItems = {
   ],
   technician: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: 'Schedule', path: '/calendar', icon: Calendar },
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: ClipboardList },
     { label: 'My Jobs', path: '/repair-jobs', icon: Wrench },
