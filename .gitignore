@@ -11,5 +11,11 @@ logs/
 coverage/
 .tempmediaStorage/
 client/dist/
+admin/dist/
 server/uploads/
 server/coverage/
+.vite/
+.cache/
+*.swp
+*.swo
+*.orig

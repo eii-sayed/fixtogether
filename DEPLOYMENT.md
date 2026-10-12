@@ -48,6 +48,11 @@ GEMINI_API_KEY=your_production_google_gemini_api_key
 CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 CLOUDINARY_API_KEY=your_cloudinary_api_key
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# Web Push (VAPID Configuration for Service Worker background alerts)
+VAPID_PUBLIC_KEY=your_production_vapid_public_key
+VAPID_PRIVATE_KEY=your_production_vapid_private_key
+VAPID_SUBJECT=mailto:admin@fixtogether.com
 ```
 
 ### B. Public Client Application (`client/.env.production` or Vercel Environment Variables)

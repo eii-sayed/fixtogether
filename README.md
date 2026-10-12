@@ -76,6 +76,31 @@ The platform comes pre-seeded with verified test accounts across all key roles:
 - **Quotation Comparison & Technician Assignment**: Inspect bids side-by-side, view technician credentials, and award jobs with one click.
 - **Real-Time Notification Hub**: Live unread badge count, filter by unread status, mark-all-as-read, and direct deep-linking to related entities.
 
+### 6. 📅 Interactive Calendar & Handover Scheduling (`/calendar`)
+- **Monthly Interactive Grid**: Dynamic visual calendar with month navigation, appointment counts, and date indicators.
+- **Real-Time Status Badges**: Color-coded badges for `scheduled`, `confirmed`, `in_progress`, `completed`, `rescheduled`, and `cancelled` handovers.
+- **Daily Agenda & Detail Modal**: Inspect appointment time, customer/technician details, item name, brand, model, and photos with 1-click status actions (confirm, reschedule, cancel, complete).
+- **Direct Workspace Integration**: Seamlessly accessible from Navbar and Owner/Technician Dashboard handover cards.
+
+### 7. 🔄 Unified Client / Admin Single Sign-On (SSO)
+- **Cross-Domain Session Bridge**: Connects the Public Client SPA (`localhost:5173` / `fixtogether.vercel.app`) with the Standalone Admin Portal (`localhost:5174` / `fixtogether-admin.vercel.app`).
+- **Cryptographic SSO Tickets**: Single-use 60-second tickets exchanged seamlessly for secure administrator authentication tokens without duplicate logins.
+
+### 8. 🔔 Background Web Push & Service Worker (`/sw.js`)
+- **W3C Standard Web Push**: OS-level push notifications delivered to desktop and mobile devices even when browser tabs are closed.
+- **VAPID Security**: Permanent cryptographic key pair validation with device subscription synchronization in MongoDB.
+- **Smart Preferences**: User-level notification settings with test notification dispatching directly from `/notifications`.
+
+### 9. 💻 Active Session & Device Management
+- **Device & Browser Detection**: Parses User-Agent into clean device categories (e.g. *Google Chrome on Windows*, *Apple Safari on iPhone*).
+- **Current Device Highlighting**: Pulsing green badge indicating the active device.
+- **Remote Revocation**: Revoke individual suspicious devices or click *"Log Out Other Devices"* to invalidate all other active refresh sessions.
+
+### 10. 🔒 Hardened Authentication & OTP Email Verification
+- **6-Digit OTP Verification**: 15-minute expiration window with SHA-256 hashed database storage.
+- **Brute-Force Lockout**: 5-attempt rate-limiting guard with timing-safe equality checks.
+- **Non-Blocking Mail Dispatch**: Asynchronous email delivery with timeouts to prevent registration UI freezing.
+
 ---
 
 ## 🛠️ Technology Stack
@@ -215,21 +240,23 @@ npm run dev
 
 ## 🧪 Testing & Quality Assurance
 
-FixTogether includes comprehensive backend test suites covering API contracts, authorization matrices, edge cases, and safety interceptors.
+FixTogether features a 100% harmonized test suite across all three monorepo workspaces:
 
-### Run Backend Tests (Jest & Supertest)
 ```bash
+# Run all test suites across the entire monorepo
+npm test
+
+# Run backend API & integration tests (Jest + Supertest: 95 tests)
 npm run test:server
-```
 
-### Run Frontend Tests (Vitest)
-```bash
+# Run client web application tests (Vitest + React Testing Library: 22 tests)
 npm run test:client
-```
 
-### Production Build Verification
-```bash
-npm run build
+# Run admin command center tests (Vitest + React Testing Library: 9 tests)
+npm run test:admin
+
+# Verify production builds for client and admin SPAs
+npm run build:all
 ```
 
 ---
@@ -240,8 +267,22 @@ npm run build
 |---|---|---|---|---|
 | **Auth** | `POST` | `/api/v1/auth/register` | Register new user account | Public |
 | | `POST` | `/api/v1/auth/login` | Login & receive JWT + HTTP-only cookie | Public |
+| | `POST` | `/api/v1/auth/verify-email` | Verify 6-digit email OTP | Public |
+| | `POST` | `/api/v1/auth/resend-verification` | Resend verification OTP code | Public (Rate-limited) |
 | | `POST` | `/api/v1/auth/refresh` | Rotate refresh token & get new access token | Public |
 | | `POST` | `/api/v1/auth/logout` | Clear refresh token session | Authenticated |
+| | `POST` | `/api/v1/auth/sso-ticket` | Generate single-use admin SSO ticket | Admin |
+| | `POST` | `/api/v1/auth/sso-exchange` | Exchange SSO ticket for admin credentials | Admin |
+| | `GET` | `/api/v1/auth/sessions` | List all active device sessions | Authenticated |
+| | `DELETE` | `/api/v1/auth/sessions/:sessionId` | Revoke a specific device session | Authenticated |
+| | `DELETE` | `/api/v1/auth/sessions` | Revoke all other active sessions | Authenticated |
+| **Web Push** | `GET` | `/api/v1/push/vapid-public-key` | Retrieve server VAPID public key | Authenticated |
+| | `POST` | `/api/v1/push/subscribe` | Register browser push subscription | Authenticated |
+| | `POST` | `/api/v1/push/unsubscribe` | Revoke browser push subscription | Authenticated |
+| | `POST` | `/api/v1/push/test` | Trigger test background push alert | Authenticated |
+| **Appointments** | `GET` | `/api/v1/appointments` | Get appointments (calendar / list) | Authenticated |
+| | `POST` | `/api/v1/appointments` | Book new handover appointment | Authenticated |
+| | `PATCH` | `/api/v1/appointments/:id` | Update status (confirm, reschedule, cancel) | Authenticated |
 | **Threads (Forum)** | `GET` | `/api/v1/threads` | List forum threads (search, filter, paginate) | Public |
 | | `POST` | `/api/v1/threads` | Create new thread post / question | Authenticated |
 | | `GET` | `/api/v1/threads/:id` | Get thread details & nested comments | Public |
