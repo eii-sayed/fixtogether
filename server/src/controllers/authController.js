@@ -44,19 +44,65 @@ const parseDuration = (duration) => {
 const register = asyncHandler(async (req, res) => {
   const { fullName, email, password, role, phone } = req.body;
 
+  const normalizedEmail = email.toLowerCase().trim();
+
   // Check if user already exists
-  const existingUser = await User.findOne({ email });
+  const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    return errorResponse(res, 'An account with this email already exists.', 409);
+    if (existingUser.emailVerified) {
+      return errorResponse(res, 'An account with this email already exists.', 409);
+    }
+
+    // Unverified account duplicate: regenerate and resend verification OTP instead of locking user out
+    const otp = crypto.randomInt(100000, 1000000).toString();
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    existingUser.emailVerificationToken = hashedOtp;
+    existingUser.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000);
+    existingUser.emailVerificationAttempts = 0;
+    existingUser.emailVerificationLastSentAt = new Date();
+    if (fullName) existingUser.fullName = fullName;
+    if (password) existingUser.passwordHash = password;
+    await existingUser.save();
+
+    await emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName);
+    logger.info(`Verification email resent to existing unverified user: ${existingUser.email}`);
+
+    return successResponse(
+      res,
+      {
+        user: {
+          _id: existingUser._id,
+          fullName: existingUser.fullName,
+          email: existingUser.email,
+          role: existingUser.role,
+          accountStatus: existingUser.accountStatus,
+          emailVerified: false,
+        },
+        requiresVerification: true,
+        email: existingUser.email,
+      },
+      'A new verification code has been sent to your email. Please verify your account.',
+      200
+    );
   }
+
+  // Generate 6-digit Email Verification OTP
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
   // Create user
   const user = await User.create({
     fullName,
-    email,
+    email: normalizedEmail,
     passwordHash: password, // Will be hashed by pre-save hook
     role: role || ROLES.OWNER,
     phone: phone || '',
+    emailVerified: false,
+    emailVerificationToken: hashedOtp,
+    emailVerificationExpires: new Date(Date.now() + 15 * 60 * 1000),
+    emailVerificationAttempts: 0,
+    emailVerificationLastSentAt: new Date(),
   });
 
   // Create profile based on role
@@ -103,14 +149,6 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
-  // Generate 6-digit Email Verification OTP
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
-  
-  await User.findByIdAndUpdate(user._id, {
-    emailVerificationToken: hashedOtp,
-  });
-
   // Send Verification Email
   await emailService.sendVerificationEmail(user.email, otp, user.fullName);
   logger.info(`Verification email sent to ${user.email}`);
@@ -122,10 +160,12 @@ const register = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       accountStatus: user.accountStatus,
+      emailVerified: false,
     },
     accessToken,
     refreshToken,
-  }, 'Registration successful', 201);
+    requiresVerification: true,
+  }, 'Registration successful. Please check your email for the verification code.', 201);
 });
 
 /**
@@ -133,8 +173,9 @@ const register = asyncHandler(async (req, res) => {
  */
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = email ? email.toLowerCase().trim() : '';
 
-  const user = await User.findOne({ email }).select('+passwordHash +accountStatus');
+  const user = await User.findOne({ email: normalizedEmail }).select('+passwordHash +accountStatus');
 
   if (!user) {
     return errorResponse(res, 'Invalid email or password.', 401);
@@ -145,7 +186,12 @@ const login = asyncHandler(async (req, res) => {
   }
 
   if (!user.emailVerified) {
-    return errorResponse(res, 'Please verify your email address before logging in.', 403);
+    return res.status(403).json({
+      status: 'error',
+      message: 'Please verify your email address before logging in.',
+      requiresVerification: true,
+      email: user.email,
+    });
   }
 
   let isMatch = await user.comparePassword(password);
@@ -401,19 +447,137 @@ const verifyEmail = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Email and OTP are required.', 400);
   }
 
-  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+  const normalizedEmail = email.toLowerCase().trim();
+  const cleanOtp = String(otp).trim();
 
-  const user = await User.findOne({ email, emailVerificationToken: hashedOtp });
+  const user = await User.findOne({ email: normalizedEmail }).select(
+    '+emailVerificationToken +emailVerificationExpires +emailVerificationAttempts'
+  );
 
   if (!user) {
-    return errorResponse(res, 'Invalid or expired OTP code.', 400);
+    return errorResponse(res, 'Invalid verification code or email.', 400);
   }
 
+  if (user.emailVerified) {
+    return successResponse(res, { alreadyVerified: true }, 'Email is already verified. You can log in.');
+  }
+
+  if (!user.emailVerificationToken) {
+    return errorResponse(res, 'No active verification code found. Please request a new code.', 400);
+  }
+
+  // 1. Check max attempt brute-force limit (5 attempts)
+  if ((user.emailVerificationAttempts || 0) >= 5) {
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+    return errorResponse(
+      res,
+      'Too many incorrect attempts. For security, this code has been invalidated. Please request a new code.',
+      429
+    );
+  }
+
+  // 2. Check expiration (15 minutes)
+  if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+    return errorResponse(res, 'This verification code has expired. Please request a new code.', 400);
+  }
+
+  // 3. Verify OTP hash using timing-safe comparison
+  const hashedOtp = crypto.createHash('sha256').update(cleanOtp).digest('hex');
+  const storedHashBuf = Buffer.from(user.emailVerificationToken, 'utf8');
+  const candidateHashBuf = Buffer.from(hashedOtp, 'utf8');
+
+  const isMatch =
+    storedHashBuf.length === candidateHashBuf.length &&
+    crypto.timingSafeEqual(storedHashBuf, candidateHashBuf);
+
+  if (!isMatch) {
+    user.emailVerificationAttempts = (user.emailVerificationAttempts || 0) + 1;
+    await user.save();
+    const remaining = Math.max(0, 5 - user.emailVerificationAttempts);
+    return errorResponse(
+      res,
+      `Invalid verification code. ${remaining} attempt(s) remaining before code expires.`,
+      400
+    );
+  }
+
+  // 4. Mark verified & clean up tokens
   user.emailVerified = true;
   user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+  user.emailVerificationAttempts = 0;
   await user.save();
 
-  return successResponse(res, null, 'Email successfully verified. You can now log in.');
+  await createAuditLog({
+    actor: user._id,
+    action: 'EMAIL_VERIFIED',
+    targetType: 'User',
+    targetId: user._id,
+    metadata: { email: user.email },
+  }, req);
+
+  return successResponse(res, null, 'Email successfully verified! You can now log in.');
+});
+
+/**
+ * POST /auth/resend-verification
+ */
+const resendVerificationOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return errorResponse(res, 'Email is required.', 400);
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  const user = await User.findOne({ email: normalizedEmail }).select(
+    '+emailVerificationToken +emailVerificationExpires +emailVerificationAttempts +emailVerificationLastSentAt'
+  );
+
+  // Generic response if user not found or already verified to prevent account enumeration
+  if (!user || user.emailVerified) {
+    return successResponse(
+      res,
+      null,
+      'If an unverified account with that email exists, a new verification code has been sent.'
+    );
+  }
+
+  // 60-second cooldown check
+  if (user.emailVerificationLastSentAt) {
+    const elapsedMs = Date.now() - new Date(user.emailVerificationLastSentAt).getTime();
+    const cooldownMs = 60 * 1000;
+    if (elapsedMs < cooldownMs) {
+      const remainingSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+      return errorResponse(
+        res,
+        `Please wait ${remainingSeconds} second(s) before requesting another code.`,
+        429
+      );
+    }
+  }
+
+  // Generate new secure 6-digit OTP
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+  user.emailVerificationToken = hashedOtp;
+  user.emailVerificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  user.emailVerificationAttempts = 0;
+  user.emailVerificationLastSentAt = new Date();
+  await user.save();
+
+  await emailService.sendVerificationEmail(user.email, otp, user.fullName);
+  logger.info(`Verification OTP resent to ${user.email}`);
+
+  return successResponse(
+    res,
+    null,
+    'If an unverified account with that email exists, a new verification code has been sent.'
+  );
 });
 
 module.exports = {
@@ -424,5 +588,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  resendVerificationOtp,
   getMe,
 };

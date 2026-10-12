@@ -18,6 +18,7 @@ export default function LoginPage() {
   const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(loginSchema),
@@ -27,6 +28,7 @@ export default function LoginPage() {
 
   const onSubmit = async (data) => {
     setLoading(true);
+    setUnverifiedEmail('');
     try {
       const loggedInUser = await login(data.email, data.password);
       toast.success('Welcome back!');
@@ -34,7 +36,13 @@ export default function LoginPage() {
       const targetPath = location.state?.from?.pathname || defaultPath;
       navigate(targetPath, { replace: true });
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      if (error.response?.data?.requiresVerification || (error.response?.status === 403 && error.response?.data?.message?.includes('verify'))) {
+        const email = error.response?.data?.email || data.email;
+        setUnverifiedEmail(email);
+        toast.error('Your email is not verified yet. Please enter the verification code.');
+      } else {
+        toast.error(error.response?.data?.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,6 +67,22 @@ export default function LoginPage() {
         </div>
 
         <div className="card card-body">
+          {unverifiedEmail && (
+            <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>Account requires email verification.</span>
+              </div>
+              <Link
+                to="/verify-email"
+                state={{ email: unverifiedEmail }}
+                className="font-bold text-amber-800 underline hover:text-amber-950 ml-2 text-xs"
+              >
+                Verify Code &rarr;
+              </Link>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-5">
             <div>
               <label className="label" htmlFor="email">Email</label>

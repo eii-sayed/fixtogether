@@ -53,6 +53,18 @@ const updateProfileSchema = Joi.object({
   phone: Joi.string().allow('').optional(),
 });
 
+const verifyEmailSchema = Joi.object({
+  email: Joi.string().email().lowercase().trim().required()
+    .messages({ 'string.email': 'Please provide a valid email', 'any.required': 'Email is required' }),
+  otp: Joi.string().length(6).pattern(/^\d{6}$/).required()
+    .messages({ 'string.pattern.base': 'OTP must be a 6-digit number', 'any.required': 'OTP is required' }),
+});
+
+const resendVerificationSchema = Joi.object({
+  email: Joi.string().email().lowercase().trim().required()
+    .messages({ 'string.email': 'Please provide a valid email', 'any.required': 'Email is required' }),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -60,4 +72,6 @@ module.exports = {
   resetPasswordSchema,
   changePasswordSchema,
   updateProfileSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 };

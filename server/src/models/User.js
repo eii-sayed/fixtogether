@@ -147,6 +147,19 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    emailVerificationExpires: {
+      type: Date,
+      select: false,
+    },
+    emailVerificationAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    emailVerificationLastSentAt: {
+      type: Date,
+      select: false,
+    },
     lastLoginAt: {
       type: Date,
     },
@@ -160,6 +173,9 @@ const userSchema = new mongoose.Schema(
         delete ret.passwordResetToken;
         delete ret.passwordResetExpires;
         delete ret.emailVerificationToken;
+        delete ret.emailVerificationExpires;
+        delete ret.emailVerificationAttempts;
+        delete ret.emailVerificationLastSentAt;
         delete ret.__v;
         return ret;
       },
