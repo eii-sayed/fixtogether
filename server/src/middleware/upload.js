@@ -1,14 +1,26 @@
 const multer = require('multer');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const config = require('../config');
 const { AppError } = require('./errorHandler');
 
-// Ensure uploads directory exists for local fallback
-const uploadsDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+// Resolve safe writable upload directory (falls back to os.tmpdir in read-only / serverless filesystems)
+const getUploadsBaseDir = () => {
+  const localDir = path.join(__dirname, '../../uploads');
+  try {
+    if (!fs.existsSync(localDir)) {
+      fs.mkdirSync(localDir, { recursive: true });
+    }
+    return localDir;
+  } catch (_) {
+    const tmpDir = path.join(os.tmpdir(), 'fixtogether-uploads');
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    return tmpDir;
+  }
+};
 
 // File filter for images
 const imageFilter = (req, file, cb) => {
@@ -29,11 +41,12 @@ const mediaFilter = (req, file, cb) => {
   }
 };
 
-// Local storage configuration
+// Multer disk storage configuration
 const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
+    const baseDir = getUploadsBaseDir();
     const subDir = file.mimetype.startsWith('video') ? 'videos' : 'images';
-    const dir = path.join(uploadsDir, subDir);
+    const dir = path.join(baseDir, subDir);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }

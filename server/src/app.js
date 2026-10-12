@@ -87,7 +87,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), environment: config.env });
+  const { getStorageStatus } = require('./services/uploadService');
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: config.env,
+    storage: getStorageStatus(),
+  });
 });
 
 // General rate limiting — applied after health checks

@@ -42,6 +42,12 @@ JWT_REFRESH_EXPIRES_IN=7d
 # AI Provider Configuration
 AI_PROVIDER=gemini
 GEMINI_API_KEY=your_production_google_gemini_api_key
+
+# Cloud Storage Configuration (Mandatory in production)
+# Prevents media loss on ephemeral disks (e.g., Render dynos, Docker containers)
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
 ### B. Public Client Application (`client/.env.production` or Vercel Environment Variables)

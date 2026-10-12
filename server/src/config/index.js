@@ -30,6 +30,13 @@ const config = {
     apiSecret: process.env.CLOUDINARY_API_SECRET || '',
   },
 
+  // Storage Policy & Cloud Enforcement
+  storage: {
+    provider: process.env.STORAGE_PROVIDER || (process.env.CLOUDINARY_CLOUD_NAME ? 'cloudinary' : 'local'),
+    enforceCloudInProduction: process.env.ENFORCE_CLOUD_STORAGE !== 'false',
+    allowLocalInProduction: process.env.ALLOW_LOCAL_STORAGE_IN_PRODUCTION === 'true',
+  },
+
   // AI
   ai: {
     provider: process.env.AI_PROVIDER || 'gemini',
@@ -125,6 +132,18 @@ if (config.env === 'production') {
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  // Enforce Cloud Storage in production to prevent ephemeral disk file loss
+  if (config.storage.enforceCloudInProduction && !config.storage.allowLocalInProduction) {
+    const cloudMissing = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter(
+      (key) => !process.env[key]
+    );
+    if (cloudMissing.length > 0) {
+      throw new Error(
+        `Production Safety Error: Cloud storage is enforced in production to prevent permanent media loss on ephemeral disks (e.g. Render, Vercel, Docker). Missing: ${cloudMissing.join(', ')}. Set these variables or set ALLOW_LOCAL_STORAGE_IN_PRODUCTION=true to explicitly override.`
+      );
+    }
   }
 }
 
