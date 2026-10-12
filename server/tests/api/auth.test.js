@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../../src/app');
+const { User } = require('../../src/models');
 
 describe('Auth API', () => {
   describe('POST /api/v1/auth/register', () => {
@@ -25,6 +26,7 @@ describe('Auth API', () => {
         fullName: 'User 1', email: 'dupe@example.com',
         password: 'Test1234', confirmPassword: 'Test1234', role: 'owner',
       });
+      await User.updateOne({ email: 'dupe@example.com' }, { emailVerified: true });
 
       const res = await request(app).post('/api/v1/auth/register').send({
         fullName: 'User 2', email: 'dupe@example.com',
@@ -50,6 +52,7 @@ describe('Auth API', () => {
         fullName: 'Login Test', email: 'login@example.com',
         password: 'Login123', confirmPassword: 'Login123', role: 'owner',
       });
+      await User.updateOne({ email: 'login@example.com' }, { emailVerified: true });
     });
 
     it('should login with correct credentials', async () => {

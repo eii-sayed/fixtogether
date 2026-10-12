@@ -107,19 +107,19 @@ describe('DonationsPage', () => {
     render(<DonationsPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Available Items/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Donation Offers/i })).toBeInTheDocument();
     });
 
     expect(screen.getByRole('button', { name: /Community Needs/i })).toBeInTheDocument();
   });
 
-  it('displays Donate An Item call to action button', async () => {
+  it('displays call to action button for organization or donor', async () => {
     api.get.mockResolvedValue({ data: { data: mockDonationsResponse } });
 
     render(<DonationsPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /Donate an Item/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Post Community Need/i })).toBeInTheDocument();
     });
   });
 });

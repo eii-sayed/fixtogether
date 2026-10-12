@@ -76,7 +76,7 @@ describe('AdminSafetyPage', () => {
     render(<AdminSafetyPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText('Deterministic Safety Rules')).toBeInTheDocument();
+      expect(screen.getByText(/Deterministic Safety/i)).toBeInTheDocument();
     });
 
     expect(
@@ -105,7 +105,7 @@ describe('AdminSafetyPage', () => {
     render(<AdminSafetyPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getAllByTitle(/Test pattern in simulator/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByTitle(/Test Simulator/i).length).toBeGreaterThan(0);
     });
   });
 });

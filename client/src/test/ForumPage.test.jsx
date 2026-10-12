@@ -126,7 +126,7 @@ describe('ForumPage', () => {
     render(<ForumPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /Ask Question/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Ask a Question/i })).toBeInTheDocument();
     });
   });
 
@@ -141,7 +141,7 @@ describe('ForumPage', () => {
     render(<ForumPage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText(/No discussions found/i)).toBeInTheDocument();
+      expect(screen.getByText(/No Questions or Discussions Found/i)).toBeInTheDocument();
     });
   });
 });

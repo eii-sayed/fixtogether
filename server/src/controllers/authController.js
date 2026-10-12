@@ -688,6 +688,113 @@ const exchangeSsoTicket = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * GET /auth/sessions
+ * List active sessions for authenticated user
+ */
+const getActiveSessions = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.userId);
+  if (!user) {
+    return errorResponse(res, 'User not found', 404);
+  }
+
+  const currentToken = req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  const now = new Date();
+
+  // Active sessions: expires in future and not revoked
+  const activeSessions = (user.refreshTokens || [])
+    .filter((s) => s.expiresAt > now && !s.revokedAt)
+    .map((s) => {
+      const isCurrent = Boolean(currentToken && s.token === currentToken);
+      return {
+        _id: s._id,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        userAgent: s.userAgent || 'Web Browser',
+        isCurrent,
+      };
+    })
+    .sort((a, b) => {
+      if (a.isCurrent) return -1;
+      if (b.isCurrent) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+  return successResponse(res, { sessions: activeSessions }, 'Active sessions retrieved successfully');
+});
+
+/**
+ * DELETE /auth/sessions/:sessionId
+ * Revoke a specific active session
+ */
+const revokeSession = asyncHandler(async (req, res) => {
+  const { sessionId } = req.params;
+  const user = await User.findById(req.user.userId);
+  if (!user) {
+    return errorResponse(res, 'User not found', 404);
+  }
+
+  const session = (user.refreshTokens || []).find((s) => s._id.toString() === sessionId);
+  if (!session) {
+    return errorResponse(res, 'Session not found or already revoked', 404);
+  }
+
+  const currentToken = req.cookies?.refreshToken || req.headers['x-refresh-token'];
+  const isCurrent = Boolean(currentToken && session.token === currentToken);
+
+  // Remove the session from refreshTokens array
+  await User.findByIdAndUpdate(req.user.userId, {
+    $pull: { refreshTokens: { _id: sessionId } },
+  });
+
+  if (isCurrent) {
+    res.clearCookie('refreshToken');
+  }
+
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'SESSION_REVOKED',
+    targetType: 'User',
+    targetId: req.user.userId,
+    metadata: { sessionId, isCurrent },
+  }, req);
+
+  return successResponse(
+    res,
+    { isCurrent },
+    isCurrent ? 'Current session revoked. You have been logged out.' : 'Session revoked successfully'
+  );
+});
+
+/**
+ * DELETE /auth/sessions
+ * Revoke all other active sessions except the current one
+ */
+const revokeAllOtherSessions = asyncHandler(async (req, res) => {
+  const currentToken = req.cookies?.refreshToken || req.headers['x-refresh-token'];
+
+  if (currentToken) {
+    // Keep only the current token
+    await User.findByIdAndUpdate(req.user.userId, {
+      $pull: { refreshTokens: { token: { $ne: currentToken } } },
+    });
+  } else {
+    // If no refresh token cookie present, clear all
+    await User.findByIdAndUpdate(req.user.userId, {
+      $set: { refreshTokens: [] },
+    });
+  }
+
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'ALL_OTHER_SESSIONS_REVOKED',
+    targetType: 'User',
+    targetId: req.user.userId,
+  }, req);
+
+  return successResponse(res, null, 'All other sessions have been logged out successfully');
+});
+
 module.exports = {
   register,
   login,
@@ -700,4 +807,7 @@ module.exports = {
   createSsoTicket,
   exchangeSsoTicket,
   getMe,
+  getActiveSessions,
+  revokeSession,
+  revokeAllOtherSessions,
 };

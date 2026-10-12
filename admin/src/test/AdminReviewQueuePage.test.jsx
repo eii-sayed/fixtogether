@@ -124,7 +124,7 @@ describe('AdminReviewQueuePage', () => {
     render(<AdminReviewQueuePage />, { wrapper: createWrapper() });
 
     await waitFor(() => {
-      expect(screen.getByText(/All caught up!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Review Queue is Clear/i)).toBeInTheDocument();
     });
   });
 });

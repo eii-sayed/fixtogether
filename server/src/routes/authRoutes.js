@@ -25,4 +25,9 @@ router.post('/sso-ticket', authenticate, authController.createSsoTicket);
 router.post('/sso-exchange', authLimiter, authController.exchangeSsoTicket);
 router.get('/me', authenticate, authController.getMe);
 
+// Active Session Management
+router.get('/sessions', authenticate, authController.getActiveSessions);
+router.delete('/sessions/:sessionId', authenticate, authController.revokeSession);
+router.delete('/sessions', authenticate, authController.revokeAllOtherSessions);
+
 module.exports = router;

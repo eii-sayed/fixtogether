@@ -1,7 +1,6 @@
 const { PushSubscription } = require('../models');
 const pushNotificationService = require('../services/pushNotificationService');
-const { successResponse, errorResponse } = require('../utils/apiResponse');
-const asyncHandler = require('../utils/asyncHandler');
+const { asyncHandler, successResponse, errorResponse } = require('../utils/helpers');
 const logger = require('../utils/logger');
 
 /**

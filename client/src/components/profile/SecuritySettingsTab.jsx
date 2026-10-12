@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
+import ActiveSessionsCard from './ActiveSessionsCard';
 import {
   Lock,
   Eye,
@@ -201,6 +202,9 @@ export default function SecuritySettingsTab({ user }) {
           </button>
         </form>
       </div>
+
+      {/* Active Sessions & Signed-in Devices Card */}
+      <ActiveSessionsCard />
 
       {/* Privacy Settings Card */}
       <div className="card card-body">
