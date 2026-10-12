@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
-import { Wrench, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Wrench, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -67,6 +67,13 @@ export default function LoginPage() {
         </div>
 
         <div className="card card-body">
+          {location.state?.message && (
+            <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{location.state.message}</span>
+            </div>
+          )}
+
           {unverifiedEmail && (
             <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center justify-between animate-in fade-in">
               <div className="flex items-center gap-2">

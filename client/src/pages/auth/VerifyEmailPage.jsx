@@ -16,8 +16,9 @@ export default function VerifyEmailPage() {
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [cooldown, setCooldown] = useState(60);
-  const [canResend, setCanResend] = useState(false);
+  const isJustRegistered = !!location.state?.justRegistered;
+  const [cooldown, setCooldown] = useState(isJustRegistered ? 60 : 0);
+  const [canResend, setCanResend] = useState(!isJustRegistered);
 
   const inputRefs = useRef([]);
 

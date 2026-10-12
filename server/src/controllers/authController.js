@@ -191,15 +191,6 @@ const login = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Your account has been suspended.', 403);
   }
 
-  if (!user.emailVerified) {
-    return res.status(403).json({
-      status: 'error',
-      message: 'Please verify your email address before logging in.',
-      requiresVerification: true,
-      email: user.email,
-    });
-  }
-
   let isMatch = await user.comparePassword(password);
   // Gracefully support Org123! and Org1234! interchangeably for organization accounts
   if (!isMatch && user.role === ROLES.ORGANIZATION) {
@@ -212,6 +203,15 @@ const login = asyncHandler(async (req, res) => {
 
   if (!isMatch) {
     return errorResponse(res, 'Invalid email or password.', 401);
+  }
+
+  if (!user.emailVerified) {
+    return res.status(403).json({
+      status: 'error',
+      message: 'Please verify your email address before logging in.',
+      requiresVerification: true,
+      email: user.email,
+    });
   }
 
   // Generate tokens
@@ -397,9 +397,13 @@ const forgotPassword = asyncHandler(async (req, res) => {
     passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour
   });
 
-  // Send the actual email
-  await emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName);
-  logger.info(`Password reset email triggered for ${email}`);
+  // Always log reset token in server console for development and operational resilience
+  logger.info(`[AUTH] Password reset token generated for ${user.email}: ${resetToken}`);
+
+  // Send the actual email asynchronously (non-blocking)
+  emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName).catch((err) => {
+    logger.error(`[AUTH] Failed to send password reset email to ${user.email}:`, err.message);
+  });
 
   return successResponse(res, { resetToken: config.env === 'development' ? resetToken : undefined },
     'If an account with that email exists, a reset link has been sent.');
