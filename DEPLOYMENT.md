@@ -53,6 +53,14 @@ CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 VAPID_PUBLIC_KEY=your_production_vapid_public_key
 VAPID_PRIVATE_KEY=your_production_vapid_private_key
 VAPID_SUBJECT=mailto:admin@fixtogether.com
+
+# Email / SMTP Configuration (REQUIRED for Email Verification & Password Resets)
+# If using Gmail: create a 16-character App Password at myaccount.google.com -> Security -> 2-Step Verification -> App passwords
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_16char_google_app_password
+EMAIL_FROM="FixTogether" <your_email@gmail.com>
 ```
 
 ### B. Public Client Application (`client/.env.production` or Vercel Environment Variables)

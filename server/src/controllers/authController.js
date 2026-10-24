@@ -65,10 +65,19 @@ const register = asyncHandler(async (req, res) => {
     if (password) existingUser.passwordHash = password;
     await existingUser.save();
 
+    const isDev = config.env === 'development';
+    const emailConfigured = emailService.isEmailConfigured();
+
     logger.info(`[AUTH] Verification OTP generated for existing unverified user ${existingUser.email}: ${otp}`);
-    emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName).catch((err) => {
-      logger.error(`[AUTH] Failed to send verification email to ${existingUser.email}:`, err.message);
-    });
+    emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName)
+      .then((sendRes) => {
+        if (!sendRes?.success) {
+          logger.warn(`[AUTH] Verification email was not sent to ${existingUser.email}: ${sendRes?.error || 'Unknown reason'}`);
+        }
+      })
+      .catch((err) => {
+        logger.error(`[AUTH] Failed to send verification email to ${existingUser.email}:`, err.message);
+      });
 
     return successResponse(
       res,
@@ -83,8 +92,12 @@ const register = asyncHandler(async (req, res) => {
         },
         requiresVerification: true,
         email: existingUser.email,
+        otp: isDev ? otp : undefined,
+        emailServiceConfigured: emailConfigured,
       },
-      'A new verification code has been sent to your email. Please verify your account.',
+      emailConfigured
+        ? 'A new verification code has been sent to your email. Please verify your account.'
+        : 'Account exists and requires verification. Note: Outbound email service is not configured on this server; check server logs for the code.',
       200
     );
   }
@@ -151,13 +164,22 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
+  const isDev = config.env === 'development';
+  const emailConfigured = emailService.isEmailConfigured();
+
   // Log OTP for guaranteed server visibility and developer ease
   logger.info(`[AUTH] Verification OTP generated for ${user.email}: ${otp}`);
 
   // Send Verification Email asynchronously (non-blocking for instant client response)
-  emailService.sendVerificationEmail(user.email, otp, user.fullName).catch((err) => {
-    logger.error(`[AUTH] Failed to send verification email to ${user.email}:`, err.message);
-  });
+  emailService.sendVerificationEmail(user.email, otp, user.fullName)
+    .then((sendRes) => {
+      if (!sendRes?.success) {
+        logger.warn(`[AUTH] Verification email was not sent to ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
+      }
+    })
+    .catch((err) => {
+      logger.error(`[AUTH] Failed to send verification email to ${user.email}:`, err.message);
+    });
 
   return successResponse(res, {
     user: {
@@ -171,7 +193,12 @@ const register = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken,
     requiresVerification: true,
-  }, 'Registration successful. Please check your email for the verification code.', 201);
+    email: user.email,
+    otp: isDev ? otp : undefined,
+    emailServiceConfigured: emailConfigured,
+  }, emailConfigured
+    ? 'Registration successful. Please check your email for the verification code.'
+    : 'Registration successful. Note: Outbound email service is not configured on this server; check server logs for the verification code.', 201);
 });
 
 /**
@@ -211,6 +238,7 @@ const login = asyncHandler(async (req, res) => {
       message: 'Please verify your email address before logging in.',
       requiresVerification: true,
       email: user.email,
+      emailServiceConfigured: emailService.isEmailConfigured(),
     });
   }
 
@@ -580,15 +608,29 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   user.emailVerificationLastSentAt = new Date();
   await user.save();
 
+  const isDev = config.env === 'development';
+  const emailConfigured = emailService.isEmailConfigured();
+
   logger.info(`[AUTH] Verification OTP resent for ${user.email}: ${otp}`);
-  emailService.sendVerificationEmail(user.email, otp, user.fullName).catch((err) => {
-    logger.error(`[AUTH] Failed to resend verification email to ${user.email}:`, err.message);
-  });
+  emailService.sendVerificationEmail(user.email, otp, user.fullName)
+    .then((sendRes) => {
+      if (!sendRes?.success) {
+        logger.warn(`[AUTH] Verification email was not resent to ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
+      }
+    })
+    .catch((err) => {
+      logger.error(`[AUTH] Failed to resend verification email to ${user.email}:`, err.message);
+    });
 
   return successResponse(
     res,
-    null,
-    'If an unverified account with that email exists, a new verification code has been sent.'
+    {
+      otp: isDev ? otp : undefined,
+      emailServiceConfigured: emailConfigured,
+    },
+    emailConfigured
+      ? 'If an unverified account with that email exists, a new verification code has been sent.'
+      : 'A new verification code has been generated. Note: Outbound email service is not configured on this server; check server logs for the code.'
   );
 });
 

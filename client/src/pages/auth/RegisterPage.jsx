@@ -43,9 +43,19 @@ export default function RegisterPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await registerUser(data);
+      const res = await registerUser(data);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pendingVerificationEmail', data.email);
+      }
       toast.success('Account created! Please check your email for the verification code.');
-      navigate('/verify-email', { state: { email: data.email, justRegistered: true } });
+      navigate('/verify-email', {
+        state: {
+          email: data.email,
+          justRegistered: true,
+          devOtp: res?.otp,
+          emailServiceConfigured: res?.emailServiceConfigured,
+        },
+      });
     } catch (error) {
       const serverMsg =
         error.response?.data?.message ||

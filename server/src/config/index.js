@@ -58,7 +58,9 @@ const config = {
     port: parseInt(process.env.EMAIL_PORT, 10) || 587,
     user: process.env.EMAIL_USER || '',
     password: process.env.EMAIL_PASSWORD || '',
-    from: process.env.EMAIL_FROM || 'noreply@fixtogether.com',
+    from: process.env.EMAIL_FROM
+      ? process.env.EMAIL_FROM.replace(/["']/g, '').trim()
+      : (process.env.EMAIL_USER ? `FixTogether <${process.env.EMAIL_USER}>` : 'noreply@fixtogether.com'),
   },
 
   // Maps

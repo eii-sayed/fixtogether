@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Loader2, ShieldCheck, RefreshCw, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, ShieldCheck, RefreshCw, Mail, ArrowLeft, CheckCircle2, AlertTriangle, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../api/axios';
 import SEO from '../../components/common/SEO';
@@ -9,8 +9,18 @@ export default function VerifyEmailPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const initialEmail = location.state?.email || '';
-  const [email, setEmail] = useState(initialEmail);
+  // Retrieve initial email from location state, search query, or sessionStorage
+  const getInitialEmail = () => {
+    if (location.state?.email) return location.state.email;
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('email')) return searchParams.get('email');
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('pendingVerificationEmail') || '';
+    }
+    return '';
+  };
+
+  const [email, setEmail] = useState(getInitialEmail);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -19,6 +29,10 @@ export default function VerifyEmailPage() {
   const isJustRegistered = !!location.state?.justRegistered;
   const [cooldown, setCooldown] = useState(isJustRegistered ? 60 : 0);
   const [canResend, setCanResend] = useState(!isJustRegistered);
+  const [devOtp, setDevOtp] = useState(location.state?.devOtp || null);
+  const [emailServiceConfigured, setEmailServiceConfigured] = useState(
+    location.state?.emailServiceConfigured !== undefined ? location.state.emailServiceConfigured : null
+  );
 
   const inputRefs = useRef([]);
 
@@ -28,6 +42,13 @@ export default function VerifyEmailPage() {
       inputRefs.current[0].focus();
     }
   }, []);
+
+  // Sync email to sessionStorage so page refresh doesn't wipe it
+  useEffect(() => {
+    if (email && typeof window !== 'undefined') {
+      sessionStorage.setItem('pendingVerificationEmail', email);
+    }
+  }, [email]);
 
   // Cooldown countdown timer
   useEffect(() => {
@@ -47,6 +68,18 @@ export default function VerifyEmailPage() {
   }, [cooldown]);
 
   const otp = otpDigits.join('');
+
+  const fillOtp = (code) => {
+    if (!code) return;
+    const clean = String(code).trim().replace(/\D/g, '').slice(0, 6);
+    const updated = ['', '', '', '', '', ''];
+    for (let i = 0; i < clean.length; i++) {
+      updated[i] = clean[i] || '';
+    }
+    setOtpDigits(updated);
+    const focusIndex = Math.min(clean.length, 5);
+    inputRefs.current[focusIndex]?.focus();
+  };
 
   const handleDigitChange = (index, value) => {
     const clean = value.replace(/\D/g, '');
@@ -80,20 +113,15 @@ export default function VerifyEmailPage() {
     e.preventDefault();
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     if (pasted) {
-      const updated = [...otpDigits];
-      for (let i = 0; i < 6; i++) {
-        updated[i] = pasted[i] || '';
-      }
-      setOtpDigits(updated);
-      const focusIndex = Math.min(pasted.length, 5);
-      inputRefs.current[focusIndex]?.focus();
+      fillOtp(pasted);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || otp.length < 6) {
-      setError('Please enter both your email address and the full 6-digit verification code.');
+    const cleanEmail = email.trim();
+    if (!cleanEmail || otp.length < 6) {
+      setError('Please enter both your email address and the complete 6-digit verification code.');
       return;
     }
 
@@ -102,9 +130,12 @@ export default function VerifyEmailPage() {
     setSuccess('');
 
     try {
-      await api.post('/auth/verify-email', { email, otp });
+      const res = await api.post('/auth/verify-email', { email: cleanEmail, otp });
       setSuccess('Email verified successfully! Redirecting to login...');
-      toast.success('Email verified successfully!');
+      toast.success(res?.data?.message || 'Email verified successfully!');
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pendingVerificationEmail');
+      }
       setTimeout(() => {
         navigate('/login', {
           state: { message: 'Your email has been verified! You can now log in.' },
@@ -120,8 +151,9 @@ export default function VerifyEmailPage() {
   };
 
   const handleResendOtp = async () => {
-    if (!email) {
-      setError('Please provide your email address to resend code.');
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setError('Please provide your email address to resend verification code.');
       return;
     }
     if (!canResend || isResending) return;
@@ -130,8 +162,14 @@ export default function VerifyEmailPage() {
     setError('');
 
     try {
-      await api.post('/auth/resend-verification', { email });
-      toast.success('A new 6-digit verification code has been sent to your email.');
+      const res = await api.post('/auth/resend-verification', { email: cleanEmail });
+      if (res?.data?.data?.otp) {
+        setDevOtp(res.data.data.otp);
+      }
+      if (res?.data?.data?.emailServiceConfigured !== undefined) {
+        setEmailServiceConfigured(res.data.data.emailServiceConfigured);
+      }
+      toast.success(res?.data?.message || 'A new 6-digit verification code has been sent to your email.');
       setCooldown(60);
       setCanResend(false);
       setOtpDigits(['', '', '', '', '', '']);
@@ -177,6 +215,37 @@ export default function VerifyEmailPage() {
             </div>
           )}
 
+          {/* Development Mode OTP helper banner */}
+          {devOtp && (
+            <div className="mb-5 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
+                <div>
+                  <span className="font-bold">Dev Code:</span>{' '}
+                  <span className="font-mono text-sm font-bold tracking-widest text-amber-900">{devOtp}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => fillOtp(devOtp)}
+                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-950 transition-colors shadow-2xs"
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+
+          {/* Email Service Not Configured Advisory Banner */}
+          {emailServiceConfigured === false && (
+            <div className="mb-5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5 leading-relaxed">
+              <AlertTriangle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block mb-0.5">SMTP Service Not Configured</span>
+                <span>The backend email credentials (<code>EMAIL_USER</code> / <code>EMAIL_PASSWORD</code>) are not configured. Check the server console logs for your OTP code or configure SMTP in your server environment.</span>
+              </div>
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             {/* Email Field (Editable if user needs to correct typos) */}
             <div>
@@ -184,7 +253,7 @@ export default function VerifyEmailPage() {
                 <label htmlFor="email" className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Email Address
                 </label>
-                {!initialEmail && (
+                {!email && (
                   <span className="text-[11px] text-gray-400">Where we sent the code</span>
                 )}
               </div>
@@ -275,9 +344,13 @@ export default function VerifyEmailPage() {
               </button>
             </div>
 
+            <p className="text-[11px] text-gray-400 text-center leading-normal">
+              Can't find the email? Please check your <strong>Spam</strong> or <strong>Junk</strong> folder.
+            </p>
+
             <Link
               to="/login"
-              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors mt-1"
             >
               <ArrowLeft className="w-3 h-3" />
               <span>Back to Login</span>

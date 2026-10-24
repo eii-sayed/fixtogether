@@ -39,6 +39,9 @@ export default function LoginPage() {
       if (error.response?.data?.requiresVerification || (error.response?.status === 403 && error.response?.data?.message?.includes('verify'))) {
         const email = error.response?.data?.email || data.email;
         setUnverifiedEmail(email);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('pendingVerificationEmail', email);
+        }
         toast.error('Your email is not verified yet. Please enter the verification code.');
       } else {
         toast.error(error.response?.data?.message || 'Login failed');
