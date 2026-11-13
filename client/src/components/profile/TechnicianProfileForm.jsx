@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { PageLoader } from '../ui';
 
 export default function TechnicianProfileForm() {
   const queryClient = useQueryClient();

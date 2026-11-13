@@ -1,22 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  Heart,
-  Package,
-  Plus,
-  Truck,
-  MapPin,
-  Building,
-  Sparkles,
-  Info,
-  X,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  ArrowRight,
-} from 'lucide-react';
+import { Heart, Package, Plus, Truck, X } from 'lucide-react';
 
 export default function CreateDonationModal({
   open,
@@ -34,7 +20,6 @@ export default function CreateDonationModal({
   // Form State for new item specs
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [subcategory, setSubcategory] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [condition, setCondition] = useState('good');
@@ -93,9 +78,6 @@ export default function CreateDonationModal({
 
   const selectedNeed =
     preselectedNeed || needs.find((n) => n._id === selectedNeedId) || null;
-  const selectedItem =
-    myItems.find((i) => i._id === selectedItemId) || preselectedItem || null;
-
   // Donation Submission Mutation
   const createMutation = useMutation({
     mutationFn: (payload) => api.post('/donations', payload),
@@ -130,7 +112,7 @@ export default function CreateDonationModal({
         approximateArea: approximateArea.trim() || 'Central',
         city: city.trim() || 'Dhaka',
       },
-      description: handoverNotes.trim() || description.trim(),
+      handoverNotes: handoverNotes.trim(),
     };
 
     if (mode === 'existing') {
@@ -150,7 +132,6 @@ export default function CreateDonationModal({
       }
       payload.title = title.trim();
       payload.category = categoryId;
-      payload.subcategory = subcategory.trim() || undefined;
       payload.brand = brand.trim() || undefined;
       payload.model = model.trim() || undefined;
       payload.itemCondition = condition;
@@ -511,7 +492,7 @@ export default function CreateDonationModal({
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Pickup Address / Handover Notes (Optional)
+                        Pickup Area (Optional)
                       </label>
                       <input
                         type="text"
@@ -526,6 +507,18 @@ export default function CreateDonationModal({
               </details>
             </div>
           )}
+          <div className="px-5 pb-4">
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              Handover Notes (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={handoverNotes}
+              onChange={(event) => setHandoverNotes(event.target.value)}
+              className="input text-xs w-full"
+              placeholder="Add pickup instructions or details for the receiving organization"
+            />
+          </div>
         </form>
 
         {/* Footer actions */}

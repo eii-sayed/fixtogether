@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Wrench, Github, Mail, Heart } from 'lucide-react';
+import { Wrench, Heart } from 'lucide-react';
 
 export default function Footer() {
   return (

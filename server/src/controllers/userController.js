@@ -1,17 +1,5 @@
 const mongoose = require('mongoose');
-const {
-  User,
-  TechnicianProfile,
-  OrganizationProfile,
-  Item,
-  RepairRequest,
-  DonationOffer,
-  Quotation,
-  Appointment,
-  RepairJob,
-  Review,
-  ImpactRecord,
-} = require('../models');
+const { User, TechnicianProfile, OrganizationProfile, Item, RepairRequest, DonationOffer, Appointment, RepairJob, Review, ImpactRecord } = require('../models');
 const {
   asyncHandler,
   successResponse,

@@ -10,42 +10,7 @@ import {
   JOURNEY_STAGES,
   getStageProgress,
 } from '../../utils/repairStatusConfig';
-import {
-  ArrowLeft,
-  Sparkles,
-  Shield,
-  AlertTriangle,
-  Send,
-  Eye,
-  CheckCircle,
-  XCircle,
-  Users,
-  Star,
-  MessageCircle,
-  ChevronRight,
-  MoreVertical,
-  Calendar,
-  Wrench,
-  Package,
-  Award,
-  Clock,
-  ExternalLink,
-  ShieldCheck,
-  Check,
-  RotateCcw,
-  HelpCircle,
-  FileText,
-  DollarSign,
-  Layers,
-  ThumbsUp,
-  AlertCircle,
-  X,
-  Loader2,
-  CheckSquare,
-  PackageCheck,
-  UserCheck,
-  Zap,
-} from 'lucide-react';
+import { ArrowLeft, Sparkles, Shield, AlertTriangle, Send, CheckCircle, XCircle, Users, Star, MessageCircle, ChevronRight, MoreVertical, Wrench, Package, Award, ShieldCheck, Check, HelpCircle, DollarSign, AlertCircle, X, Loader2, CheckSquare, PackageCheck, UserCheck, Zap } from 'lucide-react';
 import RepairConversation from '../../components/chat/RepairConversation';
 import QuotationBuilderModal from '../../components/quotations/QuotationBuilderModal';
 import InspectionReportModal from '../../components/jobs/InspectionReportModal';
@@ -88,9 +53,6 @@ export default function RepairRequestDetailPage() {
   // Review Form state
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState('');
-  const [communicationRating, setCommunicationRating] = useState(5);
-  const [serviceQualityRating, setServiceQualityRating] = useState(5);
-  const [valueRating, setValueRating] = useState(5);
 
   // Dispute Form state
   const [disputeCategory, setDisputeCategory] = useState('quality');
@@ -138,7 +100,7 @@ export default function RepairRequestDetailPage() {
     enabled: !!id && !['draft', 'awaiting_ai_analysis', 'awaiting_owner_review', 'awaiting_clarification'].includes(rr?.requestStatus),
   });
 
-  const quotations = quotesData?.quotations || [];
+  const quotations = useMemo(() => quotesData?.quotations || [], [quotesData?.quotations]);
 
   // 3. Fetch Repair Job if quotation accepted
   const { data: jobsData } = useQuery({
@@ -439,8 +401,6 @@ export default function RepairRequestDetailPage() {
                 {JOURNEY_STAGES.map((stage, idx) => {
                   const isPast = idx < currentStageIndex;
                   const isCurrent = idx === currentStageIndex;
-                  const isUpcoming = idx > currentStageIndex;
-
                   return (
                     <div key={stage.id} className="flex flex-col items-center text-center">
                       <div className="w-full flex items-center mb-2">
@@ -1417,9 +1377,9 @@ export default function RepairRequestDetailPage() {
                   submitReviewMutation.mutate({
                     rating: reviewRating,
                     reviewText,
-                    communicationRating,
-                    serviceQualityRating,
-                    valueRating,
+                    communicationRating: reviewRating,
+                    serviceQualityRating: reviewRating,
+                    valueRating: reviewRating,
                   })
                 }
                 disabled={submitReviewMutation.isPending}

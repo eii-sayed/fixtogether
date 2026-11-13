@@ -84,7 +84,7 @@ async function seedThreads(standalone = true) {
       upvoteScore: 4,
     });
 
-    const t1c2 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t1._id,
       author: rahim._id, // OP reply
       parentComment: t1c1._id,
@@ -95,7 +95,7 @@ async function seedThreads(standalone = true) {
       upvoteScore: 2,
     });
 
-    const t1c3 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t1._id,
       author: anika._id,
       content:
@@ -140,7 +140,7 @@ async function seedThreads(standalone = true) {
       upvoteScore: 2,
     });
 
-    const t2c2 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t2._id,
       author: tanvir._id,
       parentComment: t2c1._id,
@@ -170,7 +170,7 @@ async function seedThreads(standalone = true) {
       viewsCount: 310,
     });
 
-    const t3c1 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t3._id,
       author: karim._id,
       content:
@@ -215,7 +215,7 @@ async function seedThreads(standalone = true) {
       upvoteScore: 3,
     });
 
-    const t4c2 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t4._id,
       author: karim._id,
       parentComment: t4c1._id,
@@ -255,7 +255,7 @@ async function seedThreads(standalone = true) {
       upvoteScore: 2,
     });
 
-    const t5c2 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t5._id,
       author: sumon._id, // Technician
       parentComment: t5c1._id,
@@ -290,7 +290,7 @@ async function seedThreads(standalone = true) {
       ],
     });
 
-    const t6c1 = await ThreadComment.create({
+    await ThreadComment.create({
       thread: t6._id,
       author: sumon._id,
       content:

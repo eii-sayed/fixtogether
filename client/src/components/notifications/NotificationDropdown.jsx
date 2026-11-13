@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, ChevronRight, Sparkles } from 'lucide-react';
+import { Bell, CheckCheck, ChevronRight } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -158,8 +158,6 @@ export default function NotificationDropdown() {
               notifications.map((n) => {
                 const meta = getNotificationMeta(n);
                 const Icon = meta.icon;
-                const destination = getNotificationDestination(n, user?.role);
-
                 return (
                   <div
                     key={n._id}

@@ -126,7 +126,7 @@ const checkSafetyRules = async (text, categoryId = null) => {
   const lowerText = text.toLowerCase();
 
   // 1. Check against default keywords (deterministic)
-  for (const [key, rule] of Object.entries(DEFAULT_SAFETY_KEYWORDS)) {
+  for (const [, rule] of Object.entries(DEFAULT_SAFETY_KEYWORDS)) {
     for (const keyword of rule.keywords) {
       if (lowerText.includes(keyword)) {
         flags.push({

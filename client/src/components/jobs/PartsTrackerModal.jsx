@@ -1,19 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
-import {
-  X,
-  Package,
-  Plus,
-  Truck,
-  CheckSquare,
-  Clock,
-  Search,
-  RotateCcw,
-  XCircle,
-  PackageCheck,
-  DollarSign,
-} from 'lucide-react';
+import { X, Package, Plus } from 'lucide-react';
 import { PART_STATUS_CONFIG } from '../../utils/technicianStatusConfig';
 
 export default function PartsTrackerModal({ open, onClose, repairJob }) {
@@ -55,7 +43,7 @@ export default function PartsTrackerModal({ open, onClose, repairJob }) {
   const updatePartMutation = useMutation({
     mutationFn: ({ index, payload }) =>
       api.patch(`/repair-jobs/${repairJob._id}/parts/${index}`, payload).then((r) => r.data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       setEditingPartIndex(null);
       queryClient.invalidateQueries({ queryKey: ['repair-job', repairJob._id] });
       queryClient.invalidateQueries({ queryKey: ['repair-jobs'] });

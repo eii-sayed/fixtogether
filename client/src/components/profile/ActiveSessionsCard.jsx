@@ -3,18 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow } from 'date-fns';
-import {
-  Laptop,
-  Smartphone,
-  Globe,
-  ShieldCheck,
-  LogOut,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  Clock,
-  ShieldAlert,
-} from 'lucide-react';
+import { Laptop, Smartphone, Globe, ShieldCheck, LogOut, Loader2, Clock, ShieldAlert } from 'lucide-react';
 
 /**
  * Parse human-readable device and browser info from user agent string
@@ -81,7 +70,7 @@ export default function ActiveSessionsCard() {
   // Mutation: Revoke single session
   const revokeMutation = useMutation({
     mutationFn: (sessionId) => api.delete(`/auth/sessions/${sessionId}`),
-    onSuccess: (res, sessionId) => {
+    onSuccess: (res) => {
       const isCurrent = res?.data?.data?.isCurrent;
       if (isCurrent) {
         toast.info('Current session ended. Redirecting...');

@@ -1,19 +1,5 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ArrowBigUp,
-  ArrowBigDown,
-  MessageSquare,
-  CheckCircle,
-  Clock,
-  Eye,
-  Tag,
-  Wrench,
-  HelpCircle,
-  Sparkles,
-  BookOpen,
-  MessageCircle,
-} from 'lucide-react';
+import { ArrowBigUp, ArrowBigDown, MessageSquare, CheckCircle, Clock, Eye, Wrench, HelpCircle, Sparkles, BookOpen, MessageCircle } from 'lucide-react';
 
 export default function ThreadCard({ thread, onVote }) {
   const typeConfig = {

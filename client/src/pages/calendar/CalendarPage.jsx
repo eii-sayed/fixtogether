@@ -15,29 +15,10 @@ import {
   subMonths,
   parseISO,
 } from 'date-fns';
-import {
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  MapPin,
-  User,
-  Wrench,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  CalendarCheck2,
-  ExternalLink,
-  Loader2,
-  CalendarDays,
-  ListFilter,
-  Phone,
-  Mail,
-  X,
-} from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, MapPin, User, CalendarCheck2, ExternalLink, Phone, Mail, X } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { PageLoader, EmptyState } from '../../components/ui';
+import { PageLoader } from '../../components/ui';
 import SEO from '../../components/common/SEO';
 
 const STATUS_STYLES = {

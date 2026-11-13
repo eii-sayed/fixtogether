@@ -1,22 +1,4 @@
-import {
-  Calendar,
-  Package,
-  Search,
-  AlertCircle,
-  Clock,
-  Wrench,
-  CheckSquare,
-  PackageCheck,
-  Award,
-  ShieldCheck,
-  XCircle,
-  AlertTriangle,
-  FileText,
-  UserCheck,
-  Truck,
-  RotateCcw,
-  Sparkles,
-} from 'lucide-react';
+import { Package, Search, AlertCircle, Clock, Wrench, CheckSquare, PackageCheck, Award, ShieldCheck, XCircle, AlertTriangle, FileText, Truck, RotateCcw } from 'lucide-react';
 
 /**
  * 10 Canonical Stages for Active Repair Jobs

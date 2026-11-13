@@ -1,19 +1,4 @@
-const {
-  User,
-  RepairRequest,
-  RepairJob,
-  DonationOffer,
-  Dispute,
-  ImpactRecord,
-  AIAnalysis,
-  AuditLog,
-  SafetyRule,
-  TechnicianProfile,
-  OrganizationProfile,
-  ItemCategory,
-  Skill,
-  ReviewQueueItem,
-} = require('../models');
+const { User, RepairRequest, RepairJob, Dispute, ImpactRecord, AIAnalysis, AuditLog, SafetyRule, TechnicianProfile, OrganizationProfile, ReviewQueueItem } = require('../models');
 const {
   ROLES,
   REPAIR_REQUEST_STATUS,

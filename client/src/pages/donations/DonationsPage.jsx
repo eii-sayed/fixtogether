@@ -1,41 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
-import { PageLoader, EmptyState, StatusBadge, Pagination, ErrorState } from '../../components/ui';
+import { PageLoader, EmptyState, Pagination } from '../../components/ui';
 import { toast } from 'sonner';
-import {
-  Heart,
-  Plus,
-  Calendar,
-  ArrowRight,
-  Package,
-  Truck,
-  Building,
-  Shield,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Search,
-  Sparkles,
-  HelpCircle,
-  Recycle,
-  Wrench,
-  ChevronRight,
-  Clock,
-  Layers,
-  MapPin,
-  Eye,
-  FileText,
-} from 'lucide-react';
+import { Heart, Plus, Calendar, Package, Truck, Building, Shield, CheckCircle, XCircle, AlertTriangle, Search, Sparkles, HelpCircle, Recycle, Wrench, Clock, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import {
-  DONATION_STATUS_CONFIG,
-  COMMUNITY_NEED_STATUS_CONFIG,
-  INSPECTION_OUTCOMES_CONFIG,
-  PROCESSING_OUTCOMES_CONFIG,
-  HUB_STATUS_CONFIG,
-} from '../../utils/organizationStatusConfig';
+import { DONATION_STATUS_CONFIG, INSPECTION_OUTCOMES_CONFIG, PROCESSING_OUTCOMES_CONFIG, HUB_STATUS_CONFIG } from '../../utils/organizationStatusConfig';
 import CreateDonationModal from '../../components/donations/CreateDonationModal';
 
 export default function DonationsPage() {
@@ -99,9 +70,8 @@ export default function DonationsPage() {
   const [processReplacementCost, setProcessReplacementCost] = useState(5000);
   const [processTeam, setProcessTeam] = useState('Community Redistribution Team');
 
-  // Guided Community Need Builder Modal (5 steps)
+  // Community Need Builder Modal
   const [showNeedBuilder, setShowNeedBuilder] = useState(searchParams.get('new') === 'true');
-  const [needStep, setNeedStep] = useState(1);
   const [needFormData, setNeedFormData] = useState({
     title: '',
     category: '',
@@ -242,7 +212,6 @@ export default function DonationsPage() {
       queryClient.invalidateQueries(['community-needs']);
       queryClient.invalidateQueries(['org-workspace']);
       setShowNeedBuilder(false);
-      setNeedStep(1);
       toast.success('Community need published successfully');
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Need creation failed'),
@@ -703,7 +672,6 @@ export default function DonationsPage() {
                 return;
               }
               setShowNeedBuilder(true);
-              setNeedStep(1);
             }}
             className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
           >
@@ -1110,7 +1078,6 @@ export default function DonationsPage() {
                   return;
                 }
                 setShowNeedBuilder(true);
-                setNeedStep(1);
               }}
               className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
             >
@@ -1260,6 +1227,7 @@ export default function DonationsPage() {
 
       {/* TAB 5: IMPACT LEDGER */}
       {activeMainTab === 'impact' && (
+        impactLoading ? <PageLoader /> : (
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
             <div className="card p-4">
@@ -1327,6 +1295,7 @@ export default function DonationsPage() {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* TAB 6: HUBS & VERIFICATION */}

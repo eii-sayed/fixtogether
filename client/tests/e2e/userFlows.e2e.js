@@ -9,7 +9,6 @@
 const puppeteer = require('puppeteer');
 
 const CLIENT_BASE_URL = process.env.TEST_CLIENT_URL || 'http://localhost:5173';
-const ADMIN_BASE_URL = process.env.TEST_ADMIN_URL || 'http://localhost:5174';
 
 const log = (step, msg) => console.log(`[\x1b[36m${step}\x1b[0m] ${msg}`);
 const success = (msg) => console.log(`\x1b[32m✔ ${msg}\x1b[0m`);

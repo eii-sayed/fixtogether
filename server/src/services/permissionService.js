@@ -1,4 +1,4 @@
-const { ROLES, VERIFICATION_STATUS, ADMIN_PERMISSIONS } = require('../constants');
+const { ROLES, ADMIN_PERMISSIONS } = require('../constants');
 
 /**
  * Canonical Permission Names

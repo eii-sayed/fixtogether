@@ -2,25 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  X,
-  Sparkles,
-  DollarSign,
-  Clock,
-  ShieldCheck,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  ChevronRight,
-  ChevronLeft,
-  ChevronDown,
-  Info,
-  Wrench,
-  Package,
-  Zap,
-  Loader2,
-  Send,
-} from 'lucide-react';
+import { X, Sparkles, DollarSign, Clock, FileText, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Zap, Loader2, Send } from 'lucide-react';
 
 const STEPS = [
   { id: 'review', label: '1. Review Request' },

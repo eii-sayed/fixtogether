@@ -7,7 +7,7 @@ const {
   parsePagination,
   paginationMeta,
 } = require('../utils/helpers');
-const { VERIFICATION_STATUS, ROLES, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, QUOTATION_STATUS } = require('../constants');
+const { VERIFICATION_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, QUOTATION_STATUS } = require('../constants');
 const uploadService = require('../services/uploadService');
 const { createAuditLog } = require('../middleware/auditLog');
 const { createNotification } = require('../services/notificationService');
@@ -25,6 +25,16 @@ const getTechnicians = asyncHandler(async (req, res) => {
   if (category) query.supportedCategories = category;
   if (minRating) query.averageRating = { $gte: parseFloat(minRating) };
   if (availability) query.availabilityStatus = availability;
+  if (search?.trim()) {
+    const safeSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchRegex = new RegExp(safeSearch, 'i');
+    const matchingUsers = await User.find({ fullName: searchRegex }).distinct('_id');
+    query.$or = [
+      { professionalName: searchRegex },
+      { biography: searchRegex },
+      { user: { $in: matchingUsers } },
+    ];
+  }
 
   const [profiles, total] = await Promise.all([
     TechnicianProfile.find(query)
@@ -224,15 +234,7 @@ const updateMyTechnicianProfile = asyncHandler(async (req, res) => {
  * Unified Technician Operational Workspace
  */
 const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
-  const {
-    RepairJob,
-    RepairRequest,
-    Quotation,
-    Warranty,
-    Appointment,
-    Conversation,
-    Message,
-  } = require('../models');
+  const { RepairJob, RepairRequest, Quotation, Warranty, Appointment } = require('../models');
   const { getMatchDetailsForTechnician } = require('../services/matchingService');
 
   let profile = await TechnicianProfile.findOne({ user: req.user.userId })

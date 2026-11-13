@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const { RepairRequest, Item, AIAnalysis, TechnicianMatch, ItemCategory, User, Notification, TechnicianProfile, Quotation, RepairJob } = require('../models');
-const { REPAIR_REQUEST_STATUS, REPAIR_STATUS_TRANSITIONS, NOTIFICATION_TYPES, ROLES, QUOTATION_STATUS, REPAIR_JOB_STATUS } = require('../constants');
+const { RepairRequest, Item, AIAnalysis, TechnicianMatch, User, Notification, TechnicianProfile, Quotation, RepairJob } = require('../models');
+const { REPAIR_REQUEST_STATUS, NOTIFICATION_TYPES, ROLES, QUOTATION_STATUS, REPAIR_JOB_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta } = require('../utils/helpers');
 const { createAuditLog } = require('../middleware/auditLog');
 const aiService = require('../services/ai');
@@ -30,14 +30,6 @@ const TECHNICIAN_VISIBLE_STATUSES = [
   REPAIR_REQUEST_STATUS.REPAIR_UNSUCCESSFUL,
   REPAIR_REQUEST_STATUS.CANCELLED,
 ];
-
-/**
- * Validate status transition
- */
-const isValidTransition = (currentStatus, newStatus) => {
-  const allowed = REPAIR_STATUS_TRANSITIONS[currentStatus];
-  return allowed && allowed.includes(newStatus);
-};
 
 /**
  * POST /repair-requests
@@ -152,8 +144,6 @@ const getRepairRequests = asyncHandler(async (req, res) => {
   } else if (req.user.role === ROLES.TECHNICIAN) {
     const techUserId = req.user.userId;
     const { TechnicianProfile, Quotation } = require('../models');
-    const { getMatchDetailsForTechnician } = require('../services/matchingService');
-
     const techProfile = await TechnicianProfile.findOne({ user: techUserId })
       .populate('skills')
       .populate('supportedCategories');

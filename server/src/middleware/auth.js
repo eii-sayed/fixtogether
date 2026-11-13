@@ -52,6 +52,7 @@ const authenticate = async (req, res, next) => {
       role: user.role,
       fullName: user.fullName,
       accountStatus: user.accountStatus,
+      authTime: Number.isFinite(decoded.authTime) ? decoded.authTime : decoded.iat,
     };
 
     next();
@@ -97,6 +98,7 @@ const optionalAuth = async (req, res, next) => {
         email: user.email,
         role: user.role,
         fullName: user.fullName,
+        authTime: Number.isFinite(decoded.authTime) ? decoded.authTime : decoded.iat,
       };
     }
   } catch (error) {

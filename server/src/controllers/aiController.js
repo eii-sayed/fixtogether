@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { chatWithAI } = require('../services/ai');
 const { uploadFile } = require('../services/uploadService');
-const { TechnicianProfile, User, ItemCategory } = require('../models');
+const { TechnicianProfile } = require('../models');
 const logger = require('../utils/logger');
 
 /**

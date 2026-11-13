@@ -3,21 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  Heart,
-  Package,
-  Plus,
-  Truck,
-  MapPin,
-  Building,
-  Sparkles,
-  ArrowLeft,
-  CheckCircle,
-  ShieldCheck,
-  Recycle,
-  Layers,
-  Clock,
-} from 'lucide-react';
+import { Heart, Package, Plus, Truck, ArrowLeft, ShieldCheck, Recycle } from 'lucide-react';
 
 export default function NewDonationPage() {
   const navigate = useNavigate();
@@ -34,7 +20,6 @@ export default function NewDonationPage() {
   // Form State for new item specs
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [subcategory, setSubcategory] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [condition, setCondition] = useState('good');
@@ -67,11 +52,11 @@ export default function NewDonationPage() {
     queryFn: () => api.get('/donations/needs?limit=20').then((r) => r.data.data),
   });
 
-  const categories = categoriesData?.categories || [];
   const myItems = myItemsData?.items || [];
   const needs = needsData?.needs || [];
 
   const categoryGroups = React.useMemo(() => {
+    const categories = categoriesData?.categories || [];
     if (!categories || !Array.isArray(categories)) return [];
     const parents = categories.filter((c) => !c.parent);
     return parents.map((parent) => {
@@ -81,17 +66,15 @@ export default function NewDonationPage() {
       });
       return { parent, children };
     });
-  }, [categories]);
+  }, [categoriesData?.categories]);
 
   const selectedNeed = needs.find((n) => n._id === selectedNeedId);
-  const selectedItem = myItems.find((i) => i._id === selectedItemId);
-
   // If preselectedNeed exists and has category, auto-set category
   useEffect(() => {
     if (selectedNeed?.category?._id && !categoryId) {
       setCategoryId(selectedNeed.category._id);
     }
-  }, [selectedNeed]);
+  }, [categoryId, selectedNeed]);
 
   // Create Mutation
   const createMutation = useMutation({
@@ -124,7 +107,7 @@ export default function NewDonationPage() {
         approximateArea: approximateArea.trim() || 'Central',
         city: city.trim() || 'Dhaka',
       },
-      description: handoverNotes.trim() || description.trim(),
+      handoverNotes: handoverNotes.trim(),
     };
 
     if (mode === 'existing') {
@@ -144,7 +127,6 @@ export default function NewDonationPage() {
       }
       payload.title = title.trim();
       payload.category = categoryId;
-      payload.subcategory = subcategory.trim() || undefined;
       payload.brand = brand.trim() || undefined;
       payload.model = model.trim() || undefined;
       payload.itemCondition = condition;
@@ -525,7 +507,7 @@ export default function NewDonationPage() {
 
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Pickup Area / Additional Notes (Optional)
+                          Pickup Area (Optional)
                         </label>
                         <input
                           type="text"
@@ -540,6 +522,19 @@ export default function NewDonationPage() {
                 </details>
               </div>
             )}
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Handover Notes (Optional)
+              </label>
+              <textarea
+                rows={2}
+                value={handoverNotes}
+                onChange={(event) => setHandoverNotes(event.target.value)}
+                className="input text-xs w-full"
+                placeholder="Add pickup instructions or details for the receiving organization"
+              />
+            </div>
 
             <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
               <Link to="/donations" className="btn-ghost text-xs text-gray-500">

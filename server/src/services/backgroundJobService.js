@@ -74,7 +74,7 @@ const executeJob = async (jobId) => {
       }
 
       case 'AGGREGATE_IMPACT': {
-        const { ImpactRecord, RepairJob } = require('../models');
+        const { ImpactRecord } = require('../models');
         job.progress = 50;
         const totals = await ImpactRecord.aggregate([
           {

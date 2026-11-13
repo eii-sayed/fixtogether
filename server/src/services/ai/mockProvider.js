@@ -22,7 +22,7 @@ class MockAIProvider {
    * @param {string} params.condition - Item condition
    * @returns {Promise<Object>}
    */
-  async analyzeRepairRequest({ title, description, category, brand, condition }) {
+  async analyzeRepairRequest({ title, description, category, condition }) {
     logger.info('[MockAI] Analyzing repair request:', { title, category });
 
     // Simulate processing time
@@ -49,7 +49,7 @@ class MockAIProvider {
   /**
    * Generate clarification questions
    */
-  async generateClarificationQuestions({ description, category, existingAnswers }) {
+  async generateClarificationQuestions({ category }) {
     await this._delay(300);
 
     const questions = [
@@ -87,7 +87,7 @@ class MockAIProvider {
   /**
    * Suggest reuse pathway for an item
    */
-  async suggestReusePathway({ item, condition }) {
+  async suggestReusePathway({ condition }) {
     await this._delay(200);
 
     const pathways = [];
@@ -285,12 +285,13 @@ class MockAIProvider {
 
   _suggestPathways(condition, symptoms) {
     const pathways = [];
-
-    const highSeverity = symptoms.some((s) => s.severity === 'high');
+    const hasHighSeveritySymptom = symptoms.some((symptom) => symptom.severity === 'high');
 
     pathways.push({
       pathway: 'repair',
-      reason: 'Professional inspection and repair is recommended.',
+      reason: hasHighSeveritySymptom
+        ? 'A high-risk symptom was reported. Do not attempt self-repair; seek qualified professional inspection.'
+        : 'Professional inspection and repair is recommended.',
       requiresHumanVerification: true,
     });
 

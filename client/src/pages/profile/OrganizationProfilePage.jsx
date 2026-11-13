@@ -2,22 +2,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { PageLoader, ErrorState } from '../../components/ui';
-import {
-  ArrowLeft,
-  Building,
-  ShieldCheck,
-  Heart,
-  Package,
-  Recycle,
-  MapPin,
-  Clock,
-  Phone,
-  Mail,
-  Globe,
-  CheckCircle2,
-  ShieldAlert,
-  Calendar,
-} from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Heart, Package, Recycle, MapPin, Clock, Phone, Mail, Globe, CheckCircle2, ShieldAlert, Calendar } from 'lucide-react';
 
 export default function OrganizationProfilePage() {
   const { id } = useParams();

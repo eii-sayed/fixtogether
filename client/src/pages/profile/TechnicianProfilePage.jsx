@@ -2,26 +2,10 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
-import { PageLoader, ErrorState, Pagination } from '../../components/ui';
+import { PageLoader, Pagination } from '../../components/ui';
 import ReviewCard from '../../components/reviews/ReviewCard';
 import { useAuth } from '../../context/AuthContext';
-import {
-  ArrowLeft,
-  Star,
-  MapPin,
-  Calendar,
-  CheckCircle,
-  ShieldCheck,
-  Wrench,
-  Clock,
-  Phone,
-  Mail,
-  Layers,
-  Award,
-  DollarSign,
-  Shield,
-  MessageCircle,
-} from 'lucide-react';
+import { ArrowLeft, Star, ShieldCheck, Wrench, Phone, Mail, Layers, Shield } from 'lucide-react';
 
 export default function TechnicianProfilePage() {
   const { id } = useParams();

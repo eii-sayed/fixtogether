@@ -45,6 +45,7 @@ router.patch(
   '/me/availability',
   authenticate,
   authorize(ROLES.TECHNICIAN),
+  validate(updateTechnicianAvailabilitySchema),
   techController.updateAvailability
 );
 

@@ -1,17 +1,8 @@
 import { useState, useRef } from 'react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  Plus,
-  Trash2,
-  Image as ImageIcon,
-  Loader2,
-  Calendar,
-  X,
-  Upload,
-  CheckCircle,
-} from 'lucide-react';
+import { Plus, Trash2, Image as ImageIcon, Loader2, X, Upload } from 'lucide-react';
 
 export default function PortfolioManager({ portfolio = [] }) {
   const queryClient = useQueryClient();

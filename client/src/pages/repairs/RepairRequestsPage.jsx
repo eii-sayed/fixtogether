@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { ErrorState, EmptyState, StatusBadge, Pagination, CardSkeleton } from '../../components/ui';
 import { toast } from 'sonner';
@@ -58,7 +58,6 @@ export default function RepairRequestsPage() {
   const { user } = useAuth();
   const { socket } = useSocket();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const userRole = user?.role || 'owner';

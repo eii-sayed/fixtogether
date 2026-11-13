@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const path = require('path');
 
@@ -71,7 +70,7 @@ const seed = async () => {
 
     // 2. USERS (1 Admin, 10 Owners, 10 Technicians, 10 Organizations)
     console.log('⏳ Creating users...');
-    const admin = await User.create({
+    await User.create({
       fullName: 'Admin User',
       email: 'admin@fixtogether.com',
       passwordHash: 'Admin123!',

@@ -2,24 +2,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
 import ActiveSessionsCard from './ActiveSessionsCard';
-import {
-  Lock,
-  Eye,
-  EyeOff,
-  Shield,
-  Bell,
-  AlertTriangle,
-  Loader2,
-  CheckCircle2,
-  Phone,
-  Mail,
-  MapPin,
-  Activity,
-} from 'lucide-react';
+import { Lock, Eye, EyeOff, Shield, Bell, AlertTriangle, Loader2, Phone, Mail, MapPin, Activity } from 'lucide-react';
 
 const passwordSchema = z
   .object({

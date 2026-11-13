@@ -4,26 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
 import NotificationDropdown from '../notifications/NotificationDropdown';
-import {
-  Menu,
-  X,
-  Bell,
-  User,
-  LogOut,
-  ChevronDown,
-  Wrench,
-  Package,
-  ClipboardList,
-  Users,
-  LayoutDashboard,
-  Heart,
-  Settings,
-  Cog,
-  MessageCircle,
-  Sparkles,
-  ShieldCheck,
-  MessagesSquare,
-} from 'lucide-react';
+import { Menu, X, Bell, User, LogOut, ChevronDown, Wrench, Package, ClipboardList, LayoutDashboard, Heart, MessageCircle, ShieldCheck, MessagesSquare } from 'lucide-react';
 
 const getAdminUrl = () => {
   const envUrl = import.meta.env.VITE_ADMIN_URL;

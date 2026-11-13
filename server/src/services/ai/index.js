@@ -167,7 +167,7 @@ const analyzeRepairRequest = async (params) => {
       logger.warn('Falling back to Mock AI Provider due to provider error.');
       const fallbackProvider = new MockAIProvider();
       const rawResponse = await fallbackProvider.analyzeRepairRequest(params);
-      const { valid, errors, sanitized } = validateAnalysisResponse(rawResponse);
+      const { errors, sanitized } = validateAnalysisResponse(rawResponse);
       return {
         analysis: sanitized,
         provider: 'mock (fallback)',

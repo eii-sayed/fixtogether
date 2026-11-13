@@ -3,18 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import { EmptyState, StatusBadge } from '../../components/ui';
-import {
-  MessageCircle,
-  Search,
-  Check,
-  CheckCheck,
-  ShieldCheck,
-  Package,
-  Sparkles,
-  Inbox,
-  Filter,
-} from 'lucide-react';
+import { MessageCircle, Search, Check, CheckCheck, ShieldCheck, Package, Sparkles, Inbox } from 'lucide-react';
 import RepairConversation from '../../components/chat/RepairConversation';
 
 function formatRelativeTime(dateStr) {
@@ -49,7 +38,7 @@ export default function ConversationsPage() {
     refetchInterval: 10000,
   });
 
-  const conversations = data?.conversations || [];
+  const conversations = useMemo(() => data?.conversations || [], [data?.conversations]);
 
   // Filtered & searched conversations
   const filteredConversations = useMemo(() => {

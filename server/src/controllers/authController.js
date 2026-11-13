@@ -11,8 +11,8 @@ const emailService = require('../services/emailService');
 /**
  * Generate access token
  */
-const generateAccessToken = (userId, role) => {
-  return jwt.sign({ userId, role }, config.jwt.accessSecret, {
+const generateAccessToken = (userId, role, authTime = Math.floor(Date.now() / 1000)) => {
+  return jwt.sign({ userId, role, authTime }, config.jwt.accessSecret, {
     expiresIn: config.jwt.accessExpiresIn,
   });
 };
@@ -20,9 +20,9 @@ const generateAccessToken = (userId, role) => {
 /**
  * Generate refresh token with unique jti to guarantee rotation entropy
  */
-const generateRefreshToken = (userId) => {
+const generateRefreshToken = (userId, authTime = Math.floor(Date.now() / 1000)) => {
   return jwt.sign(
-    { userId, jti: crypto.randomBytes(16).toString('hex') },
+    { userId, authTime, jti: crypto.randomBytes(16).toString('hex') },
     config.jwt.refreshSecret,
     {
       expiresIn: config.jwt.refreshExpiresIn,
@@ -154,8 +154,9 @@ const register = asyncHandler(async (req, res) => {
   let accessToken;
   let refreshToken;
   if (isTest) {
-    accessToken = generateAccessToken(user._id, user.role);
-    refreshToken = generateRefreshToken(user._id);
+    const authTime = Math.floor(Date.now() / 1000);
+    accessToken = generateAccessToken(user._id, user.role, authTime);
+    refreshToken = generateRefreshToken(user._id, authTime);
     const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
     await User.findByIdAndUpdate(user._id, {
       $push: {
@@ -252,8 +253,9 @@ const login = asyncHandler(async (req, res) => {
   }
 
   // Generate tokens
-  const accessToken = generateAccessToken(user._id, user.role);
-  const refreshToken = generateRefreshToken(user._id);
+  const authTime = Math.floor(Date.now() / 1000);
+  const accessToken = generateAccessToken(user._id, user.role, authTime);
+  const refreshToken = generateRefreshToken(user._id, authTime);
 
   // Rotate refresh tokens - remove expired, add new
   const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
@@ -335,13 +337,14 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
 
   const userRefreshTokens = user.refreshTokens || [];
   const foundToken = userRefreshTokens.find((rt) => rt.token === token);
+  const authTime = Number.isFinite(decoded.authTime) ? decoded.authTime : decoded.iat;
 
   // Grace period for concurrent requests: if token was rotated in the last 60 seconds, return the replacement
   if (foundToken && foundToken.revokedAt) {
     const gracePeriodMs = 60 * 1000;
     const isWithinGracePeriod = (Date.now() - new Date(foundToken.revokedAt).getTime()) < gracePeriodMs;
     if (isWithinGracePeriod && foundToken.replacedByToken) {
-      const existingAccessToken = generateAccessToken(user._id, user.role);
+      const existingAccessToken = generateAccessToken(user._id, user.role, authTime);
       res.cookie('refreshToken', foundToken.replacedByToken, {
         httpOnly: true,
         secure: config.env === 'production',
@@ -363,8 +366,8 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   }
 
   // Generate new tokens (rotation)
-  const newAccessToken = generateAccessToken(user._id, user.role);
-  const newRefreshToken = generateRefreshToken(user._id);
+  const newAccessToken = generateAccessToken(user._id, user.role, authTime);
+  const newRefreshToken = generateRefreshToken(user._id, authTime);
 
   // Mark current token as revoked and replaced with new token
   const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
@@ -725,6 +728,7 @@ const createSsoTicket = asyncHandler(async (req, res) => {
   ssoTicketCache.set(ticket, {
     userId: req.user.userId,
     role: req.user.role,
+    authTime: req.user.authTime,
     expiresAt: Date.now() + 60 * 1000, // 60 seconds
   });
 
@@ -755,8 +759,9 @@ const exchangeSsoTicket = asyncHandler(async (req, res) => {
   }
 
   // Generate fresh tokens for Admin portal
-  const accessToken = generateAccessToken(user._id, user.role);
-  const refreshToken = generateRefreshToken(user._id);
+  const authTime = ticketData.authTime || Math.floor(Date.now() / 1000);
+  const accessToken = generateAccessToken(user._id, user.role, authTime);
+  const refreshToken = generateRefreshToken(user._id, authTime);
 
   const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
   await User.findByIdAndUpdate(user._id, {

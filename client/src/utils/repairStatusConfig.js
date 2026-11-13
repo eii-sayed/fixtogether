@@ -1,27 +1,4 @@
-import {
-  FileEdit,
-  ShieldAlert,
-  Sparkles,
-  HelpCircle,
-  CheckCircle2,
-  Send,
-  Users,
-  Clock,
-  Inbox,
-  UserCheck,
-  Calendar,
-  Search,
-  AlertCircle,
-  Package,
-  Wrench,
-  CheckSquare,
-  PackageCheck,
-  Award,
-  Star,
-  ShieldCheck,
-  XCircle,
-  AlertTriangle,
-} from 'lucide-react';
+import { FileEdit, Sparkles, HelpCircle, CheckCircle2, Send, Users, Clock, Inbox, UserCheck, Calendar, Search, AlertCircle, Package, Wrench, CheckSquare, PackageCheck, Award, Star, ShieldCheck, XCircle, AlertTriangle } from 'lucide-react';
 
 /**
  * 5 Canonical Stage Groups for the Repair Journey Stepper

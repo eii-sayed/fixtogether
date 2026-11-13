@@ -188,6 +188,17 @@ const requireRecentAuth = (maxMinutes = 15) => {
         message: 'Authentication required.',
       });
     }
+
+    const authTime = Number(req.user.authTime);
+    const ageMs = Date.now() - authTime * 1000;
+    if (!Number.isFinite(authTime) || authTime <= 0 || ageMs < -60_000 || ageMs > maxMinutes * 60_000) {
+      return res.status(403).json({
+        success: false,
+        code: 'RECENT_AUTHENTICATION_REQUIRED',
+        message: 'Please sign in again before performing this sensitive action.',
+      });
+    }
+
     next();
   };
 };

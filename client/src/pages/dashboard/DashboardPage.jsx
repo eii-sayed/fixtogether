@@ -5,29 +5,7 @@ import { Link, useLocation, Navigate } from 'react-router-dom';
 import api from '../../api/axios';
 import { StatCard, PageLoader, ErrorState, StatusBadge } from '../../components/ui';
 import QuickAddItemModal from '../../components/items/QuickAddItemModal';
-import {
-  Package,
-  Wrench,
-  ClipboardList,
-  Heart,
-  Plus,
-  ArrowRight,
-  Users,
-  Shield,
-  BarChart3,
-  AlertTriangle,
-  AlertCircle,
-  Cog,
-  Sparkles,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  Award,
-  DollarSign,
-  Activity,
-  Truck,
-  Recycle,
-} from 'lucide-react';
+import { Package, Wrench, ClipboardList, Heart, Plus, ArrowRight, Users, Shield, BarChart3, AlertTriangle, AlertCircle, Cog, Sparkles, Clock, CheckCircle2, Activity, Truck, Recycle } from 'lucide-react';
 import { getStatusConfig } from '../../utils/repairStatusConfig';
 
 function OwnerDashboard() {
@@ -266,10 +244,10 @@ function TechnicianDashboard() {
   const matchingOpps = workspaceData?.matchingOpportunities || [];
   const invitations = workspaceData?.pendingInvitations || [];
   const todayAppts = workspaceData?.todayAppointments || [];
-  const pendingCosts = workspaceData?.pendingCostApprovals || [];
   const performance = workspaceData?.performance || {};
 
   if (isLoading) return <PageLoader />;
+  if (error) return <ErrorState error={error} />;
 
   return (
     <div className="space-y-6">

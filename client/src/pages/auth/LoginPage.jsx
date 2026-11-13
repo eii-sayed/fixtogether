@@ -24,8 +24,6 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  const from = location.state?.from?.pathname || '/dashboard';
-
   const onSubmit = async (data) => {
     setLoading(true);
     setUnverifiedEmail('');

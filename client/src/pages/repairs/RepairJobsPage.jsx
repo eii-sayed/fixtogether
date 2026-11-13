@@ -3,28 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { PageLoader, ErrorState, EmptyState, StatusBadge, Pagination } from '../../components/ui';
-import {
-  Wrench,
-  ArrowRight,
-  Calendar,
-  Star,
-  Search,
-  AlertCircle,
-  Package,
-  CheckSquare,
-  PackageCheck,
-  Clock,
-  Sparkles,
-  DollarSign,
-  Layers,
-  MessageSquare,
-  ShieldCheck,
-  Zap,
-  CheckCircle,
-  Loader2,
-  X,
-  Check,
-} from 'lucide-react';
+import { Wrench, Star, Package, MessageSquare, Zap, CheckCircle, Loader2, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import WriteReviewModal from '../../components/reviews/WriteReviewModal';
@@ -32,7 +11,7 @@ import InspectionReportModal from '../../components/jobs/InspectionReportModal';
 import CostApprovalModal from '../../components/jobs/CostApprovalModal';
 import PartsTrackerModal from '../../components/jobs/PartsTrackerModal';
 import QualityCheckModal from '../../components/jobs/QualityCheckModal';
-import { ACTIVE_JOB_STAGES, JOB_STATUS_CONFIG } from '../../utils/technicianStatusConfig';
+import { JOB_STATUS_CONFIG } from '../../utils/technicianStatusConfig';
 
 export default function RepairJobsPage() {
   const { user } = useAuth();

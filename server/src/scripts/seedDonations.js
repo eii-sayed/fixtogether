@@ -410,8 +410,6 @@ async function seedDonations(standalone = true) {
     for (const co of completedOffers) {
       const weight = co.processing?.weightKg || co.estimatedWeight || 2.5;
       const val = co.processing?.replacementValueEstimate || 15000;
-      const co2Kg = Math.round(weight * 2.8 * 10) / 10; // Carbon savings multiplier
-
       await ImpactRecord.create({
         item: co.item,
         sourceDonation: co._id,
@@ -433,7 +431,6 @@ async function seedDonations(standalone = true) {
     // 8. Update Organization Profile impact stats
     console.log('Updating organization impact counters...');
     for (const org of orgProfiles) {
-      const orgImpactCount = await ImpactRecord.countDocuments({ organization: org._id });
       const completedCount = await DonationOffer.countDocuments({
         selectedOrganization: org._id,
         status: DONATION_STATUS.COMPLETED,

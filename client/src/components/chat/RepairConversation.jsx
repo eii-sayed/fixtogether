@@ -74,7 +74,6 @@ export default function RepairConversation({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
-  const [failedMessages, setFailedMessages] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Refs
@@ -185,14 +184,9 @@ export default function RepairConversation({
         return { ...old, messages: updated };
       });
 
-      // Remove from failed list if it was a retry
-      setFailedMessages((prev) => prev.filter((id) => id !== variables.clientTempId));
     },
-    onError: (err, variables, context) => {
+    onError: (err, variables) => {
       toast.error(err.response?.data?.message || 'Message could not be sent');
-      if (variables.clientTempId) {
-        setFailedMessages((prev) => [...prev, variables.clientTempId]);
-      }
       queryClient.setQueryData(['messages', repairRequestId], (old) => {
         if (!old) return old;
         return {

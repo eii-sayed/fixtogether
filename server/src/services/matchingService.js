@@ -1,4 +1,4 @@
-const { TechnicianProfile, TechnicianMatch, User } = require('../models');
+const { TechnicianProfile } = require('../models');
 const { VERIFICATION_STATUS, ACCOUNT_STATUS } = require('../constants');
 const logger = require('../utils/logger');
 
@@ -203,7 +203,7 @@ function calculateDistanceScore(tech, repairRequest) {
 /**
  * Calculate availability score (0-100)
  */
-function calculateAvailabilityScore(tech, repairRequest) {
+function calculateAvailabilityScore(tech, _repairRequest) {
   if (!tech.workingHours) return 50;
 
   const now = new Date();

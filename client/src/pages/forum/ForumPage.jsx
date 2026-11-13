@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
@@ -6,27 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import { PageLoader, EmptyState, Pagination } from '../../components/ui';
 import ThreadCard from '../../components/forum/ThreadCard';
 import { toast } from 'sonner';
-import {
-  Flame,
-  Clock,
-  Trophy,
-  HelpCircle,
-  CheckCircle,
-  Plus,
-  Search,
-  Filter,
-  ShieldCheck,
-  Wrench,
-  Sparkles,
-  MessageSquare,
-  Users,
-  Award,
-  ChevronRight,
-  Lightbulb,
-} from 'lucide-react';
+import { Flame, Clock, Trophy, HelpCircle, CheckCircle, Plus, Search, ShieldCheck, Wrench, Sparkles, MessageSquare, Award } from 'lucide-react';
 
 export default function ForumPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 

@@ -3,7 +3,7 @@
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for existing tabs to close
-  self.skipWaiting();
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {

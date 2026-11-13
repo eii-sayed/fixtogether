@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
 import { PageLoader, ErrorState } from '../../components/ui';
@@ -218,9 +218,6 @@ export default function EditItemPage() {
     }
   };
 
-  if (itemLoading) return <PageLoader />;
-  if (itemError) return <ErrorState error={itemError} />;
-
   const categoryGroups = useMemo(() => {
     if (!categories || !Array.isArray(categories)) return [];
     const parents = categories.filter((c) => !c.parent);
@@ -232,6 +229,9 @@ export default function EditItemPage() {
       return { parent, children };
     });
   }, [categories]);
+
+  if (itemLoading) return <PageLoader />;
+  if (itemError) return <ErrorState error={itemError} />;
 
   const onFormError = (errs) => {
     const errorKeys = Object.keys(errs);

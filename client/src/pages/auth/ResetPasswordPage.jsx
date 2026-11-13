@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import api from '../../api/axios';
 import SEO from '../../components/common/SEO';
@@ -7,8 +7,6 @@ import SEO from '../../components/common/SEO';
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const navigate = useNavigate();
-
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   

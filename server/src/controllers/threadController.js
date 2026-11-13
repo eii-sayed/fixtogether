@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Thread, ThreadComment, User, ItemCategory, Notification } = require('../models');
+const { Thread, ThreadComment, ItemCategory } = require('../models');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta } = require('../utils/helpers');
 const { createNotification } = require('../services/notificationService');
 const { NOTIFICATION_TYPES } = require('../constants');

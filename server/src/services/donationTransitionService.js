@@ -1,7 +1,5 @@
-const mongoose = require('mongoose');
 const { DONATION_STATUS, DONATION_TRANSITIONS, VERIFICATION_STATUS } = require('../constants');
 const { DonationOffer, AuditLog } = require('../models');
-const { createNotification } = require('./notificationService');
 const logger = require('../utils/logger');
 
 /**

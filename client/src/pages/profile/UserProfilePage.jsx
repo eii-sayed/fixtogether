@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Building,
   Leaf,
+  Recycle,
   Globe2,
 } from 'lucide-react';
 import SEO from '../../components/common/SEO';

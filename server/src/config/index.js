@@ -101,7 +101,7 @@ const config = {
   },
   authRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: process.env.NODE_ENV === 'test' ? 50 : (parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10),
+    max: process.env.NODE_ENV === 'test' ? 10 : (parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10),
   },
   writeRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WRITE_WINDOW_MS, 10) || 15 * 60 * 1000,
@@ -146,12 +146,8 @@ const config = {
 
   // Web Push (VAPID)
   push: {
-    publicKey:
-      process.env.VAPID_PUBLIC_KEY ||
-      'BCFrryc2ka-eX36FrZPtsoPMPIuOG-xpCBS2MwIvxkfrL4iXHv2t25-XL0puDndZL14ghtuS_NJ4d2uaaTOZ6Gw',
-    privateKey:
-      process.env.VAPID_PRIVATE_KEY ||
-      '1uSXBRkvTyn9j-smUksWcwaJNptcIyetx6sqLkDxBbQ',
+    publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    privateKey: process.env.VAPID_PRIVATE_KEY || '',
     subject: process.env.VAPID_SUBJECT || 'mailto:support@fixtogether.com',
   },
 };
@@ -163,6 +159,12 @@ if (config.env === 'production') {
   const hasRefreshSecret = Boolean(process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET);
 
   const missing = [];
+  const hasVapidPublicKey = Boolean(process.env.VAPID_PUBLIC_KEY);
+  const hasVapidPrivateKey = Boolean(process.env.VAPID_PRIVATE_KEY);
+  if (hasVapidPublicKey !== hasVapidPrivateKey) {
+    throw new Error('Production Safety Error: Set both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or leave both unset to disable web push.');
+  }
+
   if (!hasMongo) missing.push('MONGODB_URI or DATABASE_URL');
   if (!hasAccessSecret) missing.push('JWT_ACCESS_SECRET or JWT_SECRET or AUTH_SECRET');
   if (!hasRefreshSecret) missing.push('JWT_REFRESH_SECRET or JWT_SECRET or AUTH_SECRET');

@@ -182,7 +182,7 @@ describe('MobileBottomNav role tests', () => {
       admin: ['Dashboard', 'Requests', 'Users', 'Verify', 'Profile'],
     };
 
-    for (const [role, tabs] of Object.entries(mobileNavConfig)) {
+    for (const tabs of Object.values(mobileNavConfig)) {
       expect(tabs).toContain('Requests');
     }
   });

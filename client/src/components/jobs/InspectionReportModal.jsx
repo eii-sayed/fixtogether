@@ -1,17 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
-import {
-  X,
-  Search,
-  CheckSquare,
-  AlertTriangle,
-  Upload,
-  FileText,
-  DollarSign,
-  ShieldAlert,
-  CheckCircle2,
-} from 'lucide-react';
+import { X, CheckSquare } from 'lucide-react';
 import { CATEGORY_INSPECTION_CHECKLISTS } from '../../utils/technicianStatusConfig';
 
 export default function InspectionReportModal({ open, onClose, repairJob }) {

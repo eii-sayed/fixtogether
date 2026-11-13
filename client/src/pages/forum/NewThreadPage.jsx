@@ -3,20 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  ArrowLeft,
-  HelpCircle,
-  Wrench,
-  MessageCircle,
-  BookOpen,
-  Sparkles,
-  Send,
-  Package,
-  Image,
-  Tag,
-  ShieldAlert,
-  CheckCircle2,
-} from 'lucide-react';
+import { ArrowLeft, HelpCircle, Wrench, MessageCircle, BookOpen, Sparkles, Send, Image, Tag, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 export default function NewThreadPage() {
   const navigate = useNavigate();
@@ -43,10 +30,10 @@ export default function NewThreadPage() {
     queryFn: () => api.get('/items?limit=50').then((r) => r.data.data),
   });
 
-  const categories = categoriesData?.categories || [];
   const myItems = itemsData?.items || [];
 
   const categoryGroups = React.useMemo(() => {
+    const categories = categoriesData?.categories || [];
     if (!categories || !Array.isArray(categories)) return [];
     const parents = categories.filter((c) => !c.parent);
     return parents.map((parent) => {
@@ -56,7 +43,7 @@ export default function NewThreadPage() {
       });
       return { parent, children };
     });
-  }, [categories]);
+  }, [categoriesData?.categories]);
 
   // Create Thread Mutation
   const createMutation = useMutation({

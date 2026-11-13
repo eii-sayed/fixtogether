@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { PageLoader, ErrorState, StatusBadge } from '../../components/ui';
 import EditProfileModal from '../../components/profile/EditProfileModal';
@@ -8,36 +8,7 @@ import SecuritySettingsTab from '../../components/profile/SecuritySettingsTab';
 import PortfolioManager from '../../components/profile/PortfolioManager';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import {
-  User,
-  MapPin,
-  Calendar,
-  Phone,
-  Mail,
-  Edit,
-  Shield,
-  ShieldCheck,
-  Star,
-  Package,
-  Wrench,
-  Heart,
-  Recycle,
-  Activity,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  Camera,
-  Layers,
-  Settings,
-  Building,
-  Briefcase,
-  AlertCircle,
-  ExternalLink,
-  ChevronRight,
-  ShieldAlert,
-  Globe2,
-  Leaf,
-} from 'lucide-react';
+import { User, MapPin, Calendar, Phone, Mail, Edit, Shield, ShieldCheck, Star, Package, Wrench, Heart, Recycle, Activity, CheckCircle2, Clock, Sparkles, Camera, Layers, Settings, Building, Briefcase, ExternalLink, ChevronRight, ShieldAlert, Globe2, Leaf } from 'lucide-react';
 import SEO from '../../components/common/SEO';
 
 export default function ProfilePage() {

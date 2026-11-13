@@ -1,6 +1,4 @@
- const { Inspection, RepairJob, RepairRequest, Quotation, RepairStatusHistory, Warranty,
-  Review, Dispute, Notification: NotificationModel, Part, DonationOffer, DonationNeed,
-  OrganizationProfile, ImpactRecord, ReviewQueueItem } = require('../models');
+ const { Inspection, RepairJob, RepairRequest, Quotation, RepairStatusHistory, Warranty, Review, Dispute, Notification: NotificationModel, Part, DonationOffer, OrganizationProfile, ImpactRecord, ReviewQueueItem } = require('../models');
 const { REPAIR_JOB_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, WARRANTY_STATUS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta, generateCode } = require('../utils/helpers');
 const { createNotification, resolveNotificationLink } = require('../services/notificationService');
@@ -919,6 +917,7 @@ const createDonation = asyncHandler(async (req, res) => {
     estimatedWeight: req.body.estimatedWeight || 1,
     preferredHandover: req.body.preferredHandover || 'either',
     pickupLocation: req.body.pickupLocation || { approximateArea: req.body.city || '', city: req.body.city || 'Dhaka' },
+    handover: { instructions: req.body.handoverNotes?.trim() || '' },
     matchingNeed: matchingNeed ? matchingNeed._id : null,
     selectedOrganization,
     matchedOrganizations,

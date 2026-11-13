@@ -1,6 +1,5 @@
-const { OrganizationProfile, DonationNeed, ItemCategory } = require('../models');
 const { calculateHaversineDistance } = require('./matchingService');
-const { ITEM_CONDITION, VERIFICATION_STATUS } = require('../constants');
+const { ITEM_CONDITION } = require('../constants');
 
 const CONDITION_RANK = {
   [ITEM_CONDITION.NEW]: 5,

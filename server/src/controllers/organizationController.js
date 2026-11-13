@@ -1,14 +1,5 @@
 const mongoose = require('mongoose');
-const {
-  OrganizationProfile,
-  DonationOffer,
-  DonationNeed,
-  ImpactRecord,
-  ItemCategory,
-  Item,
-  User,
-  AuditLog,
-} = require('../models');
+const { OrganizationProfile, DonationOffer, DonationNeed, ImpactRecord } = require('../models');
 const {
   asyncHandler,
   successResponse,
@@ -32,7 +23,6 @@ const { createAuditLog } = require('../middleware/auditLog');
 const { createNotification } = require('../services/notificationService');
 const { transitionDonationStatus } = require('../services/donationTransitionService');
 const { calculateDonationMatch } = require('../services/donationMatchingService');
-const logger = require('../utils/logger');
 
 /**
  * GET /organizations
@@ -458,7 +448,7 @@ const updateOrgVerificationStatus = asyncHandler(async (req, res) => {
  */
 const getDonationOffers = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const { tab = 'all', category, condition, urgency, handoverMethod, search } = req.query;
+  const { tab = 'all', category, condition, handoverMethod, search } = req.query;
 
   let orgProfile = null;
   if (req.user.role === 'organization') {

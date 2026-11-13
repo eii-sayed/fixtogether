@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
-import {
-  X,
-  CheckSquare,
-  Award,
-  Upload,
-  PackageCheck,
-  DollarSign,
-  FileCheck,
-} from 'lucide-react';
+import { X, CheckSquare } from 'lucide-react';
 import { QUALITY_CHECK_ITEMS } from '../../utils/technicianStatusConfig';
 
 export default function QualityCheckModal({ open, onClose, repairJob }) {
@@ -22,7 +14,7 @@ export default function QualityCheckModal({ open, onClose, repairJob }) {
   const [replacedParts, setReplacedParts] = useState('');
   const [finalLaborCost, setFinalLaborCost] = useState(repairJob?.finalLaborCost || repairJob?.acceptedQuotation?.laborCostMinimum || 500);
   const [finalPartsCost, setFinalPartsCost] = useState(repairJob?.finalPartsCost || repairJob?.acceptedQuotation?.partsEstimate || 0);
-  const [paymentMethod, setPaymentMethod] = useState('cash_on_delivery');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [submitError, setSubmitError] = useState(null);
 
@@ -129,10 +121,35 @@ export default function QualityCheckModal({ open, onClose, repairJob }) {
                   <div className="flex-1">
                     <div className="text-xs font-semibold text-gray-900">{item.title}</div>
                     <div className="text-[11px] text-gray-500 mt-0.5">{item.description}</div>
+                    <input
+                      type="text"
+                      value={item.notes}
+                      onChange={(event) => handleNotesChange(idx, event.target.value)}
+                      className="input-field mt-2 text-xs"
+                      aria-label={`Notes for ${item.title}`}
+                      placeholder="Optional verification notes"
+                    />
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+
+          <div>
+            <label htmlFor="quality-check-payment-method" className="block text-xs font-semibold text-gray-700 mb-1">
+              Payment Method
+            </label>
+            <select
+              id="quality-check-payment-method"
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value)}
+              className="input-field"
+            >
+              <option value="cash">Cash</option>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="mobile_payment">Mobile payment</option>
+              <option value="other">Other</option>
+            </select>
           </div>
 
           {/* Detailed Completion Report */}

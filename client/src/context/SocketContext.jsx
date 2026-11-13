@@ -96,7 +96,7 @@ export function SocketProvider({ children }) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, [isAuthenticated, user?.userId, navigate, queryClient]);
+  }, [isAuthenticated, user?.userId, user?.role, navigate, queryClient]);
 
   const joinChat = useCallback((repairRequestId) => {
     if (socketRef.current?.connected && repairRequestId) {

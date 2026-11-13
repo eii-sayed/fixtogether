@@ -1,4 +1,4 @@
-const { OutboxEvent, Notification } = require('../models');
+const { OutboxEvent } = require('../models');
 const logger = require('../utils/logger');
 
 let isProcessing = false;

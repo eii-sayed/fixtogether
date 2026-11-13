@@ -6,7 +6,7 @@ import { PageLoader, ErrorState, EmptyState, Pagination, ConfirmModal } from '..
 import QuickAddItemModal from '../../components/items/QuickAddItemModal';
 import QuickRepairModal from '../../components/repairs/QuickRepairModal';
 import { toast } from 'sonner';
-import { Package, Plus, Search, Trash2, Edit, Wrench, Clock, Heart, Sparkles } from 'lucide-react';
+import { Package, Search, Trash2, Edit, Wrench, Clock, Heart, Sparkles } from 'lucide-react';
 
 export default function ItemsPage() {
   const [page, setPage] = useState(1);

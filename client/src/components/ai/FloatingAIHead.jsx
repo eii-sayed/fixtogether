@@ -1,32 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Sparkles,
-  X,
-  Send,
-  Loader2,
-  Bot,
-  RotateCcw,
-  ShieldAlert,
-  ChevronDown,
-  Wrench,
-  Zap,
-  Lock,
-  LogIn,
-  UserPlus,
-  Image as ImageIcon,
-  Camera,
-  Star,
-  CheckCircle2,
-  ExternalLink,
-  PlusCircle,
-} from 'lucide-react';
+import { X, Send, Loader2, Bot, RotateCcw, ShieldAlert, ChevronDown, Wrench, Zap, Lock, LogIn, UserPlus, Camera, Star, CheckCircle2, ExternalLink, PlusCircle } from 'lucide-react';
 
 export default function FloatingAIHead() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -34,7 +13,6 @@ export default function FloatingAIHead() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [hasInteracted, setHasInteracted] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -139,7 +117,6 @@ export default function FloatingAIHead() {
     if (!text && !selectedImage) return;
     if (isTyping) return;
 
-    setHasInteracted(true);
     const userMsgId = `user-${Date.now()}`;
     const previewToKeep = imagePreview;
 

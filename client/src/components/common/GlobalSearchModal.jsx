@@ -1,18 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
-import {
-  Search,
-  Wrench,
-  Package,
-  Heart,
-  User,
-  XCircle,
-  ArrowRight,
-  Sparkles,
-  Command,
-} from 'lucide-react';
+import { Search, Wrench, Heart, User, XCircle, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function GlobalSearchModal({ isOpen, onClose }) {
   const { user } = useAuth();
@@ -20,7 +10,6 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
   const inputRef = useRef(null);
 
   const [query, setQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 

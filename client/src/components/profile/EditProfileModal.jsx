@@ -2,21 +2,10 @@ import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
-import {
-  X,
-  User,
-  Phone,
-  MapPin,
-  Globe,
-  Loader2,
-  Camera,
-  Briefcase,
-  Building,
-  Shield,
-} from 'lucide-react';
+import { X, Loader2, Camera, Briefcase, Building } from 'lucide-react';
 
 const profileSchema = z.object({
   fullName: z.string().trim().min(2, 'Name must be at least 2 characters').max(100),

@@ -5,19 +5,7 @@ import { toast } from 'sonner';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { PageLoader, EmptyState } from '../../components/ui';
-import {
-  Bell,
-  Check,
-  CheckCheck,
-  ArrowRight,
-  ExternalLink,
-  Filter,
-  BellRing,
-  Radio,
-  Smartphone,
-  CheckCircle2,
-  Loader2,
-} from 'lucide-react';
+import { Bell, Check, CheckCheck, ArrowRight, BellRing, Loader2 } from 'lucide-react';
 import {
   isPushSupported,
   getPushSubscription,
@@ -299,8 +287,6 @@ export default function NotificationsPage() {
           {filteredNotifications.map((n) => {
             const meta = getNotificationMeta(n);
             const Icon = meta.icon;
-            const destination = getNotificationDestination(n, user?.role);
-
             return (
               <div
                 key={n._id}

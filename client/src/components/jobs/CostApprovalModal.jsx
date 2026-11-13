@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
-import {
-  X,
-  AlertCircle,
-  DollarSign,
-  Upload,
-  Calendar,
-  Wrench,
-  Package,
-} from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 
 export default function CostApprovalModal({ open, onClose, repairJob }) {
   const queryClient = useQueryClient();

@@ -1,40 +1,40 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import { ProtectedRoute, GuestRoute } from './components/auth/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import api from './api/axios';
 
-// Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import ItemsPage from './pages/items/ItemsPage';
-import NewItemPage from './pages/items/NewItemPage';
-import EditItemPage from './pages/items/EditItemPage';
-import RepairRequestsPage from './pages/repairs/RepairRequestsPage';
-import RepairRequestDetailPage from './pages/repairs/RepairRequestDetailPage';
-import RepairRequestMatchesPage from './pages/repairs/RepairRequestMatchesPage';
-import NewRepairRequestPage from './pages/repairs/NewRepairRequestPage';
-import RepairJobsPage from './pages/repairs/RepairJobsPage';
-import DonationsPage from './pages/donations/DonationsPage';
-import NewDonationPage from './pages/donations/NewDonationPage';
-import ConversationsPage from './pages/messages/ConversationsPage';
-import ProfilePage from './pages/profile/ProfilePage';
-import TechnicianProfilePage from './pages/profile/TechnicianProfilePage';
-import TechniciansPage from './pages/profile/TechniciansPage';
-import UserProfilePage from './pages/profile/UserProfilePage';
-import OrganizationProfilePage from './pages/profile/OrganizationProfilePage';
-import NotificationsPage from './pages/notifications/NotificationsPage';
-import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage';
-import ForumPage from './pages/forum/ForumPage';
-import ThreadDetailPage from './pages/forum/ThreadDetailPage';
-import NewThreadPage from './pages/forum/NewThreadPage';
-import NotFoundPage from './pages/NotFoundPage';
+// Load page code only when a route is visited to keep the initial bundle small.
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const ItemsPage = lazy(() => import('./pages/items/ItemsPage'));
+const NewItemPage = lazy(() => import('./pages/items/NewItemPage'));
+const EditItemPage = lazy(() => import('./pages/items/EditItemPage'));
+const RepairRequestsPage = lazy(() => import('./pages/repairs/RepairRequestsPage'));
+const RepairRequestDetailPage = lazy(() => import('./pages/repairs/RepairRequestDetailPage'));
+const RepairRequestMatchesPage = lazy(() => import('./pages/repairs/RepairRequestMatchesPage'));
+const NewRepairRequestPage = lazy(() => import('./pages/repairs/NewRepairRequestPage'));
+const RepairJobsPage = lazy(() => import('./pages/repairs/RepairJobsPage'));
+const DonationsPage = lazy(() => import('./pages/donations/DonationsPage'));
+const NewDonationPage = lazy(() => import('./pages/donations/NewDonationPage'));
+const ConversationsPage = lazy(() => import('./pages/messages/ConversationsPage'));
+const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
+const TechnicianProfilePage = lazy(() => import('./pages/profile/TechnicianProfilePage'));
+const TechniciansPage = lazy(() => import('./pages/profile/TechniciansPage'));
+const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'));
+const OrganizationProfilePage = lazy(() => import('./pages/profile/OrganizationProfilePage'));
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
+const RepairRequestMessagesPage = lazy(() => import('./pages/repairs/RepairRequestMessagesPage'));
+const ForumPage = lazy(() => import('./pages/forum/ForumPage'));
+const ThreadDetailPage = lazy(() => import('./pages/forum/ThreadDetailPage'));
+const NewThreadPage = lazy(() => import('./pages/forum/NewThreadPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function AdminRedirectGateway() {
   const location = useLocation();
@@ -98,6 +98,7 @@ function AdminRedirectGateway() {
 
 export default function App() {
   return (
+    <Suspense fallback={<div className="page-container py-16 text-center">Loading page…</div>}>
     <Routes>
       {/* Standalone Admin Portal Redirect Gateway */}
       <Route path="/admin/*" element={<AdminRedirectGateway />} />
@@ -155,5 +156,6 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }

@@ -1,33 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { PageLoader, EmptyState } from '../../components/ui';
 import { toast } from 'sonner';
-import {
-  ArrowLeft,
-  ArrowBigUp,
-  ArrowBigDown,
-  MessageSquare,
-  CheckCircle,
-  Clock,
-  Eye,
-  Share2,
-  Trash2,
-  Edit,
-  CornerDownRight,
-  Send,
-  HelpCircle,
-  Wrench,
-  Sparkles,
-  BookOpen,
-  MessageCircle,
-  ShieldCheck,
-  Package,
-  Award,
-  UserCheck,
-} from 'lucide-react';
+import { ArrowLeft, ArrowBigUp, ArrowBigDown, MessageSquare, CheckCircle, Trash2, CornerDownRight, Send, HelpCircle, Wrench, Sparkles, BookOpen, MessageCircle, Package, UserCheck } from 'lucide-react';
 import SEO from '../../components/common/SEO';
 
 export default function ThreadDetailPage() {
