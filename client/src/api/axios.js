@@ -52,6 +52,23 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+const isPublicPath = () => {
+  if (typeof window === 'undefined') return true;
+  const p = window.location.pathname;
+  return (
+    p === '/' ||
+    p.startsWith('/login') ||
+    p.startsWith('/register') ||
+    p.startsWith('/verify-email') ||
+    p.startsWith('/forgot-password') ||
+    p.startsWith('/reset-password') ||
+    p.startsWith('/forum') ||
+    p.startsWith('/technicians') ||
+    p.startsWith('/organizations') ||
+    p.startsWith('/users')
+  );
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -106,14 +123,7 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        if (
-          typeof window !== 'undefined' &&
-          !window.location.pathname.startsWith('/login') &&
-          !window.location.pathname.startsWith('/register') &&
-          !window.location.pathname.startsWith('/verify-email') &&
-          !window.location.pathname.startsWith('/forgot-password') &&
-          !window.location.pathname.startsWith('/reset-password')
-        ) {
+        if (typeof window !== 'undefined' && !isPublicPath()) {
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -133,14 +143,7 @@ api.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        if (
-          typeof window !== 'undefined' &&
-          !window.location.pathname.startsWith('/login') &&
-          !window.location.pathname.startsWith('/register') &&
-          !window.location.pathname.startsWith('/verify-email') &&
-          !window.location.pathname.startsWith('/forgot-password') &&
-          !window.location.pathname.startsWith('/reset-password')
-        ) {
+        if (typeof window !== 'undefined' && !isPublicPath()) {
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);

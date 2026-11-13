@@ -4,10 +4,31 @@ const logger = require('../utils/logger');
 
 /**
  * Checks whether outbound email sending is properly configured
+ * Checks for Resend API key, SendGrid API key, or SMTP user & password.
  * @returns {boolean}
  */
 const isEmailConfigured = () => {
-  return Boolean(config.email.user && config.email.password);
+  if (config.email.provider === 'resend') return Boolean(config.email.resendApiKey);
+  if (config.email.provider === 'sendgrid') return Boolean(config.email.sendgridApiKey);
+  if (config.email.provider === 'smtp' || config.email.provider === 'gmail') {
+    return Boolean(config.email.user && config.email.password);
+  }
+  return false;
+};
+
+/**
+ * Returns the active email delivery provider
+ * @returns {'resend'|'sendgrid'|'gmail'|'smtp'|'unconfigured'}
+ */
+const getActiveEmailProvider = () => {
+  if (!isEmailConfigured()) return 'unconfigured';
+  if (config.email.provider === 'resend') return 'resend';
+  if (config.email.provider === 'sendgrid') return 'sendgrid';
+  if (config.email.user && config.email.password) {
+    if (config.email.provider === 'gmail' || config.email.host?.includes('gmail.com')) return 'gmail';
+    return 'smtp';
+  }
+  return 'unconfigured';
 };
 
 /**
@@ -15,24 +36,27 @@ const isEmailConfigured = () => {
  * @returns {Object}
  */
 const getEmailStatus = () => {
+  const provider = getActiveEmailProvider();
   return {
     configured: isEmailConfigured(),
+    provider,
     host: config.email.host,
     port: config.email.port,
     user: config.email.user ? config.email.user.replace(/(.{2})(.*)(@.*)/, '$1***$3') : null,
     from: config.email.from,
+    hasResendApiKey: Boolean(config.email.resendApiKey),
+    hasSendgridApiKey: Boolean(config.email.sendgridApiKey),
   };
 };
 
 /**
- * Create reusable transporter object using the default SMTP transport
+ * Create reusable transporter object for SMTP delivery
  */
 const createTransporter = () => {
+  const isGmail = config.email.provider === 'gmail' || config.email.host?.includes('gmail.com');
   const isSecure = config.email.port === 465;
-  return nodemailer.createTransport({
-    host: config.email.host,
-    port: config.email.port,
-    secure: isSecure,
+
+  const transportOptions = {
     auth: {
       user: config.email.user,
       pass: config.email.password,
@@ -40,50 +64,229 @@ const createTransporter = () => {
     tls: {
       rejectUnauthorized: config.env === 'production',
     },
-    connectionTimeout: 8000, // 8s connection timeout to prevent hanging
-    greetingTimeout: 8000,   // 8s greeting timeout
-    socketTimeout: 10000,    // 10s socket timeout
+    connectionTimeout: 10000, // 10s connection timeout
+    greetingTimeout: 10000,   // 10s greeting timeout
+    socketTimeout: 15000,    // 15s socket timeout
+  };
+
+  if (isGmail) {
+    // Gmail-specific configuration for highest reliability
+    return nodemailer.createTransport({
+      service: 'gmail',
+      ...transportOptions,
+    });
+  }
+
+  return nodemailer.createTransport({
+    host: config.email.host,
+    port: config.email.port,
+    secure: isSecure,
+    ...transportOptions,
   });
 };
 
 /**
- * Send an email using SMTP
+ * Send an email via Resend REST API (HTTPS - bypasses blocked SMTP ports)
+ */
+const sendViaResend = async (options, textContent) => {
+  const apiKey = config.email.resendApiKey;
+  logger.info(`[EMAIL:RESEND] Initiating REST API dispatch to: ${options.to}`);
+
+  const payload = {
+    from: config.email.from,
+    to: Array.isArray(options.to) ? options.to : [options.to],
+    subject: options.subject,
+    html: options.html,
+    text: textContent,
+  };
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const resJson = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const errorMsg = resJson?.message || response.statusText;
+    logger.error(`[EMAIL:RESEND] API error (${response.status}): ${errorMsg}`);
+    return { success: false, error: errorMsg, provider: 'resend' };
+  }
+
+  logger.info(`[EMAIL:RESEND] Successfully dispatched to ${options.to}: ID ${resJson.id}`);
+  return { success: true, messageId: resJson.id, provider: 'resend' };
+};
+
+/**
+ * Send an email via SendGrid REST API (HTTPS - bypasses blocked SMTP ports)
+ */
+const sendViaSendGrid = async (options, textContent) => {
+  const apiKey = config.email.sendgridApiKey;
+  logger.info(`[EMAIL:SENDGRID] Initiating REST API dispatch to: ${options.to}`);
+
+  // Extract email from "FixTogether <email@domain>" format
+  const fromMatch = config.email.from.match(/<([^>]+)>/);
+  const fromEmail = fromMatch ? fromMatch[1] : config.email.from;
+  const fromNameMatch = config.email.from.match(/^([^<]+)/);
+  const fromName = fromNameMatch ? fromNameMatch[1].trim() : 'FixTogether';
+
+  const payload = {
+    personalizations: [{
+      to: (Array.isArray(options.to) ? options.to : [options.to]).map((email) => ({ email })),
+    }],
+    from: { email: fromEmail, name: fromName },
+    subject: options.subject,
+    content: [
+      { type: 'text/plain', value: textContent },
+      { type: 'text/html', value: options.html },
+    ],
+  };
+
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    logger.error(`[EMAIL:SENDGRID] API error (${response.status}): ${errText}`);
+    return { success: false, error: errText, provider: 'sendgrid' };
+  }
+
+  const messageId = response.headers.get('x-message-id') || `sg_${Date.now()}`;
+  logger.info(`[EMAIL:SENDGRID] Successfully dispatched to ${options.to}: ID ${messageId}`);
+  return { success: true, messageId, provider: 'sendgrid' };
+};
+
+/**
+ * Send an email using SMTP (Nodemailer)
+ */
+const sendViaSmtp = async (options, textContent) => {
+  const isGmail = config.email.provider === 'gmail' || config.email.host?.includes('gmail.com');
+  const provider = isGmail ? 'gmail' : 'smtp';
+  logger.info(`[EMAIL:${provider.toUpperCase()}] Connecting to SMTP server ${config.email.host}:${config.email.port} as ${config.email.user}...`);
+
+  const transporter = createTransporter();
+
+  // If using Gmail SMTP, align the from address with the authenticated Gmail account
+  // to prevent Gmail 550 or silent drops
+  let fromAddress = config.email.from;
+  if (isGmail && config.email.user && !fromAddress.includes(config.email.user)) {
+    logger.warn(`[EMAIL:GMAIL] From header was adjusted to match authenticated user ${config.email.user} for SPF/DMARC delivery compliance.`);
+    fromAddress = `FixTogether <${config.email.user}>`;
+  }
+
+  const mailOptions = {
+    from: fromAddress,
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    text: textContent,
+    headers: {
+      'X-Entity-Ref-ID': `ft-${Date.now()}`,
+    },
+  };
+
+  const info = await transporter.sendMail(mailOptions);
+  logger.info(`[EMAIL:${provider.toUpperCase()}] Successfully dispatched to ${options.to}: ${info.messageId}`);
+  return { success: true, messageId: info.messageId, provider };
+};
+
+/**
+ * Send an email using the best configured provider
  * @param {Object} options - Email options (to, subject, html, text)
- * @returns {Promise<{success: boolean, messageId?: string, error?: string}>}
+ * @returns {Promise<{success: boolean, messageId?: string, error?: string, simulated?: boolean, provider?: string}>}
  */
 const sendEmail = async (options) => {
+  const cleanTo = Array.isArray(options.to) ? options.to.join(', ') : (options.to || '').trim();
+
+  // Generate clean plaintext fallback if none provided to pass spam checks
+  let textContent = options.text;
+  if (!textContent && options.html) {
+    textContent = options.html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // 1. Check if email service is configured
   if (!isEmailConfigured()) {
-    logger.warn(`[EMAIL] Service is not configured. Email cannot be dispatched to: ${options.to}`);
-    return { success: false, error: 'Email service is not configured on this server.' };
+    logger.warn(`[EMAIL] ⚠️ Outbound email provider is NOT configured. Email cannot be delivered to: ${cleanTo}`);
+    logger.warn('[EMAIL] Configure EMAIL_PROVIDER and its matching credentials to enable outbound email.');
+
+    // In development or test, provide simulated success so workflows aren't blocked
+    if (config.env === 'development' || config.env === 'test') {
+      logger.info(`[EMAIL DEV SIMULATION] Recipient: ${cleanTo} | Subject: "${options.subject}"`);
+      return {
+        success: true,
+        messageId: `simulated_${Date.now()}`,
+        simulated: true,
+        provider: 'simulation',
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Email service is not configured on this server.',
+      provider: 'unconfigured',
+    };
   }
 
   try {
-    const transporter = createTransporter();
-
-    // Generate clean plaintext fallback if none provided to prevent anti-spam quarantine
-    let textContent = options.text;
-    if (!textContent && options.html) {
-      textContent = options.html
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    // 2. Dispatch via active provider
+    if (config.email.provider === 'resend') {
+      return await sendViaResend(options, textContent);
     }
 
-    const mailOptions = {
-      from: config.email.from,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: textContent,
-    };
+    if (config.email.provider === 'sendgrid') {
+      return await sendViaSendGrid(options, textContent);
+    }
 
-    const info = await transporter.sendMail(mailOptions);
-    logger.info(`[EMAIL] Successfully dispatched to ${options.to}: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    // SMTP / Gmail fallback
+    return await sendViaSmtp(options, textContent);
   } catch (error) {
-    logger.error(`[EMAIL] Error dispatching to ${options.to}: ${error.message}`);
-    return { success: false, error: error.message };
+    logger.error(`[EMAIL] ❌ Error dispatching email to ${cleanTo}: ${error.message}`, {
+      code: error.code,
+      command: error.command,
+      stack: error.stack,
+    });
+    return { success: false, error: error.message, code: error.code };
+  }
+};
+
+/**
+ * Diagnostic helper to verify SMTP / Provider connection
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+const verifyEmailTransport = async () => {
+  if (!isEmailConfigured()) {
+    return { success: false, message: 'Email service is not configured.' };
+  }
+
+  try {
+    const provider = getActiveEmailProvider();
+    if (provider === 'resend' || provider === 'sendgrid') {
+      return {
+        success: true,
+        message: `${provider} credentials are configured; delivery will be verified on the first email send.`,
+      };
+    }
+
+    const transporter = createTransporter();
+    await transporter.verify();
+    return { success: true, message: `SMTP connection to ${config.email.host}:${config.email.port} verified successfully.` };
+  } catch (error) {
+    return { success: false, message: `Email transport verification failed: ${error.message}` };
   }
 };
 
@@ -174,4 +377,6 @@ module.exports = {
   sendVerificationEmail,
   isEmailConfigured,
   getEmailStatus,
+  verifyEmailTransport,
+  getActiveEmailProvider,
 };

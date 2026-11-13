@@ -9,18 +9,18 @@ const config = {
   port: parseInt(process.env.PORT, 10) || 5000,
 
   // MongoDB
-  mongoUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/fixtogether',
+  mongoUri: process.env.MONGODB_URI || process.env.DATABASE_URL || 'mongodb://localhost:27017/fixtogether',
 
   // JWT
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret',
+    accessSecret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET || 'dev-access-secret',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET || 'dev-refresh-secret',
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || '24h',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   },
 
   // Client & Admin Web Addresses
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  clientUrl: process.env.CLIENT_URL || process.env.NEXTAUTH_URL || 'http://localhost:5173',
   adminUrl: process.env.ADMIN_URL || 'http://localhost:5174',
 
   // Cloudinary
@@ -52,15 +52,20 @@ const config = {
     maxRetries: parseInt(process.env.AI_MAX_RETRIES, 10) || 2,
   },
 
-  // Email
+  // Email / SMTP / Multi-Provider Configuration
   email: {
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT, 10) || 587,
-    user: process.env.EMAIL_USER || '',
-    password: process.env.EMAIL_PASSWORD || '',
-    from: process.env.EMAIL_FROM
-      ? process.env.EMAIL_FROM.replace(/["']/g, '').trim()
-      : (process.env.EMAIL_USER ? `FixTogether <${process.env.EMAIL_USER}>` : 'noreply@fixtogether.com'),
+    provider: (process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? 'resend' : (process.env.SENDGRID_API_KEY ? 'sendgrid' : 'smtp'))).trim().toLowerCase(),
+    host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT, 10) || 587,
+    user: process.env.EMAIL_USER || process.env.SMTP_USER || '',
+    password: process.env.EMAIL_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '',
+    from: (process.env.EMAIL_FROM || process.env.MAIL_FROM)
+      ? (process.env.EMAIL_FROM || process.env.MAIL_FROM).replace(/["']/g, '').trim()
+      : (process.env.EMAIL_USER || process.env.SMTP_USER
+          ? `FixTogether <${process.env.EMAIL_USER || process.env.SMTP_USER}>`
+          : 'FixTogether <noreply@fixtogether.com>'),
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    sendgridApiKey: process.env.SENDGRID_API_KEY || '',
   },
 
   // Maps
@@ -71,20 +76,20 @@ const config = {
 
   // Rate limiting (all configurable via env)
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_GENERAL_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_GENERAL_MAX, 10) || 300,
+    windowMs: parseInt(process.env.RATE_LIMIT_GENERAL_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_GENERAL_MAX || process.env.RATE_LIMIT_MAX, 10) || 300,
   },
   publicRateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX, 10) || 200,
+    windowMs: parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX || process.env.RATE_LIMIT_MAX, 10) || 200,
   },
   authReadRateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_READ_WINDOW_MS, 10) || 15 * 60 * 1000,
+    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_READ_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
     max: parseInt(process.env.RATE_LIMIT_AUTH_READ_MAX, 10) || 600,
   },
   authRateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: process.env.NODE_ENV === 'test' ? 10 : (parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10),
+    windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'test' ? 50 : (parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 10),
   },
   writeRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WRITE_WINDOW_MS, 10) || 15 * 60 * 1000,
@@ -141,8 +146,15 @@ const config = {
 
 // Validate required config in production
 if (config.env === 'production') {
-  const required = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'MONGODB_URI'];
-  const missing = required.filter((key) => !process.env[key]);
+  const hasMongo = Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL);
+  const hasAccessSecret = Boolean(process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET);
+  const hasRefreshSecret = Boolean(process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET);
+
+  const missing = [];
+  if (!hasMongo) missing.push('MONGODB_URI or DATABASE_URL');
+  if (!hasAccessSecret) missing.push('JWT_ACCESS_SECRET or JWT_SECRET or AUTH_SECRET');
+  if (!hasRefreshSecret) missing.push('JWT_REFRESH_SECRET or JWT_SECRET or AUTH_SECRET');
+
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }

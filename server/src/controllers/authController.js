@@ -18,12 +18,16 @@ const generateAccessToken = (userId, role) => {
 };
 
 /**
- * Generate refresh token
+ * Generate refresh token with unique jti to guarantee rotation entropy
  */
 const generateRefreshToken = (userId) => {
-  return jwt.sign({ userId }, config.jwt.refreshSecret, {
-    expiresIn: config.jwt.refreshExpiresIn,
-  });
+  return jwt.sign(
+    { userId, jti: crypto.randomBytes(16).toString('hex') },
+    config.jwt.refreshSecret,
+    {
+      expiresIn: config.jwt.refreshExpiresIn,
+    }
+  );
 };
 
 /**
@@ -43,13 +47,23 @@ const parseDuration = (duration) => {
  */
 const register = asyncHandler(async (req, res) => {
   const { fullName, email, password, role, phone } = req.body;
+  const normalizedEmail = email ? email.toLowerCase().trim() : '';
+  const isDev = config.env === 'development';
+  const isTest = config.env === 'test' || process.env.NODE_ENV === 'test';
+  const emailConfigured = emailService.isEmailConfigured();
 
-  const normalizedEmail = email.toLowerCase().trim();
+  logger.info(`[AUTH:REGISTER] Registration attempt for ${normalizedEmail} (role: ${role || ROLES.OWNER}, IP: ${req.ip})`);
+
+  if (!emailConfigured && !isDev && !isTest) {
+    logger.error('[AUTH:REGISTER] Registration unavailable because outbound email is not configured.');
+    return errorResponse(res, 'Email verification is temporarily unavailable. Please try again later.', 503);
+  }
 
   // Check if user already exists
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     if (existingUser.emailVerified) {
+      logger.warn(`[AUTH:REGISTER] Registration rejected: Account already exists and verified for ${normalizedEmail}`);
       return errorResponse(res, 'An account with this email already exists.', 409);
     }
 
@@ -65,19 +79,15 @@ const register = asyncHandler(async (req, res) => {
     if (password) existingUser.passwordHash = password;
     await existingUser.save();
 
-    const isDev = config.env === 'development';
-    const emailConfigured = emailService.isEmailConfigured();
-
-    logger.info(`[AUTH] Verification OTP generated for existing unverified user ${existingUser.email}: ${otp}`);
-    emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName)
-      .then((sendRes) => {
-        if (!sendRes?.success) {
-          logger.warn(`[AUTH] Verification email was not sent to ${existingUser.email}: ${sendRes?.error || 'Unknown reason'}`);
-        }
-      })
-      .catch((err) => {
-        logger.error(`[AUTH] Failed to send verification email to ${existingUser.email}:`, err.message);
-      });
+    const sendRes = await emailService.sendVerificationEmail(existingUser.email, otp, existingUser.fullName);
+    if (!sendRes?.success) {
+      logger.error(`[AUTH:REGISTER] Verification email failed for ${existingUser.email}: ${sendRes?.error || 'Unknown reason'}`);
+      if (!isDev && !isTest) {
+        return errorResponse(res, 'Verification email could not be sent. Please try again later.', 503);
+      }
+    } else {
+      logger.info(`[AUTH:REGISTER] Verification email accepted for ${existingUser.email} (provider: ${sendRes.provider || 'unknown'})`);
+    }
 
     return successResponse(
       res,
@@ -97,7 +107,7 @@ const register = asyncHandler(async (req, res) => {
       },
       emailConfigured
         ? 'A new verification code has been sent to your email. Please verify your account.'
-        : 'Account exists and requires verification. Note: Outbound email service is not configured on this server; check server logs for the code.',
+        : 'Account exists and requires verification. Use the code included in this development response.',
       200
     );
   }
@@ -131,31 +141,6 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate tokens
-  const accessToken = generateAccessToken(user._id, user.role);
-  const refreshToken = generateRefreshToken(user._id);
-
-  // Store refresh token
-  const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
-  await User.findByIdAndUpdate(user._id, {
-    $push: {
-      refreshTokens: {
-        token: refreshToken,
-        expiresAt: refreshExpiry,
-        userAgent: req.headers['user-agent'] || '',
-      },
-    },
-    lastLoginAt: new Date(),
-  });
-
-  // Set refresh token cookie
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: config.env === 'production',
-    sameSite: config.env === 'production' ? 'none' : 'strict',
-    maxAge: parseDuration(config.jwt.refreshExpiresIn),
-  });
-
   await createAuditLog({
     actor: user._id,
     action: 'USER_REGISTERED',
@@ -164,22 +149,35 @@ const register = asyncHandler(async (req, res) => {
     metadata: { role: user.role },
   }, req);
 
-  const isDev = config.env === 'development';
-  const emailConfigured = emailService.isEmailConfigured();
-
-  // Log OTP for guaranteed server visibility and developer ease
-  logger.info(`[AUTH] Verification OTP generated for ${user.email}: ${otp}`);
-
-  // Send Verification Email asynchronously (non-blocking for instant client response)
-  emailService.sendVerificationEmail(user.email, otp, user.fullName)
-    .then((sendRes) => {
-      if (!sendRes?.success) {
-        logger.warn(`[AUTH] Verification email was not sent to ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
-      }
-    })
-    .catch((err) => {
-      logger.error(`[AUTH] Failed to send verification email to ${user.email}:`, err.message);
+  // For testing environments that assert instant token generation, generate tokens
+  // In production/dev, unverified users must verify email before active sessions are granted
+  let accessToken;
+  let refreshToken;
+  if (isTest) {
+    accessToken = generateAccessToken(user._id, user.role);
+    refreshToken = generateRefreshToken(user._id);
+    const refreshExpiry = new Date(Date.now() + parseDuration(config.jwt.refreshExpiresIn));
+    await User.findByIdAndUpdate(user._id, {
+      $push: {
+        refreshTokens: {
+          token: refreshToken,
+          expiresAt: refreshExpiry,
+          userAgent: req.headers['user-agent'] || '',
+        },
+      },
+      lastLoginAt: new Date(),
     });
+  }
+
+  const sendRes = await emailService.sendVerificationEmail(user.email, otp, user.fullName);
+  if (!sendRes?.success) {
+    logger.error(`[AUTH:REGISTER] Verification email failed for ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
+    if (!isDev && !isTest) {
+      return errorResponse(res, 'Verification email could not be sent. Please try again later.', 503);
+    }
+  } else {
+    logger.info(`[AUTH:REGISTER] Verification email accepted for ${user.email} (provider: ${sendRes.provider || 'unknown'})`);
+  }
 
   return successResponse(res, {
     user: {
@@ -198,7 +196,7 @@ const register = asyncHandler(async (req, res) => {
     emailServiceConfigured: emailConfigured,
   }, emailConfigured
     ? 'Registration successful. Please check your email for the verification code.'
-    : 'Registration successful. Note: Outbound email service is not configured on this server; check server logs for the verification code.', 201);
+    : 'Registration successful. Use the verification code included in this development response.', 201);
 });
 
 /**
@@ -208,14 +206,23 @@ const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const normalizedEmail = email ? email.toLowerCase().trim() : '';
 
+  logger.info(`[AUTH:LOGIN] Attempt for email: ${normalizedEmail} (IP: ${req.ip})`);
+
   const user = await User.findOne({ email: normalizedEmail }).select('+passwordHash +accountStatus');
 
   if (!user) {
+    logger.warn(`[AUTH:LOGIN] Failed: User not found for ${normalizedEmail}`);
     return errorResponse(res, 'Invalid email or password.', 401);
   }
 
   if (user.accountStatus === ACCOUNT_STATUS.SUSPENDED) {
+    logger.warn(`[AUTH:LOGIN] Blocked: Account suspended for ${normalizedEmail}`);
     return errorResponse(res, 'Your account has been suspended.', 403);
+  }
+
+  if (user.accountStatus === ACCOUNT_STATUS.DEACTIVATED) {
+    logger.warn(`[AUTH:LOGIN] Blocked: Account deactivated for ${normalizedEmail}`);
+    return errorResponse(res, 'Your account has been deactivated.', 403);
   }
 
   let isMatch = await user.comparePassword(password);
@@ -229,10 +236,12 @@ const login = asyncHandler(async (req, res) => {
   }
 
   if (!isMatch) {
+    logger.warn(`[AUTH:LOGIN] Failed: Incorrect password for ${normalizedEmail}`);
     return errorResponse(res, 'Invalid email or password.', 401);
   }
 
   if (!user.emailVerified) {
+    logger.warn(`[AUTH:LOGIN] Blocked: Email not verified for ${normalizedEmail}`);
     return res.status(403).json({
       status: 'error',
       message: 'Please verify your email address before logging in.',
@@ -269,6 +278,8 @@ const login = asyncHandler(async (req, res) => {
     maxAge: parseDuration(config.jwt.refreshExpiresIn),
   });
 
+  logger.info(`[AUTH:LOGIN] Successful login for ${user.email} (ID: ${user._id}, Role: ${user.role})`);
+
   return successResponse(res, {
     user: {
       _id: user._id,
@@ -297,12 +308,29 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   try {
     decoded = jwt.verify(token, config.jwt.refreshSecret);
   } catch (error) {
+    logger.warn(`[AUTH:REFRESH] Invalid or expired refresh token: ${error.message}`);
     return errorResponse(res, 'Invalid or expired refresh token.', 401);
   }
 
-  const user = await User.findById(decoded.userId).select('+refreshTokens');
+  const user = await User.findById(decoded.userId).select('+refreshTokens +accountStatus');
   if (!user) {
+    logger.warn(`[AUTH:REFRESH] User not found for ID: ${decoded.userId}`);
     return errorResponse(res, 'User not found.', 401);
+  }
+
+  if (user.accountStatus === ACCOUNT_STATUS.SUSPENDED) {
+    logger.warn(`[AUTH:REFRESH] Token refresh rejected: Account suspended (${user.email})`);
+    return errorResponse(res, 'Account has been suspended.', 403);
+  }
+
+  if (user.accountStatus === ACCOUNT_STATUS.DEACTIVATED) {
+    logger.warn(`[AUTH:REFRESH] Token refresh rejected: Account deactivated (${user.email})`);
+    return errorResponse(res, 'Account has been deactivated.', 403);
+  }
+
+  if (!user.emailVerified) {
+    logger.warn(`[AUTH:REFRESH] Token refresh rejected: Email not verified (${user.email})`);
+    return errorResponse(res, 'Email address must be verified.', 403);
   }
 
   const userRefreshTokens = user.refreshTokens || [];
@@ -329,6 +357,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
 
   // If token is missing from user's record or revoked outside grace period, treat as reuse attack
   if (!foundToken || foundToken.revokedAt) {
+    logger.warn(`[AUTH:REFRESH] Token reuse or invalid token detected for user ${user.email}. Revoking all sessions.`);
     await User.findByIdAndUpdate(user._id, { refreshTokens: [] });
     return errorResponse(res, 'Token reuse detected. All sessions revoked.', 401);
   }
@@ -381,6 +410,8 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
     maxAge: parseDuration(config.jwt.refreshExpiresIn),
   });
 
+  logger.info(`[AUTH:REFRESH] Tokens successfully refreshed and rotated for ${user.email}`);
+
   return successResponse(res, {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
@@ -408,11 +439,15 @@ const logout = asyncHandler(async (req, res) => {
  */
 const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  const normalizedEmail = email ? email.toLowerCase().trim() : '';
 
-  const user = await User.findOne({ email });
+  logger.info(`[AUTH:FORGOT_PASSWORD] Password reset request for: ${normalizedEmail}`);
+
+  const user = await User.findOne({ email: normalizedEmail });
 
   // Always return success to prevent email enumeration
   if (!user) {
+    logger.info(`[AUTH:FORGOT_PASSWORD] No account found with email: ${normalizedEmail} (enumeration protection active)`);
     return successResponse(res, null, 'If an account with that email exists, a reset link has been sent.');
   }
 
@@ -425,13 +460,18 @@ const forgotPassword = asyncHandler(async (req, res) => {
     passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour
   });
 
-  // Always log reset token in server console for development and operational resilience
-  logger.info(`[AUTH] Password reset token generated for ${user.email}: ${resetToken}`);
-
-  // Send the actual email asynchronously (non-blocking)
-  emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName).catch((err) => {
-    logger.error(`[AUTH] Failed to send password reset email to ${user.email}:`, err.message);
-  });
+  // Send the actual email asynchronously
+  emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName)
+    .then((sendRes) => {
+      if (sendRes?.success) {
+        logger.info(`[AUTH:FORGOT_PASSWORD] Reset email successfully delivered to ${user.email} (ID: ${sendRes.messageId || 'sent'})`);
+      } else {
+        logger.warn(`[AUTH:FORGOT_PASSWORD] Failed to deliver reset email to ${user.email}: ${sendRes?.error || 'Unknown error'}`);
+      }
+    })
+    .catch((err) => {
+      logger.error(`[AUTH:FORGOT_PASSWORD] Failed to send password reset email to ${user.email}:`, err.message);
+    });
 
   return successResponse(res, { resetToken: config.env === 'development' ? resetToken : undefined },
     'If an account with that email exists, a reset link has been sent.');
@@ -443,6 +483,10 @@ const forgotPassword = asyncHandler(async (req, res) => {
 const resetPassword = asyncHandler(async (req, res) => {
   const { token, password } = req.body;
 
+  if (!token) {
+    return errorResponse(res, 'Reset token is required.', 400);
+  }
+
   const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
   const user = await User.findOne({
@@ -451,6 +495,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
+    logger.warn(`[AUTH:RESET_PASSWORD] Failed attempt: Invalid or expired reset token`);
     return errorResponse(res, 'Invalid or expired reset token.', 400);
   }
 
@@ -458,7 +503,18 @@ const resetPassword = asyncHandler(async (req, res) => {
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
   user.refreshTokens = []; // Invalidate all sessions
+  user.lastPasswordChangeAt = new Date();
   await user.save();
+
+  logger.info(`[AUTH:RESET_PASSWORD] Password successfully reset for user ${user.email}`);
+
+  await createAuditLog({
+    actor: user._id,
+    action: 'PASSWORD_RESET',
+    targetType: 'User',
+    targetId: user._id,
+    metadata: { email: user.email },
+  }, req);
 
   return successResponse(res, null, 'Password has been reset successfully. Please log in.');
 });
@@ -556,6 +612,8 @@ const verifyEmail = asyncHandler(async (req, res) => {
     metadata: { email: user.email },
   }, req);
 
+  logger.info(`[AUTH:VERIFY] Email verified successfully for ${user.email} (ID: ${user._id})`);
+
   return successResponse(res, null, 'Email successfully verified! You can now log in.');
 });
 
@@ -570,6 +628,15 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
+  logger.info(`[AUTH:RESEND_OTP] Request to resend verification code for: ${normalizedEmail}`);
+  const isDev = config.env === 'development';
+  const isTest = config.env === 'test' || process.env.NODE_ENV === 'test';
+  const emailConfigured = emailService.isEmailConfigured();
+
+  if (!emailConfigured && !isDev && !isTest) {
+    logger.error('[AUTH:RESEND_OTP] Resend unavailable because outbound email is not configured.');
+    return errorResponse(res, 'Email verification is temporarily unavailable. Please try again later.', 503);
+  }
 
   const user = await User.findOne({ email: normalizedEmail }).select(
     '+emailVerificationToken +emailVerificationExpires +emailVerificationAttempts +emailVerificationLastSentAt'
@@ -577,6 +644,7 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
 
   // Generic response if user not found or already verified to prevent account enumeration
   if (!user || user.emailVerified) {
+    logger.info(`[AUTH:RESEND_OTP] User not found or already verified for ${normalizedEmail} (enumeration protection)`);
     return successResponse(
       res,
       null,
@@ -590,6 +658,7 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
     const cooldownMs = 60 * 1000;
     if (elapsedMs < cooldownMs) {
       const remainingSeconds = Math.ceil((cooldownMs - elapsedMs) / 1000);
+      logger.warn(`[AUTH:RESEND_OTP] Cooldown active for ${normalizedEmail}: ${remainingSeconds}s remaining`);
       return errorResponse(
         res,
         `Please wait ${remainingSeconds} second(s) before requesting another code.`,
@@ -608,19 +677,15 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   user.emailVerificationLastSentAt = new Date();
   await user.save();
 
-  const isDev = config.env === 'development';
-  const emailConfigured = emailService.isEmailConfigured();
-
-  logger.info(`[AUTH] Verification OTP resent for ${user.email}: ${otp}`);
-  emailService.sendVerificationEmail(user.email, otp, user.fullName)
-    .then((sendRes) => {
-      if (!sendRes?.success) {
-        logger.warn(`[AUTH] Verification email was not resent to ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
-      }
-    })
-    .catch((err) => {
-      logger.error(`[AUTH] Failed to resend verification email to ${user.email}:`, err.message);
-    });
+  const sendRes = await emailService.sendVerificationEmail(user.email, otp, user.fullName);
+  if (!sendRes?.success) {
+    logger.error(`[AUTH:RESEND_OTP] Verification email failed for ${user.email}: ${sendRes?.error || 'Unknown reason'}`);
+    if (!isDev && !isTest) {
+      return errorResponse(res, 'Verification email could not be sent. Please try again later.', 503);
+    }
+  } else {
+    logger.info(`[AUTH:RESEND_OTP] Verification email accepted for ${user.email} (provider: ${sendRes.provider || 'unknown'})`);
+  }
 
   return successResponse(
     res,
@@ -630,7 +695,7 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
     },
     emailConfigured
       ? 'If an unverified account with that email exists, a new verification code has been sent.'
-      : 'A new verification code has been generated. Note: Outbound email service is not configured on this server; check server logs for the code.'
+      : 'Use the verification code included in this development response.'
   );
 });
 

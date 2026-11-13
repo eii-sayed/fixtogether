@@ -34,7 +34,6 @@ import RepairRequestMessagesPage from './pages/repairs/RepairRequestMessagesPage
 import ForumPage from './pages/forum/ForumPage';
 import ThreadDetailPage from './pages/forum/ThreadDetailPage';
 import NewThreadPage from './pages/forum/NewThreadPage';
-import CalendarPage from './pages/calendar/CalendarPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function AdminRedirectGateway() {
@@ -151,9 +150,6 @@ export default function App() {
 
         {/* Messages */}
         <Route path="/messages" element={<ProtectedRoute><ConversationsPage /></ProtectedRoute>} />
-
-        {/* Schedule & Appointments Calendar */}
-        <Route path="/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
 
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />

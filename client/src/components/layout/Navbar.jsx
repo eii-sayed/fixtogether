@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/axios';
-import GlobalSearchModal from '../common/GlobalSearchModal';
 import NotificationDropdown from '../notifications/NotificationDropdown';
 import {
   Menu,
@@ -23,9 +22,7 @@ import {
   MessageCircle,
   Sparkles,
   ShieldCheck,
-  Search,
   MessagesSquare,
-  Calendar,
 } from 'lucide-react';
 
 const getAdminUrl = () => {
@@ -47,7 +44,6 @@ const roleNavItems = {
   owner: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { label: 'My Items', path: '/items', icon: Package },
-    { label: 'Calendar', path: '/calendar', icon: Calendar },
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: Wrench },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
@@ -55,7 +51,6 @@ const roleNavItems = {
   ],
   technician: [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'Schedule', path: '/calendar', icon: Calendar },
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: ClipboardList },
     { label: 'My Jobs', path: '/repair-jobs', icon: Wrench },
@@ -81,19 +76,6 @@ export default function Navbar() {
   const location = useLocation();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [searchModalOpen, setSearchModalOpen] = useState(false);
-
-  // Global Ctrl+K / Cmd+K listener
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchModalOpen((open) => !open);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   // Close drawer on route change
   useEffect(() => {
@@ -192,28 +174,6 @@ export default function Navbar() {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-2">
-            {/* Global Search Trigger */}
-            <button
-              onClick={() => setSearchModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-500 text-xs font-semibold border border-gray-200/60 transition-colors"
-              aria-label="Global Search"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Search...</span>
-              <kbd className="font-mono text-[10px] bg-white px-1.5 py-0.5 rounded border border-gray-200 text-gray-400">
-                Ctrl K
-              </kbd>
-            </button>
-
-            {/* Mobile Search Button */}
-            <button
-              onClick={() => setSearchModalOpen(true)}
-              className="sm:hidden p-2.5 text-gray-600 hover:bg-gray-100 rounded-xl"
-              aria-label="Global Search"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-
             {isAuthenticated ? (
               <>
                 {/* Notification Interactive Dropdown */}
@@ -491,8 +451,6 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* Global Search Modal */}
-      <GlobalSearchModal isOpen={searchModalOpen} onClose={() => setSearchModalOpen(false)} />
     </nav>
   );
 }
