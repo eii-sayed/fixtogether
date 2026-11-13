@@ -10,6 +10,7 @@ const {
   Appointment,
   RepairJob,
   Review,
+  ImpactRecord,
 } = require('../models');
 const {
   asyncHandler,
@@ -20,7 +21,86 @@ const {
 } = require('../utils/helpers');
 const { createAuditLog } = require('../middleware/auditLog');
 const uploadService = require('../services/uploadService');
-const { ROLES } = require('../constants');
+const { ROLES, REPAIR_JOB_STATUS, REPAIR_REQUEST_STATUS, DONATION_STATUS } = require('../constants');
+
+// Uses the existing donation impact estimate: 2.8 kg CO2e per kg of verified waste avoided.
+const CO2_EQUIVALENT_PER_KG_WASTE_AVOIDED = 2.8;
+// Impact points are derived from completed contributions rather than stored demo totals.
+const IMPACT_POINTS_PER_ITEM_SAVED = 10;
+const IMPACT_POINTS_PER_ITEM_DONATED = 5;
+
+const getProfileImpactStats = async (user) => {
+  let itemsSaved = 0;
+  let itemsDonated = 0;
+  let impactRecords = [];
+
+  if (user.role === ROLES.OWNER || user.role === ROLES.TECHNICIAN) {
+    const [completedDonations, repairedItemIds] = await Promise.all([
+      DonationOffer.find({ owner: user._id, status: DONATION_STATUS.COMPLETED })
+        .select('item quantity')
+        .lean(),
+      user.role === ROLES.OWNER
+        ? RepairRequest.distinct('item', {
+            owner: user._id,
+            requestStatus: REPAIR_REQUEST_STATUS.COMPLETED,
+          })
+        : RepairJob.distinct('repairRequest', {
+            technician: user._id,
+            currentStatus: REPAIR_JOB_STATUS.COMPLETED,
+          }).then((repairRequestIds) =>
+            RepairRequest.distinct('item', { _id: { $in: repairRequestIds } })
+          ),
+    ]);
+
+    const repairedItemKeys = new Set(repairedItemIds.map((id) => id.toString()));
+    const contributedItemKeys = new Set(repairedItemKeys);
+    completedDonations.forEach((offer) => {
+      if (offer.item) contributedItemKeys.add(offer.item.toString());
+      itemsDonated += Number(offer.quantity) || 1;
+    });
+    itemsSaved = contributedItemKeys.size;
+
+    if (contributedItemKeys.size > 0) {
+      const impactQuery = {
+        item: { $in: Array.from(contributedItemKeys) },
+        verified: true,
+      };
+      if (user.role === ROLES.TECHNICIAN) impactQuery.outcome = 'repaired';
+      impactRecords = await ImpactRecord.find(impactQuery)
+        .select('estimatedWasteAvoided')
+        .lean();
+    }
+  } else if (user.role === ROLES.ORGANIZATION) {
+    const organization = await OrganizationProfile.findOne({ user: user._id }).select('_id');
+    if (organization) {
+      impactRecords = await ImpactRecord.find({ organization: organization._id, verified: true })
+        .select('outcome quantity estimatedWasteAvoided')
+        .lean();
+      itemsSaved = impactRecords.reduce((total, record) => total + (Number(record.quantity) || 1), 0);
+      itemsDonated = impactRecords
+        .filter((record) => ['donated', 'redistributed'].includes(record.outcome))
+        .reduce((total, record) => total + (Number(record.quantity) || 1), 0);
+    }
+  }
+
+  const wasteAvoidedKg = impactRecords.reduce(
+    (total, record) => total + (Number(record.estimatedWasteAvoided) || 0),
+    0
+  );
+  const co2ReducedKg = Math.round(wasteAvoidedKg * CO2_EQUIVALENT_PER_KG_WASTE_AVOIDED * 10) / 10;
+  const impactPoints =
+    itemsSaved * IMPACT_POINTS_PER_ITEM_SAVED + itemsDonated * IMPACT_POINTS_PER_ITEM_DONATED;
+  const impactLevel =
+    impactPoints >= 100
+      ? 'Community Champion'
+      : impactPoints >= 25
+        ? 'Active Contributor'
+        : impactPoints > 0
+          ? 'Helpful Neighbor'
+          : 'New Member';
+
+  return { itemsSaved, co2ReducedKg, impactPoints, itemsDonated, impactLevel };
+};
 
 /**
  * GET /users/me/activity
@@ -386,6 +466,7 @@ const getMyStats = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const user = await User.findById(userId);
   if (!user) return errorResponse(res, 'User not found.', 404);
+  const impactStats = await getProfileImpactStats(user);
 
   if (user.role === ROLES.OWNER) {
     const [registeredItems, activeRepairs, completedRepairs, totalDonations, recyclingItems] =
@@ -403,7 +484,7 @@ const getMyStats = asyncHandler(async (req, res) => {
           },
         }),
         RepairRequest.countDocuments({ owner: userId, requestStatus: 'completed' }),
-        DonationOffer.countDocuments({ donor: userId }),
+        DonationOffer.countDocuments({ owner: userId }),
         Item.countDocuments({ owner: userId, condition: 'for_parts' }),
       ]);
 
@@ -415,6 +496,7 @@ const getMyStats = asyncHandler(async (req, res) => {
         totalDonations,
         recyclingItems,
       },
+      impactStats,
     });
   }
 
@@ -427,6 +509,7 @@ const getMyStats = asyncHandler(async (req, res) => {
         reviewCount: techProfile?.reviewCount || 0,
         completionRate: techProfile?.completionRate || 0,
       },
+      impactStats,
     });
   }
 
@@ -438,10 +521,11 @@ const getMyStats = asyncHandler(async (req, res) => {
         itemsProcessed: orgProfile?.impactStats?.totalItemsProcessed || 0,
         weightProcessed: orgProfile?.impactStats?.totalWeightProcessed || 0,
       },
+      impactStats,
     });
   }
 
-  return successResponse(res, { stats: {} });
+  return successResponse(res, { stats: {}, impactStats });
 });
 
 
@@ -691,10 +775,11 @@ const getUserPublicProfile = asyncHandler(async (req, res) => {
   }
 
   // Aggregate public contributions
-  const [itemsCount, completedRepairsCount, donationsCount] = await Promise.all([
+  const [itemsCount, completedRepairsCount, donationsCount, impactStats] = await Promise.all([
     Item.countDocuments({ owner: user._id }),
-    RepairJob.countDocuments({ owner: user._id, status: 'completed' }),
+    RepairJob.countDocuments({ owner: user._id, currentStatus: REPAIR_JOB_STATUS.COMPLETED }),
     DonationOffer.countDocuments({ owner: user._id, status: { $in: ['accepted', 'completed'] } }),
+    getProfileImpactStats(user),
   ]);
 
   const publicUser = {
@@ -713,6 +798,7 @@ const getUserPublicProfile = asyncHandler(async (req, res) => {
       repairsCompleted: completedRepairsCount,
       donationsContributed: donationsCount,
     },
+    impactStats,
   };
 
   return successResponse(res, { user: publicUser });

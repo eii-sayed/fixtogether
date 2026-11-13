@@ -57,12 +57,14 @@ export default function UserProfilePage() {
   const u = profileRes;
   const isSelf = currentUser && (currentUser.userId === u._id || currentUser._id === u._id);
 
-  const getRoleBadge = (role) => {
+  const getRoleBadge = (profile) => {
+    const role = profile.role;
+    const isVerifiedTechnician = profile.technicianProfile?.verificationStatus === 'approved';
     switch (role) {
       case 'technician':
         return (
-          <span className="badge-blue text-xs font-bold flex items-center gap-1">
-            <Wrench className="w-3 h-3" /> Verified Technician
+          <span className={`${isVerifiedTechnician ? 'badge-blue' : 'badge-gray'} text-xs font-bold flex items-center gap-1`}>
+            <Wrench className="w-3 h-3" /> {isVerifiedTechnician ? 'Verified Technician' : 'Technician'}
           </span>
         );
       case 'organization':
@@ -118,7 +120,7 @@ export default function UserProfilePage() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900">{u?.fullName}</h1>
-                  {getRoleBadge(u?.role)}
+                  {getRoleBadge(u)}
                 </div>
 
                 <p className="text-xs text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
@@ -172,9 +174,11 @@ export default function UserProfilePage() {
               <Globe2 className="w-5 h-5 text-green-600" />
               Environmental Impact
             </h3>
-            <span className="badge-green text-[10px] font-semibold bg-green-100 text-green-700 border-none">
-              Community Hero
-            </span>
+            {u?.impactStats?.impactLevel && (
+              <span className="badge-green text-[10px] font-semibold bg-green-100 text-green-700 border-none">
+                {u.impactStats.impactLevel}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -183,7 +187,7 @@ export default function UserProfilePage() {
                 <Leaf className="w-5 h-5 text-green-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {u?.role === 'technician' ? (u?.technicianProfile?.completedRepairCount || 0) + 12 : 4}
+                {u?.impactStats?.itemsSaved ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Items Saved</p>
             </div>
@@ -193,9 +197,9 @@ export default function UserProfilePage() {
                 <Recycle className="w-5 h-5 text-blue-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {u?.role === 'technician' ? ((u?.technicianProfile?.completedRepairCount || 0) * 3.5 + 42).toFixed(1) : 14.5}
+                {u?.impactStats?.co2ReducedKg == null ? '—' : Number(u.impactStats.co2ReducedKg).toFixed(1)}
               </span>
-              <p className="text-[10px] sm:text-xs text-gray-500 font-medium">kg CO₂ Reduced</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Est. kg CO₂ Reduced</p>
             </div>
 
             <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-white flex flex-col items-center justify-center text-center transition-transform hover:-translate-y-1 duration-300">
@@ -203,7 +207,7 @@ export default function UserProfilePage() {
                 <Star className="w-5 h-5 text-amber-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {u?.role === 'technician' ? 850 : 120}
+                {u?.impactStats?.impactPoints ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Impact Points</p>
             </div>
@@ -213,7 +217,7 @@ export default function UserProfilePage() {
                 <Heart className="w-5 h-5 text-purple-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {u?.role === 'organization' ? 25 : (u?.role === 'technician' ? 3 : 1)}
+                {u?.impactStats?.itemsDonated ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Items Donated</p>
             </div>
@@ -232,10 +236,12 @@ export default function UserProfilePage() {
               <div>
                 <h3 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
                   <span>{u.technicianProfile.professionalName || u.fullName}</span>
-                  <span className="badge-green text-[10px]">Verified Technician</span>
+                  <span className="badge-green text-[10px]">
+                    {u.technicianProfile.verificationStatus === 'approved' ? 'Verified Technician' : 'Technician'}
+                  </span>
                 </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Specialized technician with {u.technicianProfile.yearsOfExperience || 1}+ years repair experience
+                  Specialized technician with {u.technicianProfile.yearsOfExperience ?? 0}+ years repair experience
                 </p>
               </div>
             </div>
@@ -255,7 +261,7 @@ export default function UserProfilePage() {
               <div className="flex items-center justify-center gap-1 text-amber-500">
                 <Star className="w-3.5 h-3.5 fill-amber-400" />
                 <span className="font-bold text-sm text-gray-900">
-                  {u.technicianProfile.averageRating > 0 ? u.technicianProfile.averageRating.toFixed(1) : '5.0'}
+                  {u.technicianProfile.averageRating > 0 ? u.technicianProfile.averageRating.toFixed(1) : '—'}
                 </span>
               </div>
               <p className="text-[10px] text-gray-500 mt-0.5">({u.technicianProfile.reviewCount || 0} reviews)</p>
@@ -267,7 +273,7 @@ export default function UserProfilePage() {
             </div>
 
             <div className="bg-white/80 p-3 rounded-xl border border-primary-100 text-center">
-              <span className="font-bold text-sm text-gray-900">{u.technicianProfile.yearsOfExperience || 1} yrs</span>
+              <span className="font-bold text-sm text-gray-900">{u.technicianProfile.yearsOfExperience ?? 0} yrs</span>
               <p className="text-[10px] text-gray-500 mt-0.5">Experience</p>
             </div>
 

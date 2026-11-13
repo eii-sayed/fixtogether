@@ -134,8 +134,9 @@ export default function ProfilePage() {
 
   const userData = profileRes?.user || user;
   const roleProfile = profileRes?.roleProfile;
-  const completionPercentage = profileRes?.completionPercentage ?? 60;
+  const completionPercentage = profileRes?.completionPercentage;
   const stats = statsRes?.stats || {};
+  const impactStats = statsRes?.impactStats;
   const activities = activityRes?.activities || [];
 
   // Determine tabs per role
@@ -265,12 +266,14 @@ export default function ProfilePage() {
               <Sparkles className="w-4 h-4 text-primary-600 shrink-0" />
               <div>
                 <p className="text-xs font-bold text-gray-800">
-                  Profile Completion: {completionPercentage}%
+                  Profile Completion: {completionPercentage ?? '—'}{completionPercentage == null ? '' : '%'}
                 </p>
                 <p className="text-[11px] text-gray-500">
-                  {completionPercentage === 100
-                    ? 'Your profile is 100% complete and fully verified!'
-                    : 'Complete your bio, service area, and contact preferences to build trust.'}
+                  {completionPercentage == null
+                    ? 'Profile completion is currently unavailable.'
+                    : completionPercentage === 100
+                      ? 'Your profile is complete. Keep your details up to date.'
+                      : 'Complete the missing profile details to build trust.'}
                 </p>
               </div>
             </div>
@@ -278,7 +281,7 @@ export default function ProfilePage() {
             <div className="w-full sm:w-48 bg-gray-200 h-2.5 rounded-full overflow-hidden">
               <div
                 className="bg-gradient-to-r from-primary-500 to-emerald-500 h-full rounded-full transition-all duration-500"
-                style={{ width: `${completionPercentage}%` }}
+                style={{ width: `${completionPercentage ?? 0}%` }}
               />
             </div>
           </div>
@@ -296,9 +299,11 @@ export default function ProfilePage() {
               <Globe2 className="w-5 h-5 text-green-600" />
               Your Environmental Impact
             </h3>
-            <span className="badge-green text-[10px] font-semibold bg-green-100 text-green-700 border-none">
-              Community Hero
-            </span>
+            {impactStats?.impactLevel && (
+              <span className="badge-green text-[10px] font-semibold bg-green-100 text-green-700 border-none">
+                {impactStats.impactLevel}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -307,7 +312,7 @@ export default function ProfilePage() {
                 <Leaf className="w-5 h-5 text-green-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {userData?.role === 'technician' ? (statsRes?.repairsCompleted || 0) + 12 : 4}
+                {impactStats?.itemsSaved ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Items Saved</p>
             </div>
@@ -317,9 +322,9 @@ export default function ProfilePage() {
                 <Recycle className="w-5 h-5 text-blue-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {userData?.role === 'technician' ? ((statsRes?.repairsCompleted || 0) * 3.5 + 42).toFixed(1) : 14.5}
+                {impactStats?.co2ReducedKg == null ? '—' : Number(impactStats.co2ReducedKg).toFixed(1)}
               </span>
-              <p className="text-[10px] sm:text-xs text-gray-500 font-medium">kg CO₂ Reduced</p>
+              <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Est. kg CO₂ Reduced</p>
             </div>
 
             <div className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border border-white flex flex-col items-center justify-center text-center transition-transform hover:-translate-y-1 duration-300">
@@ -327,7 +332,7 @@ export default function ProfilePage() {
                 <Star className="w-5 h-5 text-amber-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {userData?.role === 'technician' ? 850 : 120}
+                {impactStats?.impactPoints ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Impact Points</p>
             </div>
@@ -337,7 +342,7 @@ export default function ProfilePage() {
                 <Heart className="w-5 h-5 text-purple-600" />
               </div>
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                {userData?.role === 'organization' ? 25 : (userData?.role === 'technician' ? 3 : 1)}
+                {impactStats?.itemsDonated ?? '—'}
               </span>
               <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Items Donated</p>
             </div>
@@ -500,7 +505,7 @@ export default function ProfilePage() {
                 <div className="card card-body text-center">
                   <Star className="w-6 h-6 text-amber-500 fill-amber-500 mx-auto mb-1" />
                   <p className="text-2xl font-extrabold text-gray-900">
-                    {roleProfile?.averageRating > 0 ? roleProfile.averageRating.toFixed(1) : '5.0'}
+                    {roleProfile?.averageRating > 0 ? roleProfile.averageRating.toFixed(1) : '—'}
                   </p>
                   <p className="text-xs text-gray-500 font-medium">({roleProfile?.reviewCount || 0} reviews)</p>
                 </div>
@@ -535,7 +540,7 @@ export default function ProfilePage() {
                     Capacity Limit
                   </label>
                   <div className="text-sm font-extrabold text-gray-900">
-                    Max {roleProfile?.maxConcurrentJobs || 5} Concurrent Jobs
+                    Max {roleProfile?.maxConcurrentJobs ?? '—'} Concurrent Jobs
                   </div>
                   {roleProfile?.vacationMode && (
                     <span className="text-[10px] text-purple-700 font-bold mt-0.5">
@@ -766,7 +771,7 @@ export default function ProfilePage() {
 
             <div>
               <h4 className="font-bold text-xs text-gray-500 uppercase">Service Radius</h4>
-              <p className="text-lg font-extrabold text-gray-900 mt-1">{roleProfile?.maximumServiceDistance || 25} km</p>
+              <p className="text-lg font-extrabold text-gray-900 mt-1">{roleProfile?.maximumServiceDistance ?? '—'} km</p>
             </div>
           </div>
 
