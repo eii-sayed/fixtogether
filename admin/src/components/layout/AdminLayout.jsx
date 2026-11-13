@@ -19,7 +19,6 @@ import {
   LogOut,
   ExternalLink,
   ShieldAlert,
-  Sparkles,
 } from 'lucide-react';
 
 const ADMIN_MENU_GROUPS = [

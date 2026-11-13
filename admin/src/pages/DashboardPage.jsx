@@ -1,8 +1,7 @@
-import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
-import { StatCard, PageLoader, ErrorState } from '../components/ui';
+import { PageLoader, ErrorState } from '../components/ui';
 import {
   ClipboardList,
   Shield,
@@ -15,8 +14,6 @@ import {
   ArrowRight,
   Users,
   Activity,
-  CheckCircle,
-  Sparkles,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -33,6 +30,12 @@ export default function DashboardPage() {
   const criticalAlerts = data?.criticalAlerts || {};
   const metrics = data?.metrics || {};
   const systemHealth = data?.systemHealth || {};
+  const apiOperational = systemHealth.status === 'operational';
+  const databaseConnected = systemHealth.database === 'connected';
+  const uptimeSeconds = Math.max(0, Math.floor(systemHealth.apiUptime || 0));
+  const uptimeDays = Math.floor(uptimeSeconds / 86400);
+  const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+  const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -261,21 +264,34 @@ export default function DashboardPage() {
             <div className="space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-gray-400">
                 <span>API Gateway:</span>
-                <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Operational
+                <span className={`${apiOperational ? 'text-emerald-400' : 'text-amber-400'} font-semibold flex items-center gap-1.5`}>
+                  <span className={`w-2 h-2 rounded-full ${apiOperational ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                  {systemHealth.status || 'Unknown'}
                 </span>
               </div>
               <div className="flex items-center justify-between text-gray-400">
                 <span>Database Cluster:</span>
-                <span className="text-emerald-400 font-semibold">Connected</span>
+                <span className={`${databaseConnected ? 'text-emerald-400' : 'text-red-400'} font-semibold`}>
+                  {systemHealth.database || 'Unknown'}
+                </span>
               </div>
               <div className="flex items-center justify-between text-gray-400">
-                <span>AI Governance:</span>
-                <span className="text-emerald-400 font-semibold">Healthy</span>
+                <span>AI analyses:</span>
+                <span className="text-gray-200 font-semibold">
+                  {(metrics.aiAnalysesCount || 0).toLocaleString()}
+                </span>
               </div>
               <div className="flex items-center justify-between text-gray-400">
                 <span>Environment:</span>
-                <span className="text-gray-300 font-mono text-[11px]">Development (Port 5174)</span>
+                <span className="text-gray-300 font-mono text-[11px]">
+                  {systemHealth.environment || 'Unknown'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-gray-400">
+                <span>API uptime:</span>
+                <span className="text-gray-300 font-mono text-[11px]">
+                  {uptimeDays > 0 ? `${uptimeDays}d ` : ''}{uptimeHours}h {uptimeMinutes}m
+                </span>
               </div>
             </div>
           </div>

@@ -1,20 +1,12 @@
-import React, { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
 import {
-  MessageSquare,
   Shield,
-  Clock,
-  UserCheck,
   CheckCircle2,
-  AlertTriangle,
-  Send,
   HelpCircle,
   FileText,
-  DollarSign,
-  Calendar,
-  Wrench,
   Scale,
   XCircle,
 } from 'lucide-react';
@@ -39,10 +31,22 @@ export default function AdminDisputesPage() {
     queryFn: () => api.get('/admin/disputes').then((r) => r.data.data),
   });
 
-  const disputes = disputesData?.disputes || [];
+  const disputes = useMemo(() => disputesData?.disputes || [], [disputesData?.disputes]);
+
+  useEffect(() => {
+    if (disputes.length && !disputes.some((dispute) => dispute._id === selectedDisputeId)) {
+      setSelectedDisputeId(disputes[0]._id);
+    } else if (!disputes.length && selectedDisputeId) {
+      setSelectedDisputeId(null);
+    }
+  }, [disputes, selectedDisputeId]);
 
   // 2. Fetch Selected Dispute Details & Evidence
-  const { data: selectedDetails, isLoading: isDetailsLoading } = useQuery({
+  const {
+    data: selectedDetails,
+    isLoading: isDetailsLoading,
+    error: detailsError,
+  } = useQuery({
     queryKey: ['admin-dispute-details', selectedDisputeId],
     queryFn: () => api.get(`/admin/disputes/${selectedDisputeId}`).then((r) => r.data.data?.dispute),
     enabled: !!selectedDisputeId,
@@ -91,7 +95,7 @@ export default function AdminDisputesPage() {
   if (isLoading) return <PageLoader />;
   if (error) return <ErrorState error={error} />;
 
-  const activeDispute = selectedDetails || (disputes.length > 0 ? disputes[0] : null);
+  const activeDispute = selectedDisputeId ? selectedDetails : null;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -180,7 +184,11 @@ export default function AdminDisputesPage() {
 
         {/* Right: Consolidated Evidence Timeline & Resolution Controls */}
         <div className="lg:col-span-8 space-y-6">
-          {activeDispute ? (
+          {selectedDisputeId && isDetailsLoading ? (
+            <PageLoader />
+          ) : detailsError ? (
+            <ErrorState error={detailsError} />
+          ) : activeDispute ? (
             <div className="space-y-6">
               {/* Case Header Card */}
               <div className="card p-5 space-y-4 bg-gray-900 border-gray-800">

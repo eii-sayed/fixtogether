@@ -1,20 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
 import {
   Shield,
-  Search,
-  Filter,
   Download,
-  Clock,
   Sparkles,
-  CheckCircle2,
-  AlertTriangle,
   Server,
-  Activity,
-  UserCheck,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 export default function AdminAuditLogsPage() {
@@ -37,7 +29,7 @@ export default function AdminAuditLogsPage() {
   });
 
   // 2. Fetch AI Analytics Deep Dive
-  const { data: aiData, isLoading: isAILoading } = useQuery({
+  const { data: aiData, isLoading: isAILoading, error: aiError } = useQuery({
     queryKey: ['admin-ai-analytics'],
     queryFn: () => api.get('/admin/ai-analytics').then((r) => r.data.data),
     enabled: activeTab === 'ai_analytics',
@@ -257,6 +249,12 @@ export default function AdminAuditLogsPage() {
       {/* TAB 2: AI ANALYTICS & PROVIDER GOVERNANCE */}
       {activeTab === 'ai_analytics' && (
         <div className="space-y-6">
+          {isAILoading ? (
+            <PageLoader />
+          ) : aiError ? (
+            <ErrorState error={aiError} />
+          ) : (
+            <>
           {/* Key Benchmarks */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="card p-5 bg-gray-900 border-gray-800">
@@ -270,7 +268,7 @@ export default function AdminAuditLogsPage() {
             <div className="card p-5 bg-gray-900 border-gray-800">
               <span className="text-xs text-gray-400 font-medium">Avg Processing Time</span>
               <div className="text-2xl font-bold text-primary-400 mt-1">
-                {aiData?.averageProcessingTime ? `${Math.round(aiData.averageProcessingTime)}ms` : '640ms'}
+                {aiData?.totalAnalyses > 0 ? `${Math.round(aiData.averageProcessingTime || 0)}ms` : '—'}
               </div>
               <p className="text-[11px] text-gray-500 mt-1">Provider latency</p>
             </div>
@@ -278,15 +276,19 @@ export default function AdminAuditLogsPage() {
             <div className="card p-5 bg-gray-900 border-gray-800">
               <span className="text-xs text-gray-400 font-medium">Owner Correction Rate</span>
               <div className="text-2xl font-bold text-amber-400 mt-1">
-                {aiData?.correctionRate || 0}%
+                {aiData?.correctionRate ?? 0}%
               </div>
               <p className="text-[11px] text-gray-500 mt-1">{aiData?.correctionCount || 0} corrected</p>
             </div>
 
             <div className="card p-5 bg-gray-900 border-gray-800">
-              <span className="text-xs text-gray-400 font-medium">Safety Override Rate</span>
-              <div className="text-2xl font-bold text-emerald-400 mt-1">100%</div>
-              <p className="text-[11px] text-gray-500 mt-1">Deterministic blocks respected</p>
+              <span className="text-xs text-gray-400 font-medium">Analyses with Safety Flags</span>
+              <div className="text-2xl font-bold text-emerald-400 mt-1">
+                {aiData?.safetyFlagRate ?? 0}%
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1">
+                {aiData?.safetyFlaggedCount ?? 0} of {aiData?.totalAnalyses ?? 0} analyses
+              </p>
             </div>
           </div>
 
@@ -297,21 +299,33 @@ export default function AdminAuditLogsPage() {
             </h3>
 
             <div className="grid sm:grid-cols-3 gap-3">
-              {(aiData?.byProvider || [
-                { _id: 'gemini', count: aiData?.totalAnalyses || 12 },
-              ]).map((p, i) => (
-                <div key={i} className="p-4 bg-gray-950/70 rounded-xl border border-gray-800 text-xs space-y-1">
+              {(aiData?.byProvider || []).map((p) => (
+                <div key={p._id || 'unknown'} className="p-4 bg-gray-950/70 rounded-xl border border-gray-800 text-xs space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-gray-200 uppercase">{p._id || 'Primary'}</span>
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Active
+                    <span className="text-gray-400 font-semibold">
+                      Recorded
                     </span>
                   </div>
-                  <p className="text-gray-400">{p.count} successful analyses executed</p>
+                  <p className="text-gray-400">{p.count} analyses recorded</p>
                 </div>
               ))}
+              {(aiData?.byProvider || []).length === 0 && (
+                <div className="sm:col-span-3">
+                  <EmptyState
+                    title="No AI analyses recorded"
+                    description="Provider metrics will appear after repair requests have been analyzed."
+                    icon={Server}
+                  />
+                </div>
+              )}
             </div>
+            <p className="text-xs text-gray-400">
+              Provider fallback used for {aiData?.fallbackCount ?? 0} analyses ({aiData?.fallbackRate ?? 0}%).
+            </p>
           </div>
+            </>
+          )}
         </div>
       )}
     </div>

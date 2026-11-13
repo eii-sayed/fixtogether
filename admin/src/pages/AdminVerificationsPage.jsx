@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
@@ -8,15 +8,8 @@ import {
   CheckCircle,
   XCircle,
   User,
-  Calendar,
   Building,
-  FileText,
-  AlertTriangle,
   HelpCircle,
-  Eye,
-  CheckSquare,
-  Square,
-  Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 

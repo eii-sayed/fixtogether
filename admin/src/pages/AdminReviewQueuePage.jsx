@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
 import {
-  ClipboardList,
   AlertTriangle,
   Shield,
   Clock,
@@ -14,7 +13,6 @@ import {
   Unlock,
   MessageSquare,
   ArrowRight,
-  Filter,
   Search,
   CheckSquare,
   Square,
@@ -23,7 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { ADMIN_PRIORITIES, REVIEW_QUEUE_STATES, formatSLACountdown } from '../utils/adminStatusConfig';
+import { ADMIN_PRIORITIES, formatSLACountdown } from '../utils/adminStatusConfig';
 
 const QUEUE_TABS = [
   { key: 'all', label: 'All Items' },
@@ -54,7 +52,7 @@ export default function AdminReviewQueuePage() {
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['admin-review-queue', { tab: activeTab, search }],
     queryFn: () =>
-      api.get(`/admin/review-queue?tab=${activeTab}&search=${search}`).then((r) => r.data.data),
+      api.get('/admin/review-queue', { params: { tab: activeTab, search } }).then((r) => r.data.data),
     refetchInterval: 20000,
   });
 
@@ -80,12 +78,6 @@ export default function AdminReviewQueuePage() {
       queryClient.invalidateQueries(['admin-review-queue']);
     },
     onError: (err) => setErrorMsg(err.response?.data?.message || 'Failed to take over review lock.'),
-  });
-
-  // Assign Mutation
-  const assignMutation = useMutation({
-    mutationFn: ({ id, adminId }) => api.post(`/admin/review-queue/${id}/assign`, { adminId }),
-    onSuccess: () => queryClient.invalidateQueries(['admin-review-queue']),
   });
 
   // Add Note Mutation
@@ -135,8 +127,12 @@ export default function AdminReviewQueuePage() {
   const items = data?.items || [];
 
   const toggleSelectAll = () => {
-    if (selectedItems.length === items.length) setSelectedItems([]);
-    else setSelectedItems(items.map((i) => i._id));
+    const visibleIds = new Set(items.map((item) => item._id));
+    const allVisibleSelected = items.length > 0 && items.every((item) => selectedItems.includes(item._id));
+    setSelectedItems((previous) => allVisibleSelected
+      ? previous.filter((id) => !visibleIds.has(id))
+      : [...new Set([...previous, ...visibleIds])]
+    );
   };
 
   const toggleSelectItem = (id) => {
@@ -225,6 +221,18 @@ export default function AdminReviewQueuePage() {
           />
         </div>
 
+        <button
+          type="button"
+          onClick={toggleSelectAll}
+          disabled={items.length === 0 || bulkMutation.isPending}
+          aria-pressed={items.length > 0 && items.every((item) => selectedItems.includes(item._id))}
+          className="btn-outline py-2 px-3 text-xs disabled:opacity-50"
+        >
+          {items.length > 0 && items.every((item) => selectedItems.includes(item._id))
+            ? 'Clear page selection'
+            : 'Select page'}
+        </button>
+
         {selectedItems.length > 0 && (
           <div className="flex items-center gap-2 bg-primary-500/10 px-3 py-1.5 rounded-xl border border-primary-500/30">
             <span className="text-xs font-bold text-primary-300">
@@ -232,11 +240,13 @@ export default function AdminReviewQueuePage() {
             </span>
             <button
               onClick={() => bulkMutation.mutate({ action: 'assign_to_me' })}
+              disabled={bulkMutation.isPending}
               className="btn-primary py-1 px-2.5 text-xs"
             >
               Assign to Me
             </button>
             <button
+              disabled={bulkMutation.isPending}
               onClick={() => {
                 const snoozeUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
                 bulkMutation.mutate({ action: 'snooze', snoozedUntil: snoozeUntil });

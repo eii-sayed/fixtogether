@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
@@ -13,10 +13,7 @@ import {
   RotateCcw,
   CheckCircle2,
   XCircle,
-  FileCode,
-  Layers,
   History,
-  Eye,
 } from 'lucide-react';
 
 export default function AdminSafetyPage() {
@@ -54,7 +51,7 @@ export default function AdminSafetyPage() {
   });
 
   // 2. Fetch Flagged Listings
-  const { data: flaggedData, isLoading: isFlaggedLoading } = useQuery({
+  const { data: flaggedData, isLoading: isFlaggedLoading, error: flaggedError } = useQuery({
     queryKey: ['admin-flagged-listings'],
     queryFn: () => api.get('/admin/flagged-listings').then((r) => r.data.data),
     enabled: activeTab === 'flagged',
@@ -517,6 +514,11 @@ export default function AdminSafetyPage() {
 
       {/* TAB 2: FLAGGED LISTINGS */}
       {activeTab === 'flagged' && (
+        isFlaggedLoading ? (
+          <PageLoader />
+        ) : flaggedError ? (
+          <ErrorState error={flaggedError} />
+        ) : (
         <div className="space-y-3">
           {listings.length > 0 ? (
             listings.map((l) => (
@@ -579,6 +581,7 @@ export default function AdminSafetyPage() {
             />
           )}
         </div>
+        )
       )}
 
       {/* Simulator Modal */}

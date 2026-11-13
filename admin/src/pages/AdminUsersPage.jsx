@@ -1,22 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, StatusBadge, Pagination } from '../components/ui';
 import { toast } from 'sonner';
-import {
-  Users,
-  Search,
-  Shield,
-  Ban,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  RotateCcw,
-  Key,
-  LogOut,
-  History,
-  MoreVertical,
-} from 'lucide-react';
+import { Search, Shield, Ban, CheckCircle, XCircle, History } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_TABS = [

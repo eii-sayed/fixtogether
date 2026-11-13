@@ -22,7 +22,7 @@
     "seed": "cd server && npm run seed",
     "seed:donations": "cd server && npm run seed:donations",
     "seed:threads": "cd server && npm run seed:threads",
-    "lint": "cd server && npm run lint && cd ../client && npm run lint",
+    "lint": "cd server && npm run lint && cd ../client && npm run lint && cd ../admin && npm run lint",
     "format": "cd server && npm run format && cd ../client && npm run format",
     "docker:up": "docker compose up",
     "docker:up:build": "docker compose up --build",

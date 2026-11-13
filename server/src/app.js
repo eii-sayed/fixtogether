@@ -8,6 +8,7 @@ const config = require('./config');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const logger = require('./utils/logger');
+const { isOriginAllowed } = require('./utils/cors');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -35,29 +36,15 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// CORS (supports both Client and Admin web origins)
-const allowedOrigins = [
-  config.clientUrl ? config.clientUrl.replace(/\/+$/, '') : null,
-  config.adminUrl ? config.adminUrl.replace(/\/+$/, '') : null,
-  'https://fixtogether.vercel.app',
-  'https://fixtogether-admin.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:5174',
-].filter(Boolean);
-
+// CORS is restricted to configured production origins and explicit local dev URLs.
 app.use(cors({
   origin: (origin, callback) => {
-    const cleanOrigin = origin ? origin.replace(/\/+$/, '') : '';
-    if (
-      !origin ||
-      allowedOrigins.includes(cleanOrigin) ||
-      cleanOrigin.endsWith('.vercel.app') ||
-      cleanOrigin.includes('localhost') ||
-      cleanOrigin.includes('127.0.0.1')
-    ) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`Origin ${origin} not allowed by CORS`));
+      const error = new Error(`Origin ${origin} not allowed by CORS`);
+      error.status = 403;
+      callback(error);
     }
   },
   credentials: true,
@@ -90,12 +77,16 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   const { getStorageStatus } = require('./services/uploadService');
   const { getEmailStatus } = require('./services/emailService');
+  const emailStatus = getEmailStatus();
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     environment: config.env,
     storage: getStorageStatus(),
-    email: getEmailStatus(),
+    email: {
+      configured: emailStatus.configured,
+      provider: emailStatus.provider,
+    },
   });
 });
 

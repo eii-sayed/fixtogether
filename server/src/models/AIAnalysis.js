@@ -11,7 +11,7 @@ const aiAnalysisSchema = new mongoose.Schema(
     provider: {
       type: String,
       required: true,
-      enum: ['mock', 'openai'],
+      enum: ['mock', 'openai', 'gemini'],
     },
     model: {
       type: String,
@@ -94,6 +94,10 @@ const aiAnalysisSchema = new mongoose.Schema(
     processingTime: {
       type: Number, // milliseconds
       default: 0,
+    },
+    fallbackUsed: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

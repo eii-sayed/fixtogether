@@ -12,6 +12,7 @@ const logger = require('../../utils/logger');
  */
 
 let providerInstance = null;
+let providerFallbackUsed = false;
 
 /**
  * Get the configured AI provider instance
@@ -28,6 +29,7 @@ const getProvider = () => {
       if (!config.ai.gemini.apiKey) {
         logger.warn('Gemini API key not configured. Falling back to mock provider.');
         providerInstance = new MockAIProvider();
+        providerFallbackUsed = true;
       } else {
         providerInstance = new GeminiProvider();
         logger.info(`AI provider: Gemini (${config.ai.gemini.model || 'gemini-3.1-pro-preview'})`);
@@ -37,6 +39,7 @@ const getProvider = () => {
       if (!config.ai.openai.apiKey) {
         logger.warn('OpenAI API key not configured. Falling back to mock provider.');
         providerInstance = new MockAIProvider();
+        providerFallbackUsed = true;
       } else {
         providerInstance = new OpenAIProvider();
         logger.info('AI provider: OpenAI');
@@ -158,6 +161,7 @@ const analyzeRepairRequest = async (params) => {
       provider: provider.name,
       model: provider.model,
       processingTime: Date.now() - startTime,
+      fallbackUsed: providerFallbackUsed,
       validationErrors: errors,
     };
   } catch (error) {
@@ -170,9 +174,10 @@ const analyzeRepairRequest = async (params) => {
       const { errors, sanitized } = validateAnalysisResponse(rawResponse);
       return {
         analysis: sanitized,
-        provider: 'mock (fallback)',
+        provider: 'mock',
         model: fallbackProvider.model,
         processingTime: Date.now() - startTime,
+        fallbackUsed: true,
         validationErrors: errors,
       };
     }

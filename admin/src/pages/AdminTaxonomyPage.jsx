@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, EmptyState } from '../components/ui';
 import {
-  Cog,
   Plus,
   Edit2,
-  Trash2,
   GitMerge,
-  AlertTriangle,
-  CheckCircle2,
   Layers,
   Wrench,
   Search,
-  XCircle,
 } from 'lucide-react';
 
 export default function AdminTaxonomyPage() {
@@ -42,19 +37,28 @@ export default function AdminTaxonomyPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   // 1. Fetch Categories
-  const { data: catData, isLoading: isCatLoading } = useQuery({
+  const { data: catData, isLoading: isCatLoading, error: categoriesError } = useQuery({
     queryKey: ['admin-categories'],
     queryFn: () => api.get('/categories?active=true').then((r) => r.data.data?.categories || []),
   });
 
   // 2. Fetch Skills
-  const { data: skillsData, isLoading: isSkillsLoading } = useQuery({
+  const { data: skillsData, isLoading: isSkillsLoading, error: skillsError } = useQuery({
     queryKey: ['admin-skills'],
     queryFn: () => api.get('/skills?active=true').then((r) => r.data.data?.skills || []),
   });
 
   const categories = catData || [];
   const skills = skillsData || [];
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredCategories = categories.filter((category) =>
+    [category.name, category.slug, category.description, category.riskLevel]
+      .some((value) => value?.toLowerCase().includes(normalizedSearch))
+  );
+  const filteredSkills = skills.filter((skill) =>
+    [skill.name, skill.description, skill.category?.name]
+      .some((value) => value?.toLowerCase().includes(normalizedSearch))
+  );
 
   // Category Mutations
   const createCatMutation = useMutation({
@@ -149,6 +153,7 @@ export default function AdminTaxonomyPage() {
   };
 
   if (isCatLoading || isSkillsLoading) return <PageLoader />;
+  if (categoriesError || skillsError) return <ErrorState error={categoriesError || skillsError} />;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -220,10 +225,22 @@ export default function AdminTaxonomyPage() {
         </button>
       </div>
 
+      <div className="relative max-w-md">
+        <Search className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" />
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={`Search ${activeTab === 'categories' ? 'categories' : 'skills'}...`}
+          aria-label={`Search ${activeTab}`}
+          className="input pl-9 text-xs py-2 w-full bg-gray-900 border-gray-800 text-white"
+        />
+      </div>
+
       {/* TAB 1: CATEGORIES */}
       {activeTab === 'categories' && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.map((cat) => (
+          {filteredCategories.length > 0 ? filteredCategories.map((cat) => (
             <div key={cat._id} className="card p-5 space-y-3 flex flex-col justify-between bg-gray-900 border-gray-800">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -264,7 +281,15 @@ export default function AdminTaxonomyPage() {
                 <span className="text-emerald-400 font-semibold">Active</span>
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <EmptyState
+                title={search ? 'No matching categories' : 'No categories available'}
+                description={search ? 'Try a different search term.' : 'Categories will appear here when they are created.'}
+                icon={Layers}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -272,7 +297,7 @@ export default function AdminTaxonomyPage() {
       {activeTab === 'skills' && (
         <div className="card bg-gray-900 border-gray-800">
           <div className="divide-y divide-gray-800">
-            {skills.map((sk) => (
+            {filteredSkills.length > 0 ? filteredSkills.map((sk) => (
               <div
                 key={sk._id}
                 className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-800/40 transition-colors"
@@ -307,7 +332,13 @@ export default function AdminTaxonomyPage() {
                   </button>
                 </div>
               </div>
-            ))}
+            )) : (
+              <EmptyState
+                title={search ? 'No matching skills' : 'No skills available'}
+                description={search ? 'Try a different search term.' : 'Skills will appear here when they are created.'}
+                icon={Wrench}
+              />
+            )}
           </div>
         </div>
       )}

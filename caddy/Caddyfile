@@ -1,0 +1,15 @@
+{
+	email {$ACME_EMAIL}
+}
+
+api.fixtogether.com {
+	reverse_proxy server:5000
+}
+
+fixtogether.com, app.fixtogether.com {
+	reverse_proxy client:80
+}
+
+admin.fixtogether.com {
+	reverse_proxy admin:80
+}

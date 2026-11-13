@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+const config = require('../config');
 const { User, RepairRequest, RepairJob, Dispute, ImpactRecord, AIAnalysis, AuditLog, SafetyRule, TechnicianProfile, OrganizationProfile, ReviewQueueItem } = require('../models');
 const {
   ROLES,
@@ -105,10 +107,10 @@ const getDashboard = asyncHandler(async (req, res) => {
       stalledRequestsCount: stalledRequests.length,
     },
     systemHealth: {
-      status: 'operational',
-      database: 'connected',
+      status: mongoose.connection.readyState === 1 ? 'operational' : 'degraded',
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
       apiUptime: process.uptime(),
-      failedPlatformOperationsCount: 0,
+      environment: config.env,
     },
     metrics: {
       users: { total: totalUsers, owners: totalOwners, technicians: totalTechnicians, organizations: totalOrganizations, admins: totalAdmins },
@@ -605,21 +607,27 @@ const getAuditLogs = asyncHandler(async (req, res) => {
  * 6. AI ANALYTICS & PROVIDER GOVERNANCE
  */
 const getAIAnalytics = asyncHandler(async (req, res) => {
-  const [total, byProvider, avgProcessingTime, correctionRate] = await Promise.all([
+  const [total, byProvider, avgProcessingTime, correctionCount, safetyFlaggedCount, fallbackCount] = await Promise.all([
     AIAnalysis.countDocuments(),
     AIAnalysis.aggregate([{ $group: { _id: '$provider', count: { $sum: 1 } } }]),
     AIAnalysis.aggregate([{ $group: { _id: null, avgTime: { $avg: '$processingTime' } } }]),
     AIAnalysis.countDocuments({
       $or: [{ 'ownerCorrections.categoryChanged': true }, { 'ownerCorrections.symptomsModified': true }],
     }),
+    AIAnalysis.countDocuments({ 'safetyFlags.0': { $exists: true } }),
+    AIAnalysis.countDocuments({ fallbackUsed: true }),
   ]);
 
   return successResponse(res, {
     totalAnalyses: total,
     byProvider,
     averageProcessingTime: avgProcessingTime[0]?.avgTime || 0,
-    correctionCount: correctionRate,
-    correctionRate: total > 0 ? Math.round((correctionRate / total) * 100) : 0,
+    correctionCount,
+    correctionRate: total > 0 ? Math.round((correctionCount / total) * 100) : 0,
+    safetyFlaggedCount,
+    safetyFlagRate: total > 0 ? Math.round((safetyFlaggedCount / total) * 100) : 0,
+    fallbackCount,
+    fallbackRate: total > 0 ? Math.round((fallbackCount / total) * 100) : 0,
   });
 });
 

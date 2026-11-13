@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/fixtogether_ci
+      JWT_ACCESS_SECRET: ci-only-access-secret-change-me
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-change-me
+      AI_PROVIDER: mock
+      STORAGE_PROVIDER: local
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Install admin dependencies
+        run: npm ci --prefix admin
+
+      - name: Install Chrome for browser smoke tests
+        working-directory: client
+        run: npx puppeteer browsers install chrome
+
+      - name: Lint all applications
+        run: npm run lint
+
+      - name: Run unit and API tests
+        run: npm test
+
+      - name: Build client and admin
+        run: npm run build:all
+
+      - name: Validate production Compose configuration
+        env:
+          JWT_ACCESS_SECRET: ci-compose-access-secret
+          JWT_REFRESH_SECRET: ci-compose-refresh-secret
+          CLOUDINARY_CLOUD_NAME: ci-cloud
+          CLOUDINARY_API_KEY: ci-cloud-key
+          CLOUDINARY_API_SECRET: ci-cloud-secret
+          EMAIL_USER: ci@example.com
+          EMAIL_PASSWORD: ci-password
+          ACME_EMAIL: ci@example.com
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+      - name: Start API for browser smoke tests
+        run: |
+          NODE_ENV=development PORT=5000 npm --prefix server start > /tmp/fixtogether-server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:5000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/fixtogether-server.log
+          exit 1
+
+      - name: Start client for browser smoke tests
+        env:
+          VITE_ADMIN_URL: http://127.0.0.1:5174
+        run: |
+          npm --prefix client run dev -- --host 127.0.0.1 > /tmp/fixtogether-client.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5173 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/fixtogether-client.log
+          exit 1
+
+      - name: Start admin for browser smoke tests
+        run: |
+          npm --prefix admin run dev -- --host 127.0.0.1 --port 5174 > /tmp/fixtogether-admin.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5174 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/fixtogether-admin.log
+          exit 1
+
+      - name: Run browser smoke tests
+        env:
+          TEST_CLIENT_URL: http://127.0.0.1:5173
+        run: npm --prefix client run test:e2e

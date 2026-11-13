@@ -4,6 +4,7 @@ const app = require('./app');
 const config = require('./config');
 const connectDB = require('./config/database');
 const logger = require('./utils/logger');
+const { isOriginAllowed } = require('./utils/cors');
 const { setSocketIO } = require('./services/notificationService');
 const { startOutboxWorker, stopOutboxWorker } = require('./services/outboxService');
 
@@ -18,17 +19,10 @@ const startServer = async () => {
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        if (
-          !origin ||
-          origin.endsWith('.vercel.app') ||
-          origin.includes('localhost') ||
-          origin.includes('127.0.0.1') ||
-          (config.clientUrl && origin.startsWith(config.clientUrl)) ||
-          (config.adminUrl && origin.startsWith(config.adminUrl))
-        ) {
+        if (isOriginAllowed(origin)) {
           callback(null, true);
         } else {
-          callback(null, true);
+          callback(new Error(`Origin ${origin} not allowed by Socket.IO CORS`));
         }
       },
       methods: ['GET', 'POST'],
