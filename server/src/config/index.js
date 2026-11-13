@@ -4,6 +4,18 @@ const path = require('path');
 // Load .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+const emailHost = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
+const emailProvider = (
+  process.env.EMAIL_PROVIDER ||
+  (process.env.RESEND_API_KEY
+    ? 'resend'
+    : process.env.SENDGRID_API_KEY
+      ? 'sendgrid'
+      : emailHost.toLowerCase().includes('gmail.com')
+        ? 'gmail'
+        : 'smtp')
+).trim().toLowerCase();
+
 const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 5000,
@@ -54,8 +66,8 @@ const config = {
 
   // Email / SMTP / Multi-Provider Configuration
   email: {
-    provider: (process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? 'resend' : (process.env.SENDGRID_API_KEY ? 'sendgrid' : 'smtp'))).trim().toLowerCase(),
-    host: process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+    provider: emailProvider,
+    host: emailHost,
     port: parseInt(process.env.EMAIL_PORT || process.env.SMTP_PORT, 10) || 587,
     user: process.env.EMAIL_USER || process.env.SMTP_USER || '',
     password: process.env.EMAIL_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '',
