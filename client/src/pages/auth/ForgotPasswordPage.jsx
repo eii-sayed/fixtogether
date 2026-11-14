@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, Loader2, CheckCircle2 } from 'lucide-react';
+import { Mail, Loader2, CheckCircle2, Copy, ExternalLink } from 'lucide-react';
 import api from '../../api/axios';
 import SEO from '../../components/common/SEO';
 
@@ -9,6 +9,10 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [resetLink, setResetLink] = useState('');
+  const [emailDeliveryFailed, setEmailDeliveryFailed] = useState(false);
+  const [emailSimulated, setEmailSimulated] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +22,13 @@ export default function ForgotPasswordPage() {
     setError('');
 
     try {
-      await api.post('/auth/forgot-password', { email });
+      const { data } = await api.post('/auth/forgot-password', { email: email.trim().toLowerCase() });
+      const resetToken = data?.data?.resetToken;
+      if (resetToken) {
+        setResetLink(`${window.location.origin}/reset-password?token=${encodeURIComponent(resetToken)}`);
+      }
+      setEmailDeliveryFailed(Boolean(data?.data?.emailDeliveryFailed));
+      setEmailSimulated(Boolean(data?.data?.emailSimulated));
       setIsSuccess(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong. Please try again.');
@@ -52,12 +62,54 @@ export default function ForgotPasswordPage() {
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Check your email</h3>
               <p className="text-sm text-gray-500 mb-6">
-                We've sent a password reset link to <span className="font-medium text-gray-900">{email}</span>.
-                Please check your inbox and spam folder.
+                If an account exists for <span className="font-medium text-gray-900">{email.trim()}</span>, a reset link has been sent. Check your inbox and spam folder.
               </p>
+              {resetLink && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 text-left">
+                  <p className="text-sm font-semibold text-amber-900 mb-1">
+                    {emailDeliveryFailed ? 'Email could not be sent' : emailSimulated ? 'Local email simulation' : 'Development reset link'}
+                  </p>
+                  <p className="text-xs text-amber-800 mb-3">
+                    {emailDeliveryFailed
+                      ? 'Use this one-time link to finish resetting your password.'
+                      : 'Use this link to reset your password in this development session.'}
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <a href={resetLink} className="btn-primary flex-1 justify-center text-sm">
+                      <ExternalLink className="w-4 h-4 mr-2" /> Open reset page
+                    </a>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(resetLink);
+                          setCopied(true);
+                        } catch {
+                          setCopied(false);
+                        }
+                      }}
+                      className="btn-secondary flex-1 justify-center text-sm"
+                    >
+                      <Copy className="w-4 h-4 mr-2" /> {copied ? 'Copied' : 'Copy link'}
+                    </button>
+                  </div>
+                </div>
+              )}
               <Link to="/login" className="btn-primary w-full">
                 Return to Login
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuccess(false);
+                  setResetLink('');
+                  setError('');
+                  setCopied(false);
+                }}
+                className="mt-3 w-full text-sm text-primary-700 hover:text-primary-800 font-medium"
+              >
+                Try another email
+              </button>
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>

@@ -74,6 +74,12 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(ROLES),
       default: ROLES.OWNER,
     },
+    adminPreviousRole: {
+      type: String,
+      enum: [ROLES.OWNER, ROLES.TECHNICIAN, ROLES.ORGANIZATION],
+      default: null,
+      select: false,
+    },
     adminPermissions: {
       type: [{ type: String, enum: Object.values(ADMIN_PERMISSIONS) }],
       default: [],
@@ -172,6 +178,7 @@ const userSchema = new mongoose.Schema(
       transform(doc, ret) {
         delete ret.passwordHash;
         delete ret.refreshTokens;
+        delete ret.adminPreviousRole;
         delete ret.passwordResetToken;
         delete ret.passwordResetExpires;
         delete ret.emailVerificationToken;

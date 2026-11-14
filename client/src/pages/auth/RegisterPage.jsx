@@ -10,7 +10,7 @@ import { Wrench, Eye, EyeOff, Loader2 } from 'lucide-react';
 const registerSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
   email: z.string().email('Please enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters')
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128, 'Password must be no more than 128 characters')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Must contain uppercase, lowercase, and a number'),
   confirmPassword: z.string(),
   role: z.enum(['owner', 'technician', 'organization']),
@@ -118,13 +118,14 @@ export default function RegisterPage() {
             <div>
               <label className="label" htmlFor="password">Password</label>
               <div className="relative">
-                <input {...register('password')} type={showPassword ? 'text' : 'password'} id="password"
+                <input {...register('password')} type={showPassword ? 'text' : 'password'} id="password" maxLength={128}
                   className={`input pr-10 ${errors.password ? 'input-error' : ''}`} placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="text-xs text-gray-500 mt-1">Use 8–128 characters, including at least one uppercase letter, one lowercase letter, and one number. A symbol is optional.</p>
               {errors.password && <p className="error-text">{errors.password.message}</p>}
             </div>
 

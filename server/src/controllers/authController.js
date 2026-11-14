@@ -456,20 +456,27 @@ const forgotPassword = asyncHandler(async (req, res) => {
     passwordResetExpires: new Date(Date.now() + 3600000), // 1 hour
   });
 
-  // Send the actual email asynchronously
-  emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName)
-    .then((sendRes) => {
-      if (sendRes?.success) {
-        logger.info(`[AUTH:FORGOT_PASSWORD] Reset email successfully delivered to ${user.email} (ID: ${sendRes.messageId || 'sent'})`);
-      } else {
-        logger.warn(`[AUTH:FORGOT_PASSWORD] Failed to deliver reset email to ${user.email}: ${sendRes?.error || 'Unknown error'}`);
-      }
-    })
-    .catch((err) => {
-      logger.error(`[AUTH:FORGOT_PASSWORD] Failed to send password reset email to ${user.email}:`, err.message);
-    });
+  // Await delivery so serverless runtimes do not terminate the request before the email is sent.
+  const sendRes = await emailService.sendPasswordResetEmail(user.email, resetToken, user.fullName);
+  if (sendRes?.success) {
+    logger.info(`[AUTH:FORGOT_PASSWORD] Reset email successfully delivered to ${user.email} (ID: ${sendRes.messageId || 'sent'})`);
+  } else {
+    logger.warn(`[AUTH:FORGOT_PASSWORD] Failed to deliver reset email to ${user.email}: ${sendRes?.error || 'Unknown error'}`);
+    // In development the UI provides a local reset link. In production, avoid retaining
+    // a valid token that could never reach the account owner.
+    if (config.env === 'production') {
+      await User.updateOne(
+        { _id: user._id, passwordResetToken: hashedToken },
+        { $unset: { passwordResetToken: 1, passwordResetExpires: 1 } }
+      );
+    }
+  }
 
-  return successResponse(res, { resetToken: config.env === 'development' ? resetToken : undefined },
+  return successResponse(res, {
+    resetToken: config.env === 'development' ? resetToken : undefined,
+    emailDeliveryFailed: config.env === 'development' && !sendRes?.success,
+    emailSimulated: config.env === 'development' && Boolean(sendRes?.simulated),
+  },
     'If an account with that email exists, a reset link has been sent.');
 });
 

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, StatusBadge, Pagination } from '../components/ui';
 import { toast } from 'sonner';
-import { Search, Shield, Ban, CheckCircle, XCircle, History, KeyRound } from 'lucide-react';
+import { Search, Shield, Ban, CheckCircle, XCircle, History, KeyRound, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_TABS = [
@@ -30,6 +30,9 @@ export default function AdminUsersPage() {
   const [activeHistoryUser, setActiveHistoryUser] = useState(null);
   const [permissionModal, setPermissionModal] = useState(null);
   const [permissionSelection, setPermissionSelection] = useState([]);
+  const [roleModal, setRoleModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const isSuperAdmin = currentUser?.adminPermissions?.includes('super_admin');
   const permissionOptions = [
     ['support', 'Support & user directory'],
@@ -75,6 +78,39 @@ export default function AdminUsersPage() {
     onError: (err) => toast.error(err.response?.data?.message || 'Administrator access update failed'),
   });
 
+  const roleMutation = useMutation({
+    mutationFn: ({ id, ...payload }) => api.patch(`/admin/users/${id}/role`, payload),
+    onSuccess: (res) => {
+      setPermissionModal(null);
+      setRoleModal(null);
+      setPermissionSelection([]);
+      queryClient.invalidateQueries(['admin-users']);
+      toast.success(res.data?.message || 'Administrator role updated');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Administrator role update failed'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ id, confirmEmail }) => api.delete(`/admin/users/${id}`, { data: { confirmEmail } }),
+    onSuccess: (res) => {
+      setDeleteModal(null);
+      setDeleteConfirmation('');
+      if (data?.users?.length === 1 && page > 1) setPage((current) => current - 1);
+      queryClient.invalidateQueries(['admin-users']);
+      toast.success(res.data?.message || 'User account and related data deleted');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'User deletion failed'),
+  });
+
+  const saveAdministratorAccess = () => {
+    if (!permissionModal) return;
+    if (permissionModal.role === 'admin') {
+      permissionsMutation.mutate({ id: permissionModal._id, adminPermissions: permissionSelection });
+      return;
+    }
+    roleMutation.mutate({ id: permissionModal._id, role: 'admin', adminPermissions: permissionSelection });
+  };
+
   const handleOpenModeration = (targetUser, initialAction = 'warn') => {
     if (targetUser._id === currentUser?.userId) {
       toast.error('Safeguard: You cannot moderate or suspend your own administrator account.');
@@ -104,7 +140,7 @@ export default function AdminUsersPage() {
             </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            Manage permissions, issue compliance warnings, enforce temporary/permanent suspensions, and invalidate sessions.
+            Promote users to administrators, manage access, moderate accounts, or permanently delete user data.
           </p>
         </div>
       </div>
@@ -175,10 +211,16 @@ export default function AdminUsersPage() {
                           )}
                         </div>
                         <span className="text-[11px] text-gray-400">{u.email}</span>
+                        {!u.emailVerified && <span className="ml-2 text-[9px] text-amber-400">Email unverified</span>}
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className="badge-blue capitalize text-[10px]">{u.role}</span>
+                      {u.role === 'admin' && (
+                        <span className="block mt-1 text-[9px] text-gray-500">
+                          {u.adminPermissions?.includes('super_admin') ? 'Full administrator access' : `${u.adminPermissions?.length || 0} access scopes`}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <StatusBadge status={u.accountStatus} />
@@ -200,7 +242,18 @@ export default function AdminUsersPage() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {isSuperAdmin && u.role !== 'admin' && !isSelf && <button
+                          onClick={() => {
+                            setPermissionModal(u);
+                            setPermissionSelection(['support']);
+                          }}
+                          disabled={roleMutation.isPending || !u.emailVerified}
+                          className="btn-outline py-1 px-2 text-[11px] border-emerald-700 text-emerald-300 hover:bg-emerald-950/50"
+                          title={u.emailVerified ? 'Promote this user to administrator' : 'This user must verify their email before becoming an administrator'}
+                        >
+                          <Shield className="w-3.5 h-3.5" /> Make admin
+                        </button>}
                         {isSuperAdmin && u.role === 'admin' && !isSelf && <button
                           onClick={() => {
                             setPermissionModal(u);
@@ -211,6 +264,14 @@ export default function AdminUsersPage() {
                           title="Edit administrator access"
                         >
                           <KeyRound className="w-3.5 h-3.5" />
+                        </button>}
+                        {isSuperAdmin && u.role === 'admin' && !isSelf && <button
+                          onClick={() => setRoleModal(u)}
+                          disabled={roleMutation.isPending}
+                          className="btn-outline py-1 px-2 text-[11px] text-amber-300 border-amber-800 hover:bg-amber-950/40"
+                          title="Remove administrator access and restore the previous role"
+                        >
+                          Demote
                         </button>}
                         {isSuperAdmin && <button
                           onClick={() => handleOpenModeration(u, 'warn')}
@@ -244,6 +305,17 @@ export default function AdminUsersPage() {
                             <CheckCircle className="w-3.5 h-3.5" />
                           </button>
                         ))}
+                        {isSuperAdmin && !isSelf && <button
+                          onClick={() => {
+                            setDeleteModal(u);
+                            setDeleteConfirmation('');
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="btn-danger py-1 px-2 text-[11px]"
+                          title="Permanently delete this user and related data"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>}
                       </div>
                     </td>
                   </tr>
@@ -259,8 +331,14 @@ export default function AdminUsersPage() {
       {permissionModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-white">Administrator Access</h3>
-            <p className="text-xs text-gray-400">Assign only the workflows this administrator needs. Changes take effect immediately.</p>
+            <h3 className="text-base font-bold text-white">
+              {permissionModal.role === 'admin' ? 'Administrator Access' : 'Promote to Administrator'}
+            </h3>
+            <p className="text-xs text-gray-400">
+              {permissionModal.role === 'admin'
+                ? 'Assign only the workflows this administrator needs. Changes take effect immediately.'
+                : `Choose the access scopes for ${permissionModal.fullName}. They need a verified email and must sign in again to use the admin portal.`}
+            </p>
             <div className="space-y-2">
               {permissionOptions.map(([value, label]) => (
                 <label key={value} className="flex items-center gap-2 text-xs text-gray-200">
@@ -286,10 +364,62 @@ export default function AdminUsersPage() {
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
               <button onClick={() => setPermissionModal(null)} className="btn-secondary text-xs">Cancel</button>
               <button
-                onClick={() => permissionsMutation.mutate({ id: permissionModal._id, adminPermissions: permissionSelection })}
-                disabled={permissionsMutation.isPending}
+                onClick={saveAdministratorAccess}
+                disabled={permissionsMutation.isPending || roleMutation.isPending || (permissionModal.role !== 'admin' && permissionSelection.length === 0)}
                 className="btn-primary text-xs"
-              >Save Access</button>
+              >{permissionModal.role === 'admin' ? 'Save Access' : 'Grant Admin Access'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {roleModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Remove administrator access?</h3>
+            <p className="text-xs text-gray-300">
+              {roleModal.fullName} ({roleModal.email}) will lose all administrator permissions and return to their previous account role. Their active sessions will be revoked.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
+              <button onClick={() => setRoleModal(null)} className="btn-secondary text-xs">Cancel</button>
+              <button
+                onClick={() => roleMutation.mutate({ id: roleModal._id, role: 'previous' })}
+                disabled={roleMutation.isPending}
+                className="btn-danger text-xs"
+              >Remove Admin Access</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-red-900/70 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-red-300">Permanently delete user data?</h3>
+            <p className="text-xs text-gray-300">
+              This removes {deleteModal.fullName}’s account, profile, repair history, listings, messages, and community content. Audit records are retained with the user reference removed. This cannot be undone.
+            </p>
+            <div>
+              <label htmlFor="delete-user-confirmation" className="text-xs font-semibold text-gray-300 block mb-1">
+                Type <span className="text-white">{deleteModal.email}</span> to confirm
+              </label>
+              <input
+                id="delete-user-confirmation"
+                type="email"
+                autoComplete="off"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                className="input text-xs w-full bg-gray-950 border-gray-800 text-gray-200"
+                placeholder="User email"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
+              <button onClick={() => setDeleteModal(null)} className="btn-secondary text-xs">Cancel</button>
+              <button
+                onClick={() => deleteMutation.mutate({ id: deleteModal._id, confirmEmail: deleteConfirmation })}
+                disabled={deleteMutation.isPending || deleteConfirmation.trim().toLowerCase() !== deleteModal.email.toLowerCase()}
+                className="btn-danger text-xs"
+              >Delete user data</button>
             </div>
           </div>
         </div>

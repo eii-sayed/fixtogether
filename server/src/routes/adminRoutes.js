@@ -36,7 +36,9 @@ router.post('/review-queue/bulk', requireQueueItemsPermission, adminController.b
 // 3. User Governance & Moderation
 router.get('/users', requireAdminPermission(ADMIN_PERMISSIONS.SUPPORT), userController.getAllUsers);
 router.patch('/users/:id/status', requireAdminPermission(ADMIN_PERMISSIONS.SUPER_ADMIN), requireRecentAuth(15), userController.updateUserStatus);
+router.patch('/users/:id/role', requireAdminPermission(ADMIN_PERMISSIONS.SUPER_ADMIN), requireRecentAuth(15), userController.updateUserRole);
 router.post('/users/:id/moderate', requireAdminPermission(ADMIN_PERMISSIONS.SUPER_ADMIN), requireRecentAuth(15), userController.moderateUser);
+router.delete('/users/:id', requireAdminPermission(ADMIN_PERMISSIONS.SUPER_ADMIN), requireRecentAuth(15), userController.deleteUser);
 router.patch('/admins/:id/permissions', requireAdminPermission(ADMIN_PERMISSIONS.SUPER_ADMIN), requireRecentAuth(15), userController.updateAdminPermissions);
 
 // 4. Technician & Organization Verification

@@ -9,6 +9,7 @@ export default function ResetPasswordPage() {
   const token = searchParams.get('token');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswords, setShowPasswords] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -37,8 +38,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (password.length < 8 || password.length > 128 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      setError('Use 8–128 characters, including an uppercase letter, a lowercase letter, and a number.');
       return;
     }
 
@@ -64,7 +65,7 @@ export default function ResetPasswordPage() {
           Create new password
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Your new password must be different from previous used passwords.
+          Choose a secure password you haven’t used elsewhere.
         </p>
       </div>
 
@@ -96,14 +97,21 @@ export default function ResetPasswordPage() {
                   <input
                     id="password"
                     name="password"
-                    type="password"
+                    type={showPasswords ? 'text' : 'password'}
                     required
+                    minLength={8}
+                    maxLength={128}
+                    autoComplete="new-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError('');
+                    }}
                     className="input pl-10"
                     placeholder="••••••••"
                   />
                 </div>
+                <p className="mt-1 text-xs text-gray-500">8–128 characters, with at least one uppercase letter, one lowercase letter, and one number.</p>
               </div>
 
               <div>
@@ -117,19 +125,39 @@ export default function ResetPasswordPage() {
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
-                    type="password"
+                    type={showPasswords ? 'text' : 'password'}
                     required
+                    maxLength={128}
+                    autoComplete="new-password"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setError('');
+                    }}
                     className="input pl-10"
                     placeholder="••••••••"
                   />
                 </div>
               </div>
 
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={showPasswords}
+                  onChange={(e) => setShowPasswords(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                Show passwords
+              </label>
+
               {error && (
-                <div className="rounded-md bg-danger-50 p-4 border border-danger-100">
+                <div className="rounded-md bg-danger-50 p-4 border border-danger-100" role="alert">
                   <div className="text-sm text-danger-700">{error}</div>
+                  {(error.toLowerCase().includes('expired') || error.toLowerCase().includes('invalid')) && (
+                    <Link to="/forgot-password" className="inline-block mt-2 text-sm font-medium text-primary-700 hover:underline">
+                      Request a new reset link
+                    </Link>
+                  )}
                 </div>
               )}
 

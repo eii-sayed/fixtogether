@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { User, TechnicianProfile, OrganizationProfile, Item, RepairRequest, DonationOffer, Appointment, RepairJob, Review, ImpactRecord } = require('../models');
+const models = require('../models');
+const { User, TechnicianProfile, OrganizationProfile, Item, RepairRequest, DonationOffer, Appointment, RepairJob, Review, ImpactRecord } = models;
 const {
   asyncHandler,
   successResponse,
@@ -11,6 +12,7 @@ const { createAuditLog } = require('../middleware/auditLog');
 const uploadService = require('../services/uploadService');
 const { ROLES, ADMIN_PERMISSIONS, REPAIR_JOB_STATUS, REPAIR_REQUEST_STATUS, DONATION_STATUS } = require('../constants');
 const { protectSuperAdminAction } = require('../middleware/authorize');
+const { deleteUserData } = require('../services/userDataDeletionService');
 
 // Uses the existing donation impact estimate: 2.8 kg CO2e per kg of verified waste avoided.
 const CO2_EQUIVALENT_PER_KG_WASTE_AVOIDED = 2.8;
@@ -770,6 +772,133 @@ const updateAdminPermissions = asyncHandler(async (req, res) => {
   return successResponse(res, { user: targetAdmin }, 'Administrator permissions updated');
 });
 
+const updateUserRole = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { role, adminPermissions } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(id)) return errorResponse(res, 'Invalid user ID.', 400);
+  if (id.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot change your own administrator role.', 403);
+  }
+
+  const targetUser = await User.findById(id).select('+adminPreviousRole');
+  if (!targetUser) return errorResponse(res, 'User not found.', 404);
+
+  if (role === ROLES.ADMIN) {
+    if (targetUser.role === ROLES.ADMIN) {
+      return errorResponse(res, 'This user is already an administrator. Edit their access scopes instead.', 409);
+    }
+    if (!targetUser.emailVerified) {
+      return errorResponse(res, 'The user must verify their email before administrator access can be assigned.', 400);
+    }
+    if (targetUser.accountStatus !== 'active') {
+      return errorResponse(res, 'The user account must be active before administrator access can be assigned.', 400);
+    }
+    if (
+      !Array.isArray(adminPermissions) ||
+      adminPermissions.length === 0 ||
+      adminPermissions.some((permission) => !Object.values(ADMIN_PERMISSIONS).includes(permission))
+    ) {
+      return errorResponse(res, 'Select at least one valid administrator permission scope.', 400);
+    }
+
+    const normalizedPermissions = [...new Set(adminPermissions)];
+    if (normalizedPermissions.includes(ADMIN_PERMISSIONS.SUPER_ADMIN)) {
+      normalizedPermissions.splice(0, normalizedPermissions.length, ADMIN_PERMISSIONS.SUPER_ADMIN);
+    }
+
+    const previousRole = targetUser.role;
+    targetUser.adminPreviousRole = previousRole;
+    targetUser.role = ROLES.ADMIN;
+    targetUser.adminPermissions = normalizedPermissions;
+    targetUser.refreshTokens = [];
+    await targetUser.save();
+
+    await createAuditLog({
+      actor: req.user.userId,
+      action: 'ADMIN_ROLE_GRANTED',
+      targetType: 'User',
+      targetId: targetUser._id,
+      metadata: { previousRole, adminPermissions: normalizedPermissions },
+    }, req);
+
+    return successResponse(res, { user: targetUser }, 'Administrator access granted');
+  }
+
+  if (role !== 'previous') return errorResponse(res, 'Choose administrator access or restore the user’s previous role.', 400);
+  if (targetUser.role !== ROLES.ADMIN) return errorResponse(res, 'This user is not an administrator.', 409);
+
+  await protectSuperAdminAction(targetUser._id, req.user.userId, 'demote');
+  const previousRole = targetUser.adminPreviousRole || ROLES.OWNER;
+  targetUser.role = previousRole;
+  targetUser.adminPermissions = [];
+  targetUser.adminPreviousRole = null;
+  targetUser.refreshTokens = [];
+  await targetUser.save();
+
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'ADMIN_ROLE_REVOKED',
+    targetType: 'User',
+    targetId: targetUser._id,
+    metadata: { restoredRole: previousRole },
+  }, req);
+
+  return successResponse(res, { user: targetUser }, `Administrator access removed; restored ${previousRole} role`);
+});
+
+const deleteUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { confirmEmail } = req.body || {};
+  if (!mongoose.Types.ObjectId.isValid(id)) return errorResponse(res, 'Invalid user ID.', 400);
+  if (id.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot delete your own administrator account.', 403);
+  }
+
+  const session = await mongoose.startSession();
+  let deletedRecords = {};
+  let mediaIds = [];
+  try {
+    await session.withTransaction(async () => {
+      const targetUser = await User.findById(id).session(session);
+      if (!targetUser) {
+        const error = new Error('User not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+      if (typeof confirmEmail !== 'string' || confirmEmail.trim().toLowerCase() !== targetUser.email.toLowerCase()) {
+        const error = new Error('Enter the user’s exact email address to confirm deletion.');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (targetUser.role === ROLES.ADMIN) {
+        await protectSuperAdminAction(targetUser._id, req.user.userId, 'delete');
+      }
+
+      const deletionResult = await deleteUserData(targetUser._id, session);
+      deletedRecords = deletionResult.deletedRecords;
+      mediaIds = deletionResult.mediaIds;
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await Promise.allSettled(mediaIds.map((publicId) => uploadService.deleteFile(publicId)));
+
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'USER_DELETED',
+    targetType: 'User',
+    targetId: id,
+    metadata: { deletedRecords },
+  }, req);
+
+  return successResponse(
+    res,
+    { deletedUserId: id, deletedRecords, mediaFilesDeleted: mediaIds.length },
+    'User account and related data permanently deleted'
+  );
+});
+
 /**
  * GET /users/:id
  * Public user profile DTO - accessible by anyone
@@ -846,6 +975,8 @@ module.exports = {
   updateUserStatus,
   moderateUser,
   updateAdminPermissions,
+  updateUserRole,
+  deleteUser,
   getUserPublicProfile,
 };
 
