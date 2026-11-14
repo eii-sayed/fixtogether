@@ -69,6 +69,9 @@ if (config.env === 'development') {
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Browsers request a favicon even from the API's JSON landing page.
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 // Health checks — placed ABOVE rate limiter so they are never throttled
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'FixTogether API is running', environment: config.env });
