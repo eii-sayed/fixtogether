@@ -17,7 +17,8 @@ const emailProvider = (
 ).trim().toLowerCase();
 
 const config = {
-  env: process.env.NODE_ENV || 'development',
+  // Local development must be explicitly selected; an omitted NODE_ENV stays fail-closed.
+  env: (process.env.NODE_ENV || 'production').toLowerCase(),
   port: parseInt(process.env.PORT, 10) || 5000,
 
   // MongoDB
@@ -27,7 +28,7 @@ const config = {
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET || 'dev-access-secret',
     refreshSecret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET || 'dev-refresh-secret',
-    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || '24h',
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || process.env.ACCESS_TOKEN_EXPIRES_IN || '15m',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
   },
 
@@ -155,8 +156,10 @@ const config = {
 // Validate required config in production
 if (config.env === 'production') {
   const hasMongo = Boolean(process.env.MONGODB_URI || process.env.DATABASE_URL);
-  const hasAccessSecret = Boolean(process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET);
-  const hasRefreshSecret = Boolean(process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || process.env.AUTH_SECRET);
+  const accessSecret = process.env.JWT_ACCESS_SECRET || '';
+  const refreshSecret = process.env.JWT_REFRESH_SECRET || '';
+  const hasAccessSecret = Boolean(accessSecret);
+  const hasRefreshSecret = Boolean(refreshSecret);
 
   const missing = [];
   const hasVapidPublicKey = Boolean(process.env.VAPID_PUBLIC_KEY);
@@ -166,17 +169,52 @@ if (config.env === 'production') {
   }
 
   if (!hasMongo) missing.push('MONGODB_URI or DATABASE_URL');
-  if (!hasAccessSecret) missing.push('JWT_ACCESS_SECRET or JWT_SECRET or AUTH_SECRET');
-  if (!hasRefreshSecret) missing.push('JWT_REFRESH_SECRET or JWT_SECRET or AUTH_SECRET');
+  if (!hasAccessSecret) missing.push('JWT_ACCESS_SECRET');
+  if (!hasRefreshSecret) missing.push('JWT_REFRESH_SECRET');
 
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
+  const looksLikeSecretPlaceholder = (value) => /^(replace-with|your[_-]|generate-|change[-_ ]?me|placeholder)/i.test(value);
+  if ([accessSecret, refreshSecret].some((secret) => secret.length < 32 || looksLikeSecretPlaceholder(secret))) {
+    throw new Error('Production Safety Error: Set unique random JWT_ACCESS_SECRET and JWT_REFRESH_SECRET values, each at least 32 characters long.');
+  }
+  if (accessSecret === refreshSecret) {
+    throw new Error('Production Safety Error: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different values.');
+  }
+
+  const configuredAiProvider = config.ai.provider.toLowerCase();
+  if (configuredAiProvider === 'mock') {
+    throw new Error('Production Safety Error: AI_PROVIDER=mock is only allowed outside production.');
+  }
+  if (['gemini', 'google'].includes(configuredAiProvider) &&
+      (!config.ai.gemini.apiKey || looksLikeSecretPlaceholder(config.ai.gemini.apiKey))) {
+    throw new Error('Production Safety Error: GEMINI_API_KEY is required for the configured AI provider.');
+  }
+  if (configuredAiProvider === 'openai' &&
+      (!config.ai.openai.apiKey || looksLikeSecretPlaceholder(config.ai.openai.apiKey))) {
+    throw new Error('Production Safety Error: OPENAI_API_KEY is required for the configured AI provider.');
+  }
+  if (!['gemini', 'google', 'openai'].includes(configuredAiProvider)) {
+    throw new Error(`Production Safety Error: Unsupported AI_PROVIDER "${config.ai.provider}".`);
+  }
+
+  const emailProviderCredentials = {
+    resend: [process.env.RESEND_API_KEY],
+    sendgrid: [process.env.SENDGRID_API_KEY],
+    gmail: [config.email.user, config.email.password],
+    smtp: [config.email.user, config.email.password],
+  }[config.email.provider];
+  if (!emailProviderCredentials || emailProviderCredentials.some((credential) =>
+    !credential || looksLikeSecretPlaceholder(credential))) {
+    throw new Error(`Production Safety Error: Provide valid credentials for EMAIL_PROVIDER=${config.email.provider}.`);
+  }
+
   // Enforce Cloud Storage in production to prevent ephemeral disk file loss
   if (config.storage.enforceCloudInProduction && !config.storage.allowLocalInProduction) {
     const cloudMissing = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'].filter(
-      (key) => !process.env[key]
+      (key) => !process.env[key] || looksLikeSecretPlaceholder(process.env[key])
     );
     if (cloudMissing.length > 0) {
       throw new Error(

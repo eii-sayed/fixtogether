@@ -22,20 +22,7 @@ Built on the MERN stack (MongoDB, Express, React 18, Node.js) with real-time Soc
 | **Backend API** | [api.fixtogether.com/api/v1](https://api.fixtogether.com/api/health) | `http://localhost:5000/api/v1` | Multi-origin REST API & Socket.IO server |
 | **Health Check** | `/api/health` | `http://localhost:5000/api/health` | High-priority unthrottled uptime heartbeat |
 
-> 📖 **Production Deployment Guide:** See [DEPLOYMENT.md](file:///d:/Projects/FixTogether/DEPLOYMENT.md) for full DNS, Vercel, Docker Compose, and Nginx reverse proxy instructions.
-
-### 🔑 Verified Demonstration Accounts
-
-The platform comes pre-seeded with verified test accounts across all key roles:
-
-| Role | Demo Email | Password | Primary Workspace / Capabilities |
-|---|---|---|---|
-| **Administrator** | `admin@fixtogether.com` | `Admin123!` | Platform Command Center, Review Queue, Safety Engine, Disputes, User Moderation |
-| **Technician** | `sumon@example.com` | `Tech123!` | Quotation Engine, Diagnostic Inspections, Active Repair Jobs, Milestone Tracking |
-| **Organization** | `hope@example.com` / `greenrepair@example.com` | `Org1234!` (or `Org123!`) | Donation Offers, Community Needs, Collections, Refurbishment, Impact Tracking |
-| **Item Owner** | `rahim@example.com` | `Owner123!` | Digital Garage, AI Repair Diagnostic Assistant, Request Lifecycle, Forum Q&A |
-
-> **Tip**: Quick-login buttons are available directly on the `/login` page for instant role switching during review.
+> 📖 **Production Deployment Guide:** See [DEPLOYMENT.md](DEPLOYMENT.md) for DNS, cloud platform, and production Docker Compose instructions.
 
 ---
 
@@ -214,9 +201,10 @@ VITE_API_URL=http://localhost:5000/api/v1
 VITE_SOCKET_URL=http://localhost:5000
 ```
 
-### 4. Seed Database
+### 4. Seed Local Development Data
 
-Populate the database with complete mock data across all modules:
+These fixture commands require `NODE_ENV` to be explicitly set to a non-production value. The core seed resets its fixture collections and must only target a disposable development database.
+Set `FIXTURE_USER_PASSWORD` in your local `server/.env` first. Seeded local accounts share that password, which is never printed or committed.
 ```bash
 # Seed core users, categories, skills, safety rules, items, requests & quotations
 npm run seed
@@ -227,6 +215,17 @@ npm run seed:donations
 # Seed community Q&A forum threads, nested comments, and replies
 npm run seed:threads
 ```
+
+Existing administrator accounts need explicit access scopes. To bootstrap the first super administrator on an existing database, run this once from `server/` with the exact account email:
+```bash
+# PowerShell
+$env:BOOTSTRAP_SUPER_ADMIN_EMAIL = "admin@example.com"
+npm run admin:bootstrap-super
+
+# Bash
+BOOTSTRAP_SUPER_ADMIN_EMAIL=admin@example.com npm run admin:bootstrap-super
+```
+The local development administrator is created with the `super_admin` scope. Production credentials are not published in this repository. For production, create or select the administrator account through your deployment process, then assign its initial super-admin scope with the bootstrap command.
 
 ### 5. Start Development Servers
 ```bash

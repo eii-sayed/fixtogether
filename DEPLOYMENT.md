@@ -33,7 +33,7 @@ CLIENT_URL=https://fixtogether.vercel.app
 ADMIN_URL=https://fixtogether-admin.vercel.app
 # (Or if using custom domains: https://app.fixtogether.com and https://admin.fixtogether.com)
 
-# JWT Secrets (Generate strong random 64-char keys)
+# JWT Secrets (Generate two different strong random keys; each must be at least 32 characters)
 JWT_ACCESS_SECRET=your_super_strong_production_access_secret_64chars
 JWT_REFRESH_SECRET=your_super_strong_production_refresh_secret_64chars
 JWT_ACCESS_EXPIRES_IN=15m
@@ -42,6 +42,7 @@ JWT_REFRESH_EXPIRES_IN=7d
 # AI Provider Configuration
 AI_PROVIDER=gemini
 GEMINI_API_KEY=your_production_google_gemini_api_key
+# Or set AI_PROVIDER=openai and provide OPENAI_API_KEY instead.
 
 # Cloud Storage Configuration (Mandatory in production)
 # Prevents media loss on ephemeral disks (e.g., Render dynos, Docker containers)
@@ -54,8 +55,9 @@ VAPID_PUBLIC_KEY=your_production_vapid_public_key
 VAPID_PRIVATE_KEY=your_production_vapid_private_key
 VAPID_SUBJECT=mailto:admin@fixtogether.com
 
-# Email / SMTP Configuration (REQUIRED for Email Verification & Password Resets)
-# If using Gmail: create a 16-character App Password at myaccount.google.com -> Security -> 2-Step Verification -> App passwords
+# Email Provider Configuration (REQUIRED for Email Verification & Password Resets)
+# For Gmail/SMTP, set EMAIL_USER and EMAIL_PASSWORD. For Gmail, use an App Password.
+# Alternatively, set EMAIL_PROVIDER=resend with RESEND_API_KEY, or sendgrid with SENDGRID_API_KEY.
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your_email@gmail.com
@@ -168,6 +170,8 @@ sudo certbot --nginx -d app.fixtogether.com -d admin.fixtogether.com -d api.fixt
 ## 5. Security & Verification Checklist
 
 - [ ] **Cross-Origin Resource Sharing (CORS):** Ensure `server/.env` contains exact domain strings (`https://app.fixtogether.com`, `https://admin.fixtogether.com`) without trailing slashes.
+- [ ] **Fixture Accounts:** Remove or rotate any demo accounts created by an earlier seed run before exposing the production deployment.
+- [ ] **Production Secrets:** Use different random JWT access and refresh secrets, each at least 32 characters; placeholder values are rejected at startup.
 - [ ] **Token Isolation:** Confirm that `localStorage.getItem('adminAccessToken')` is used in the admin app and `localStorage.getItem('accessToken')` in the client app.
 - [ ] **Admin Gateway Safeguard:** Try accessing `https://admin.fixtogether.com` using a regular owner or technician account; verify that the login rejects them with `403 Forbidden: Administrator privileges required`.
 - [ ] **Public Portal Redirection:** Navigate to `https://app.fixtogether.com/admin` in your browser; verify that it automatically redirects to `https://admin.fixtogether.com/`.

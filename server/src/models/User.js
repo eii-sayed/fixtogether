@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { ROLES, ACCOUNT_STATUS } = require('../constants');
+const { ROLES, ACCOUNT_STATUS, ADMIN_PERMISSIONS } = require('../constants');
 
 const userSchema = new mongoose.Schema(
   {
@@ -74,12 +74,10 @@ const userSchema = new mongoose.Schema(
       enum: Object.values(ROLES),
       default: ROLES.OWNER,
     },
-    adminPermissions: [
-      {
-        type: String,
-        default: 'super_admin',
-      },
-    ],
+    adminPermissions: {
+      type: [{ type: String, enum: Object.values(ADMIN_PERMISSIONS) }],
+      default: [],
+    },
     profileImage: {
       url: { type: String, default: '' },
       publicId: { type: String, default: '' },
@@ -100,6 +98,10 @@ const userSchema = new mongoose.Schema(
     suspensionReason: {
       type: String,
       default: '',
+    },
+    suspensionExpiresAt: {
+      type: Date,
+      default: null,
     },
     moderationHistory: [
       {
@@ -186,6 +188,7 @@ const userSchema = new mongoose.Schema(
 // Indexes
 // userSchema.index({ email: 1 }, { unique: true }); // Removed duplicate index, unique:true in schema definition already handles this
 userSchema.index({ role: 1, accountStatus: 1 });
+userSchema.index({ accountStatus: 1, suspensionExpiresAt: 1 });
 userSchema.index({ createdAt: -1 });
 
 /**

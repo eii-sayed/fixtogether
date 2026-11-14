@@ -26,6 +26,7 @@ const {
 
 const {
   ROLES,
+  ADMIN_PERMISSIONS,
   ORGANIZATION_TYPES,
   VERIFICATION_STATUS,
   ITEM_CONDITION,
@@ -39,6 +40,13 @@ const {
 
 const seed = async () => {
   try {
+    if ((process.env.NODE_ENV || 'production').toLowerCase() === 'production') {
+      throw new Error('Fixture seeding is disabled in production. Use reviewed migrations or production provisioning instead.');
+    }
+    const fixturePassword = process.env.FIXTURE_USER_PASSWORD;
+    if (typeof fixturePassword !== 'string' || fixturePassword.length < 8) {
+      throw new Error('Set a local-only FIXTURE_USER_PASSWORD of at least 8 characters before seeding development accounts.');
+    }
     await connectDB();
     console.log('🌱 Starting comprehensive database seeding (10+ per field)...\n');
 
@@ -73,49 +81,50 @@ const seed = async () => {
     await User.create({
       fullName: 'Admin User',
       email: 'admin@fixtogether.com',
-      passwordHash: 'Admin123!',
+      passwordHash: fixturePassword,
       role: ROLES.ADMIN,
+      adminPermissions: [ADMIN_PERMISSIONS.SUPER_ADMIN],
       emailVerified: true,
       phone: '01700000000',
     });
 
     const owners = await User.create([
-      { fullName: 'Rahim Ahmed', email: 'rahim@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01711111111' },
-      { fullName: 'Fatima Begum', email: 'fatima@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01722222222' },
-      { fullName: 'Karim Hassan', email: 'karim@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01733333333' },
-      { fullName: 'Anika Tabassum', email: 'anika@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01744444444' },
-      { fullName: 'Tanvir Islam', email: 'tanvir@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01755555555' },
-      { fullName: 'Nusrat Jahan', email: 'nusrat@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01766666666' },
-      { fullName: 'Shakib Al Hasan', email: 'shakib@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01777777777' },
-      { fullName: 'Mehedi Hasan', email: 'mehedi@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01788888888' },
-      { fullName: 'Priya Roy', email: 'priya@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01799999999' },
-      { fullName: 'Tariqul Islam', email: 'tariqul@example.com', passwordHash: 'Owner123!', role: ROLES.OWNER, emailVerified: true, phone: '01710101010' },
+      { fullName: 'Rahim Ahmed', email: 'rahim@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01711111111' },
+      { fullName: 'Fatima Begum', email: 'fatima@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01722222222' },
+      { fullName: 'Karim Hassan', email: 'karim@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01733333333' },
+      { fullName: 'Anika Tabassum', email: 'anika@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01744444444' },
+      { fullName: 'Tanvir Islam', email: 'tanvir@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01755555555' },
+      { fullName: 'Nusrat Jahan', email: 'nusrat@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01766666666' },
+      { fullName: 'Shakib Al Hasan', email: 'shakib@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01777777777' },
+      { fullName: 'Mehedi Hasan', email: 'mehedi@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01788888888' },
+      { fullName: 'Priya Roy', email: 'priya@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01799999999' },
+      { fullName: 'Tariqul Islam', email: 'tariqul@example.com', passwordHash: fixturePassword, role: ROLES.OWNER, emailVerified: true, phone: '01710101010' },
     ]);
 
     const techs = await User.create([
-      { fullName: 'Sumon Electronics', email: 'sumon@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01811111111' },
-      { fullName: 'Arafat Mobile Care', email: 'arafat@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01822222222' },
-      { fullName: 'Bikash Cycle Works', email: 'bikash@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01833333333' },
-      { fullName: 'Rony Furniture Fix', email: 'rony@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01844444444' },
-      { fullName: 'Sadia Appliance Pro', email: 'sadia@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01855555555' },
-      { fullName: 'Kamal Audio Systems', email: 'kamal@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01866666666' },
-      { fullName: 'Nazmul Computer Hub', email: 'nazmul@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01877777777' },
-      { fullName: 'Rubel Watch & Device Lab', email: 'rubel@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01888888888' },
-      { fullName: 'Farhana Smart Home Tech', email: 'farhana@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01899999999' },
-      { fullName: 'Jahangir Motor Works', email: 'jahangir@example.com', passwordHash: 'Tech123!', role: ROLES.TECHNICIAN, emailVerified: true, phone: '01810101010' },
+      { fullName: 'Sumon Electronics', email: 'sumon@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01811111111' },
+      { fullName: 'Arafat Mobile Care', email: 'arafat@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01822222222' },
+      { fullName: 'Bikash Cycle Works', email: 'bikash@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01833333333' },
+      { fullName: 'Rony Furniture Fix', email: 'rony@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01844444444' },
+      { fullName: 'Sadia Appliance Pro', email: 'sadia@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01855555555' },
+      { fullName: 'Kamal Audio Systems', email: 'kamal@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01866666666' },
+      { fullName: 'Nazmul Computer Hub', email: 'nazmul@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01877777777' },
+      { fullName: 'Rubel Watch & Device Lab', email: 'rubel@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01888888888' },
+      { fullName: 'Farhana Smart Home Tech', email: 'farhana@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01899999999' },
+      { fullName: 'Jahangir Motor Works', email: 'jahangir@example.com', passwordHash: fixturePassword, role: ROLES.TECHNICIAN, emailVerified: true, phone: '01810101010' },
     ]);
 
     const orgs = await User.create([
-      { fullName: 'Green Repair Group', email: 'greenrepair@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01911111111' },
-      { fullName: 'Hope Donations', email: 'hope@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01922222222' },
-      { fullName: 'Community Aid Foundation', email: 'communityaid@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01933333333' },
-      { fullName: 'EcoRecycle Facility', email: 'ecorecycle@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01944444444' },
-      { fullName: 'CleanTech Recyclers', email: 'cleantech@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01955555555' },
-      { fullName: 'TechForGood Bangladesh', email: 'techforgood@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01966666666' },
-      { fullName: 'Village Reuse Initiative', email: 'villagereuse@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01977777777' },
-      { fullName: 'Sustainable Earth Center', email: 'sustainable@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01988888888' },
-      { fullName: 'Urban Charity Guild', email: 'urbancharity@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01999999999' },
-      { fullName: 'Dhaka E-Waste Hub', email: 'ewastehub@example.com', passwordHash: 'Org1234!', role: ROLES.ORGANIZATION, emailVerified: true, phone: '01910101010' },
+      { fullName: 'Green Repair Group', email: 'greenrepair@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01911111111' },
+      { fullName: 'Hope Donations', email: 'hope@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01922222222' },
+      { fullName: 'Community Aid Foundation', email: 'communityaid@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01933333333' },
+      { fullName: 'EcoRecycle Facility', email: 'ecorecycle@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01944444444' },
+      { fullName: 'CleanTech Recyclers', email: 'cleantech@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01955555555' },
+      { fullName: 'TechForGood Bangladesh', email: 'techforgood@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01966666666' },
+      { fullName: 'Village Reuse Initiative', email: 'villagereuse@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01977777777' },
+      { fullName: 'Sustainable Earth Center', email: 'sustainable@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01988888888' },
+      { fullName: 'Urban Charity Guild', email: 'urbancharity@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01999999999' },
+      { fullName: 'Dhaka E-Waste Hub', email: 'ewastehub@example.com', passwordHash: fixturePassword, role: ROLES.ORGANIZATION, emailVerified: true, phone: '01910101010' },
     ]);
     console.log(`✅ Users created: 1 Admin, ${owners.length} Owners, ${techs.length} Technicians, ${orgs.length} Organizations`);
 
@@ -731,25 +740,6 @@ const seed = async () => {
     console.log('   DATABASE SEEDED SUCCESSFULLY WITH 10+ RECORDS PER FIELD!');
     console.log('========================================================\n');
 
-    console.log('📋 Demo Credentials Reference:');
-    console.log('────────────────────────────────────────────────────────────');
-    console.log('👑 Admin:          admin@fixtogether.com         / Admin123!');
-    console.log('👤 Owners:         rahim@example.com             / Owner123!');
-    console.log('                   fatima@example.com            / Owner123!');
-    console.log('                   karim@example.com             / Owner123!');
-    console.log('                   anika@example.com             / Owner123!');
-    console.log('                   tanvir@example.com            / Owner123!');
-    console.log('🔧 Technicians:    sumon@example.com             / Tech123!');
-    console.log('                   arafat@example.com            / Tech123!');
-    console.log('                   bikash@example.com            / Tech123!');
-    console.log('                   rony@example.com              / Tech123!');
-    console.log('                   sadia@example.com             / Tech123!');
-    console.log('🏢 Organizations:  greenrepair@example.com       / Org1234!');
-    console.log('                   hope@example.com              / Org1234!');
-    console.log('                   communityaid@example.com      / Org1234!');
-    console.log('                   ecorecycle@example.com        / Org1234!');
-    console.log('                   cleantech@example.com         / Org1234!');
-    console.log('────────────────────────────────────────────────────────────\n');
 
     process.exit(0);
   } catch (error) {

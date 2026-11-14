@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import { PageLoader, ErrorState } from '../components/ui';
 import {
   ClipboardList,
@@ -17,6 +18,9 @@ import {
 } from 'lucide-react';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const hasPermission = (scope) => user?.adminPermissions?.includes('super_admin') || user?.adminPermissions?.includes(scope);
+  const canReviewQueue = user?.adminPermissions?.includes('super_admin') || ['support', 'verification', 'safety', 'disputes', 'audit'].some(hasPermission);
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api.get('/admin/dashboard').then((r) => r.data.data),
@@ -56,17 +60,18 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Link to="/review-queue" className="btn-primary text-xs flex items-center gap-1.5 shadow-xs">
+          {canReviewQueue && <Link to="/review-queue" className="btn-primary text-xs flex items-center gap-1.5 shadow-xs">
             <ClipboardList className="w-4 h-4" /> Open Review Queue
-          </Link>
-          <Link to="/audit-logs" className="btn-outline text-xs flex items-center gap-1.5">
+          </Link>}
+          {hasPermission('audit') && <Link to="/audit-logs" className="btn-outline text-xs flex items-center gap-1.5">
             <Shield className="w-4 h-4" /> Audit Logs
-          </Link>
+          </Link>}
         </div>
       </div>
 
       {/* CRITICAL OPERATIONAL QUEUE */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {hasPermission('safety') && (
         <Link
           to="/review-queue?tab=critical"
           className="card p-4 hover:border-red-500/80 transition-all border-l-4 border-l-red-500 group"
@@ -76,11 +81,13 @@ export default function DashboardPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
           </div>
           <div className="text-2xl font-bold text-white mt-2">
-            {criticalAlerts.criticalSafetyFlags?.length || 0}
+            {criticalAlerts.criticalSafetyFlagsCount || 0}
           </div>
           <p className="text-[11px] text-gray-400 mt-1">Hazardous flags awaiting triage</p>
         </Link>
+        )}
 
+        {hasPermission('disputes') && (
         <Link
           to="/disputes"
           className="card p-4 hover:border-purple-500/80 transition-all border-l-4 border-l-purple-500 group"
@@ -90,11 +97,13 @@ export default function DashboardPage() {
             <AlertCircle className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-2">
-            {criticalAlerts.highPriorityDisputes?.length || 0}
+            {criticalAlerts.highPriorityDisputesCount || 0}
           </div>
           <p className="text-[11px] text-gray-400 mt-1">Formal arbitration cases</p>
         </Link>
+        )}
 
+        {hasPermission('verification') && (
         <Link
           to="/verifications"
           className="card p-4 hover:border-amber-500/80 transition-all border-l-4 border-l-amber-500 group"
@@ -108,7 +117,9 @@ export default function DashboardPage() {
           </div>
           <p className="text-[11px] text-gray-400 mt-1">Pending tech & org credentials</p>
         </Link>
+        )}
 
+        {canReviewQueue && (
         <Link
           to="/review-queue"
           className="card p-4 hover:border-blue-500/80 transition-all border-l-4 border-l-blue-500 group"
@@ -118,10 +129,11 @@ export default function DashboardPage() {
             <Clock className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold text-white mt-2">
-            {urgentQueue.length}
+            {data?.urgentQueueCount || 0}
           </div>
           <p className="text-[11px] text-gray-400 mt-1">Urgent triage items</p>
         </Link>
+        )}
       </div>
 
       {/* 2-COLUMN OPERATIONAL BENCH */}
@@ -133,15 +145,15 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-primary-400" />
                 <h2 className="font-semibold text-white text-sm">
-                  Active Priority Review Queue ({urgentQueue.length})
+                  Active Priority Review Queue ({data?.urgentQueueCount || 0})
                 </h2>
               </div>
-              <Link
+              {canReviewQueue && <Link
                 to="/review-queue"
                 className="text-xs text-primary-400 hover:text-primary-300 font-semibold flex items-center gap-1"
               >
                 View Full Queue <ArrowRight className="w-3 h-3" />
-              </Link>
+              </Link>}
             </div>
 
             <div className="divide-y divide-gray-800">
@@ -195,6 +207,7 @@ export default function DashboardPage() {
 
           {/* Platform Performance & Impact */}
           <div className="grid sm:grid-cols-3 gap-3">
+            {hasPermission('support') && (
             <div className="card p-4">
               <span className="text-xs text-gray-400 font-medium">Total Users</span>
               <div className="text-lg font-bold text-white mt-1">{metrics.users?.total || 0}</div>
@@ -202,6 +215,8 @@ export default function DashboardPage() {
                 {metrics.users?.owners || 0} Owners • {metrics.users?.technicians || 0} Techs
               </div>
             </div>
+            )}
+            {hasPermission('support') && (
             <div className="card p-4">
               <span className="text-xs text-gray-400 font-medium">Completed Repairs</span>
               <div className="text-lg font-bold text-emerald-400 mt-1">{metrics.repairs?.completed || 0}</div>
@@ -209,6 +224,8 @@ export default function DashboardPage() {
                 {metrics.repairs?.active || 0} Active in shop
               </div>
             </div>
+            )}
+            {hasPermission('audit') && (
             <div className="card p-4">
               <span className="text-xs text-gray-400 font-medium">E-Waste Avoided</span>
               <div className="text-lg font-bold text-emerald-400 mt-1">
@@ -218,6 +235,7 @@ export default function DashboardPage() {
                 ৳{(metrics.impact?.totalCostSaved || 0).toLocaleString()} customer savings
               </div>
             </div>
+            )}
           </div>
         </div>
 
@@ -229,30 +247,30 @@ export default function DashboardPage() {
               <h2 className="font-semibold text-white text-sm">Governance Modules</h2>
             </div>
             <div className="p-3 grid grid-cols-2 gap-2">
-              <Link to="/verifications" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              {hasPermission('verification') && <Link to="/verifications" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <Shield className="w-4 h-4 text-amber-400" />
                 <span>Verifications</span>
-              </Link>
-              <Link to="/users" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              </Link>}
+              {hasPermission('support') && <Link to="/users" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <Users className="w-4 h-4 text-blue-400" />
                 <span>User Directory</span>
-              </Link>
-              <Link to="/safety" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              </Link>}
+              {hasPermission('safety') && <Link to="/safety" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <AlertTriangle className="w-4 h-4 text-red-400" />
                 <span>Safety Rules</span>
-              </Link>
-              <Link to="/disputes" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              </Link>}
+              {hasPermission('disputes') && <Link to="/disputes" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <Wrench className="w-4 h-4 text-purple-400" />
                 <span>Dispute Cases</span>
-              </Link>
-              <Link to="/taxonomy" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              </Link>}
+              {hasPermission('config') && <Link to="/taxonomy" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <Package className="w-4 h-4 text-indigo-400" />
                 <span>Categories</span>
-              </Link>
-              <Link to="/audit-logs" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
+              </Link>}
+              {hasPermission('audit') && <Link to="/audit-logs" className="p-3 rounded-xl border border-gray-800 hover:bg-gray-800/80 transition-colors text-xs font-semibold text-gray-300 flex flex-col gap-1.5">
                 <BarChart3 className="w-4 h-4 text-emerald-400" />
                 <span>Audit Logs</span>
-              </Link>
+              </Link>}
             </div>
           </div>
 
@@ -275,12 +293,11 @@ export default function DashboardPage() {
                   {systemHealth.database || 'Unknown'}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-gray-400">
-                <span>AI analyses:</span>
-                <span className="text-gray-200 font-semibold">
+              {hasPermission('audit') && <div className="flex items-center justify-between text-gray-400">
+                <span>AI analyses:</span><span className="text-gray-200 font-semibold">
                   {(metrics.aiAnalysesCount || 0).toLocaleString()}
                 </span>
-              </div>
+              </div>}
               <div className="flex items-center justify-between text-gray-400">
                 <span>Environment:</span>
                 <span className="text-gray-300 font-mono text-[11px]">

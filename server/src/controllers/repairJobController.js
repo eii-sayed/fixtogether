@@ -1,5 +1,5 @@
  const { Inspection, RepairJob, RepairRequest, Quotation, RepairStatusHistory, Warranty, Review, Dispute, Notification: NotificationModel, Part, DonationOffer, OrganizationProfile, ImpactRecord, ReviewQueueItem } = require('../models');
-const { REPAIR_JOB_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, WARRANTY_STATUS } = require('../constants');
+const { REPAIR_JOB_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, WARRANTY_STATUS, DISPUTE_STATUS, DISPUTE_RESOLUTIONS } = require('../constants');
 const { asyncHandler, successResponse, errorResponse, parsePagination, paginationMeta, generateCode } = require('../utils/helpers');
 const { createNotification, resolveNotificationLink } = require('../services/notificationService');
 const uploadService = require('../services/uploadService');
@@ -660,11 +660,12 @@ const createDispute = asyncHandler(async (req, res) => {
 
 const getDisputes = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
-  const query = {};
+  const query = req.query.status
+    ? { status: req.query.status }
+    : { status: { $in: [DISPUTE_STATUS.OPEN, DISPUTE_STATUS.UNDER_REVIEW, DISPUTE_STATUS.AWAITING_RESPONSE] } };
   if (req.user.role !== 'admin') {
     query.$or = [{ openedBy: req.user.userId }, { againstUser: req.user.userId }];
   }
-  if (req.query.status) query.status = req.query.status;
 
   const [disputes, total] = await Promise.all([
     Dispute.find(query).populate('openedBy', 'fullName').populate('againstUser', 'fullName')
@@ -696,18 +697,34 @@ const requestMissingDisputeInfo = asyncHandler(async (req, res) => {
   if (!dispute) return errorResponse(res, 'Dispute not found.', 404);
 
   const { targetUserId, requestText } = req.body;
-  if (!requestText?.trim()) return errorResponse(res, 'Request text is required.', 400);
+  if (![DISPUTE_STATUS.OPEN, DISPUTE_STATUS.UNDER_REVIEW, DISPUTE_STATUS.AWAITING_RESPONSE].includes(dispute.status)) {
+    return res.status(409).json({ success: false, code: 'DISPUTE_NOT_ACTIVE', message: 'This dispute is no longer active.' });
+  }
+  if (typeof requestText !== 'string' || !requestText.trim() || requestText.trim().length > 2000) {
+    return errorResponse(res, 'Provide a request of 2,000 characters or fewer.', 400);
+  }
+  const requestedFrom = targetUserId || dispute.againstUser.toString();
+  if (![dispute.openedBy.toString(), dispute.againstUser.toString()].includes(requestedFrom.toString())) {
+    return errorResponse(res, 'Information can only be requested from a dispute participant.', 400);
+  }
 
-  dispute.missingInfoRequests.push({
-    requestedFrom: targetUserId || dispute.againstUser,
-    requestText: requestText.trim(),
-    requestedAt: new Date(),
-  });
-  dispute.status = 'awaiting_response';
-  await dispute.save();
+  const updatedDispute = await Dispute.findOneAndUpdate(
+    {
+      _id: dispute._id,
+      version: dispute.version,
+      status: { $in: [DISPUTE_STATUS.OPEN, DISPUTE_STATUS.UNDER_REVIEW, DISPUTE_STATUS.AWAITING_RESPONSE] },
+    },
+    {
+      $push: { missingInfoRequests: { requestedFrom, requestText: requestText.trim(), requestedAt: new Date() } },
+      $set: { status: DISPUTE_STATUS.AWAITING_RESPONSE },
+      $inc: { version: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updatedDispute) return res.status(409).json({ success: false, code: 'RESOURCE_VERSION_CONFLICT', message: 'This dispute changed while information was being requested. Reload and try again.' });
 
   await createNotification({
-    userId: (targetUserId || dispute.againstUser).toString(),
+    userId: requestedFrom.toString(),
     type: NOTIFICATION_TYPES.DISPUTE_OPENED,
     title: 'Dispute Mediation: Action Required',
     message: `Administrator requested additional information: "${requestText.substring(0, 100)}..."`,
@@ -715,7 +732,15 @@ const requestMissingDisputeInfo = asyncHandler(async (req, res) => {
     relatedEntityId: dispute._id,
   });
 
-  return successResponse(res, { dispute }, 'Missing information requested');
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'DISPUTE_INFORMATION_REQUESTED',
+    targetType: 'Dispute',
+    targetId: dispute._id,
+    metadata: { requestedFrom, requestText: requestText.trim() },
+  }, req);
+
+  return successResponse(res, { dispute: updatedDispute }, 'Missing information requested');
 });
 
 const addDisputeInternalNote = asyncHandler(async (req, res) => {
@@ -723,16 +748,17 @@ const addDisputeInternalNote = asyncHandler(async (req, res) => {
   if (!dispute) return errorResponse(res, 'Dispute not found.', 404);
 
   const { note } = req.body;
-  if (!note?.trim()) return errorResponse(res, 'Note is required.', 400);
+  if (typeof note !== 'string' || !note.trim() || note.trim().length > 3000) return errorResponse(res, 'Provide a note of 3,000 characters or fewer.', 400);
 
-  dispute.internalNotes.push({
-    admin: req.user.userId,
-    note: note.trim(),
-    createdAt: new Date(),
-  });
-  await dispute.save();
+  const updatedDispute = await Dispute.findOneAndUpdate(
+    { _id: dispute._id, version: dispute.version },
+    { $push: { internalNotes: { admin: req.user.userId, note: note.trim(), createdAt: new Date() } }, $inc: { version: 1 } },
+    { new: true, runValidators: true }
+  );
+  if (!updatedDispute) return res.status(409).json({ success: false, code: 'RESOURCE_VERSION_CONFLICT', message: 'This dispute changed. Reload and try again.' });
+  await createAuditLog({ actor: req.user.userId, action: 'DISPUTE_INTERNAL_NOTE_ADDED', targetType: 'Dispute', targetId: dispute._id }, req);
 
-  return successResponse(res, { internalNotes: dispute.internalNotes }, 'Note added');
+  return successResponse(res, { internalNotes: updatedDispute.internalNotes }, 'Note added');
 });
 
 const resolveDispute = asyncHandler(async (req, res) => {
@@ -740,6 +766,19 @@ const resolveDispute = asyncHandler(async (req, res) => {
   if (!dispute) return errorResponse(res, 'Not found.', 404);
 
   const { decision, notes, internalFindings, consequencePreview, expectedVersion } = req.body;
+
+  if (!Object.values(DISPUTE_RESOLUTIONS).includes(decision)) {
+    return errorResponse(res, 'Choose a valid dispute resolution.', 400);
+  }
+  if (typeof notes !== 'string' || !notes.trim() || notes.trim().length > 3000) {
+    return errorResponse(res, 'Provide a public explanation of 3,000 characters or fewer.', 400);
+  }
+  if (internalFindings !== undefined && (typeof internalFindings !== 'string' || internalFindings.length > 5000)) {
+    return errorResponse(res, 'Internal findings must be 5,000 characters or fewer.', 400);
+  }
+  if (![DISPUTE_STATUS.OPEN, DISPUTE_STATUS.UNDER_REVIEW, DISPUTE_STATUS.AWAITING_RESPONSE].includes(dispute.status)) {
+    return res.status(409).json({ success: false, code: 'DISPUTE_ALREADY_RESOLVED', message: 'This dispute has already been resolved.' });
+  }
 
   // Optimistic concurrency
   if (expectedVersion !== undefined && dispute.version !== expectedVersion) {
@@ -751,22 +790,33 @@ const resolveDispute = asyncHandler(async (req, res) => {
     });
   }
 
-  dispute.status = 'resolved';
-  dispute.resolution = {
-    decision,
-    notes,
-    internalFindings: internalFindings || '',
-    consequencePreview: consequencePreview || {},
-    resolvedBy: req.user.userId,
-  };
-  dispute.resolvedAt = new Date();
-  dispute.version += 1;
-  await dispute.save();
+  const resolvedAt = new Date();
+  const resolvedDispute = await Dispute.findOneAndUpdate(
+    {
+      _id: dispute._id,
+      version: dispute.version,
+      status: { $in: [DISPUTE_STATUS.OPEN, DISPUTE_STATUS.UNDER_REVIEW, DISPUTE_STATUS.AWAITING_RESPONSE] },
+    },
+    {
+      $set: {
+        status: DISPUTE_STATUS.RESOLVED,
+        resolution: { decision, notes: notes.trim(), internalFindings: internalFindings?.trim() || '', consequencePreview: consequencePreview || {}, resolvedBy: req.user.userId },
+        resolvedAt,
+      },
+      $inc: { version: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+  if (!resolvedDispute) return res.status(409).json({ success: false, code: 'RESOURCE_VERSION_CONFLICT', message: 'This dispute changed while you were resolving it. Reload and review the latest details.' });
+  dispute.status = resolvedDispute.status;
+  dispute.resolution = resolvedDispute.resolution;
+  dispute.resolvedAt = resolvedDispute.resolvedAt;
+  dispute.version = resolvedDispute.version;
 
   // Mark corresponding review queue item resolved
   await ReviewQueueItem.findOneAndUpdate(
     { entityType: 'dispute', entityId: dispute._id },
-    { reviewState: 'resolved' }
+    { $set: { reviewState: 'resolved' }, $inc: { version: 1 } }
   );
 
   await createNotification({

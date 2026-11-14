@@ -74,7 +74,7 @@ const hasPermission = (user, permission, context = {}) => {
 
   // Super admin possesses all permissions
   if (role === ROLES.ADMIN) {
-    if (adminPermissions.includes('super_admin') || adminPermissions.length === 0) return true;
+    if (adminPermissions.includes(ADMIN_PERMISSIONS.SUPER_ADMIN)) return true;
 
     // Check fine-grained admin scopes
     switch (permission) {
@@ -98,7 +98,7 @@ const hasPermission = (user, permission, context = {}) => {
       case PERMISSIONS.ADMIN_PERMISSIONS_MANAGE:
         return adminPermissions.includes('super_admin');
       default:
-        return true; // General admin read/moderate access
+        return false;
     }
   }
 

@@ -166,8 +166,9 @@ const analyzeRepairRequest = async (params) => {
     };
   } catch (error) {
     logger.error('AI analysis failed:', error.message);
-    // If external provider fails (e.g. 429 quota exhausted or network error), fallback gracefully to Mock provider
+    // Development may use deterministic mock responses when the external provider is unavailable.
     if (provider.name !== 'mock') {
+      if (config.env === 'production') throw error;
       logger.warn('Falling back to Mock AI Provider due to provider error.');
       const fallbackProvider = new MockAIProvider();
       const rawResponse = await fallbackProvider.analyzeRepairRequest(params);
@@ -256,6 +257,10 @@ const chatWithAI = async (params) => {
     const mock = new MockAIProvider();
     return await mock.chat(params);
   } catch (error) {
+    if (config.env === 'production') {
+      logger.error('AI chat failed:', error.message);
+      throw error;
+    }
     logger.warn('AI chat error, falling back to mock provider:', error.message);
     const mock = new MockAIProvider();
     return await mock.chat(params);

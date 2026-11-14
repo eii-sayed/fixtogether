@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { PageLoader, ErrorState, StatusBadge, Pagination } from '../components/ui';
 import { toast } from 'sonner';
-import { Search, Shield, Ban, CheckCircle, XCircle, History } from 'lucide-react';
+import { Search, Shield, Ban, CheckCircle, XCircle, History, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_TABS = [
@@ -28,6 +28,18 @@ export default function AdminUsersPage() {
   const [modInternalNote, setModInternalNote] = useState('');
   const [modDuration, setModDuration] = useState(7);
   const [activeHistoryUser, setActiveHistoryUser] = useState(null);
+  const [permissionModal, setPermissionModal] = useState(null);
+  const [permissionSelection, setPermissionSelection] = useState([]);
+  const isSuperAdmin = currentUser?.adminPermissions?.includes('super_admin');
+  const permissionOptions = [
+    ['support', 'Support & user directory'],
+    ['verification', 'Verification review'],
+    ['safety', 'Safety review and rules'],
+    ['disputes', 'Dispute mediation'],
+    ['config', 'Taxonomy configuration'],
+    ['audit', 'Audit and analytics'],
+    ['super_admin', 'Super administrator'],
+  ];
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-users', page, role, search],
@@ -51,6 +63,16 @@ export default function AdminUsersPage() {
       toast.success(res.data?.message || 'User moderation applied successfully');
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Moderation action failed'),
+  });
+
+  const permissionsMutation = useMutation({
+    mutationFn: ({ id, adminPermissions }) => api.patch(`/admin/admins/${id}/permissions`, { adminPermissions }),
+    onSuccess: () => {
+      setPermissionModal(null);
+      queryClient.invalidateQueries(['admin-users']);
+      toast.success('Administrator access updated');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Administrator access update failed'),
   });
 
   const handleOpenModeration = (targetUser, initialAction = 'warn') => {
@@ -179,15 +201,26 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
+                        {isSuperAdmin && u.role === 'admin' && !isSelf && <button
+                          onClick={() => {
+                            setPermissionModal(u);
+                            setPermissionSelection(u.adminPermissions || []);
+                          }}
+                          disabled={permissionsMutation.isPending}
+                          className="btn-outline py-1 px-2 text-[11px]"
+                          title="Edit administrator access"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                        </button>}
+                        {isSuperAdmin && <button
                           onClick={() => handleOpenModeration(u, 'warn')}
                           disabled={isSelf}
                           className="btn-outline py-1 px-2 text-[11px]"
                           title="Moderate User"
                         >
                           Moderate
-                        </button>
-                        {u.accountStatus === 'active' ? (
+                        </button>}
+                        {isSuperAdmin && (u.accountStatus === 'active' ? (
                           <button
                             onClick={() => handleOpenModeration(u, 'temporary_suspension')}
                             disabled={isSelf}
@@ -210,7 +243,7 @@ export default function AdminUsersPage() {
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                        ))}
                       </div>
                     </td>
                   </tr>
@@ -222,6 +255,45 @@ export default function AdminUsersPage() {
       </div>
 
       <Pagination pagination={data?.pagination} onPageChange={setPage} />
+
+      {permissionModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Administrator Access</h3>
+            <p className="text-xs text-gray-400">Assign only the workflows this administrator needs. Changes take effect immediately.</p>
+            <div className="space-y-2">
+              {permissionOptions.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-xs text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={permissionSelection.includes(value)}
+                    onChange={(event) => {
+                      if (value === 'super_admin') {
+                        setPermissionSelection(event.target.checked ? ['super_admin'] : []);
+                      } else {
+                        setPermissionSelection((current) => {
+                          const next = current.filter((permission) => permission !== 'super_admin');
+                          return event.target.checked ? [...new Set([...next, value])] : next.filter((permission) => permission !== value);
+                        });
+                      }
+                    }}
+                    className="rounded text-primary-600 bg-gray-950 border-gray-700"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-800">
+              <button onClick={() => setPermissionModal(null)} className="btn-secondary text-xs">Cancel</button>
+              <button
+                onClick={() => permissionsMutation.mutate({ id: permissionModal._id, adminPermissions: permissionSelection })}
+                disabled={permissionsMutation.isPending}
+                className="btn-primary text-xs"
+              >Save Access</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Advanced Moderation Dialog */}
       {modModal && (

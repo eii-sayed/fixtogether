@@ -226,15 +226,7 @@ const login = asyncHandler(async (req, res) => {
     return errorResponse(res, 'Your account has been deactivated.', 403);
   }
 
-  let isMatch = await user.comparePassword(password);
-  // Gracefully support Org123! and Org1234! interchangeably for organization accounts
-  if (!isMatch && user.role === ROLES.ORGANIZATION) {
-    if (password === 'Org123!') {
-      isMatch = await user.comparePassword('Org1234!');
-    } else if (password === 'Org1234!') {
-      isMatch = await user.comparePassword('Org123!');
-    }
-  }
+  const isMatch = await user.comparePassword(password);
 
   if (!isMatch) {
     logger.warn(`[AUTH:LOGIN] Failed: Incorrect password for ${normalizedEmail}`);
@@ -288,6 +280,7 @@ const login = asyncHandler(async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      adminPermissions: user.adminPermissions || [],
       profileImage: user.profileImage,
       accountStatus: user.accountStatus,
     },
@@ -790,6 +783,7 @@ const exchangeSsoTicket = asyncHandler(async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         role: user.role,
+        adminPermissions: user.adminPermissions || [],
         accountStatus: user.accountStatus,
         profileImage: user.profileImage,
       },

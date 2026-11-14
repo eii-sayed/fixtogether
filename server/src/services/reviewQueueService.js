@@ -16,13 +16,22 @@ const {
 const logger = require('../utils/logger');
 
 const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+let syncInterval = null;
+let syncInProgress = false;
 
 /**
  * Sync active work items into the unified Review Queue
  */
 const syncReviewQueue = async () => {
+  if (syncInProgress) return;
+  syncInProgress = true;
   try {
     const now = new Date();
+
+    await ReviewQueueItem.updateMany(
+      { reviewState: REVIEW_QUEUE_STATE.SNOOZED, snoozedUntil: { $lte: now } },
+      { $set: { reviewState: REVIEW_QUEUE_STATE.PENDING, snoozedUntil: null }, $inc: { version: 1 } }
+    );
 
     // 1. Pending Technician Verifications
     const pendingTechs = await TechnicianProfile.find({
@@ -33,6 +42,20 @@ const syncReviewQueue = async () => {
       const waitHours = (now - new Date(tech.updatedAt || tech.createdAt)) / (1000 * 60 * 60);
       const priority = waitHours > 48 ? REVIEW_PRIORITY.HIGH : REVIEW_PRIORITY.MEDIUM;
       const slaDeadline = new Date(new Date(tech.updatedAt || tech.createdAt).getTime() + 48 * 60 * 60 * 1000);
+
+      await ReviewQueueItem.updateOne(
+        { entityType: REVIEW_QUEUE_TYPE.VERIFICATION, entityId: tech._id, reviewState: REVIEW_QUEUE_STATE.RESOLVED },
+        {
+          $set: {
+            reviewState: REVIEW_QUEUE_STATE.PENDING,
+            submittedAt: tech.updatedAt || tech.createdAt,
+            assignedAdmin: null,
+            snoozedUntil: null,
+            lock: { lockedBy: null, lockedAt: null, expiresAt: null },
+          },
+          $inc: { version: 1 },
+        }
+      );
 
       await ReviewQueueItem.findOneAndUpdate(
         { entityType: REVIEW_QUEUE_TYPE.VERIFICATION, entityId: tech._id },
@@ -66,6 +89,20 @@ const syncReviewQueue = async () => {
       const waitHours = (now - new Date(org.updatedAt || org.createdAt)) / (1000 * 60 * 60);
       const priority = waitHours > 48 ? REVIEW_PRIORITY.HIGH : REVIEW_PRIORITY.MEDIUM;
       const slaDeadline = new Date(new Date(org.updatedAt || org.createdAt).getTime() + 48 * 60 * 60 * 1000);
+
+      await ReviewQueueItem.updateOne(
+        { entityType: REVIEW_QUEUE_TYPE.VERIFICATION, entityId: org._id, reviewState: REVIEW_QUEUE_STATE.RESOLVED },
+        {
+          $set: {
+            reviewState: REVIEW_QUEUE_STATE.PENDING,
+            submittedAt: org.updatedAt || org.createdAt,
+            assignedAdmin: null,
+            snoozedUntil: null,
+            lock: { lockedBy: null, lockedAt: null, expiresAt: null },
+          },
+          $inc: { version: 1 },
+        }
+      );
 
       await ReviewQueueItem.findOneAndUpdate(
         { entityType: REVIEW_QUEUE_TYPE.VERIFICATION, entityId: org._id },
@@ -163,6 +200,23 @@ const syncReviewQueue = async () => {
     });
   } catch (err) {
     logger.error('Error syncing Review Queue:', err.message);
+  } finally {
+    syncInProgress = false;
+  }
+};
+
+const startReviewQueueSyncWorker = (intervalMs = 120_000) => {
+  stopReviewQueueSyncWorker();
+  syncReviewQueue().catch((err) => logger.error('Review queue sync worker failed:', err.message));
+  syncInterval = setInterval(() => {
+    syncReviewQueue().catch((err) => logger.error('Review queue sync worker failed:', err.message));
+  }, intervalMs);
+};
+
+const stopReviewQueueSyncWorker = () => {
+  if (syncInterval) {
+    clearInterval(syncInterval);
+    syncInterval = null;
   }
 };
 
@@ -170,45 +224,54 @@ const syncReviewQueue = async () => {
  * Acquire soft review lock
  */
 const acquireLock = async (queueItemId, adminId) => {
-  const item = await ReviewQueueItem.findById(queueItemId);
-  if (!item) throw new Error('Queue item not found.');
-
   const now = new Date();
-  if (
-    item.lock?.lockedBy &&
-    item.lock.lockedBy.toString() !== adminId.toString() &&
-    item.lock.expiresAt > now
-  ) {
-    const lockedAdmin = await User.findById(item.lock.lockedBy).select('fullName email');
-    return {
-      acquired: false,
-      lockedBy: lockedAdmin || { fullName: 'Another Administrator' },
-      expiresAt: item.lock.expiresAt,
-    };
+  const item = await ReviewQueueItem.findOneAndUpdate(
+    {
+      _id: queueItemId,
+      $or: [
+        { 'lock.lockedBy': null },
+        { 'lock.expiresAt': { $lte: now } },
+        { 'lock.lockedBy': adminId },
+      ],
+    },
+    {
+      $set: {
+        lock: { lockedBy: adminId, lockedAt: now, expiresAt: new Date(now.getTime() + LOCK_DURATION_MS) },
+      },
+      $inc: { version: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+  if (item?.reviewState === REVIEW_QUEUE_STATE.PENDING) {
+    const transitioned = await ReviewQueueItem.findOneAndUpdate(
+      { _id: item._id, version: item.version, reviewState: REVIEW_QUEUE_STATE.PENDING },
+      { $set: { reviewState: REVIEW_QUEUE_STATE.IN_REVIEW }, $inc: { version: 1 } },
+      { new: true }
+    );
+    return { acquired: true, item: transitioned || await ReviewQueueItem.findById(item._id) };
   }
+  if (item) return { acquired: true, item };
 
-  item.lock = {
-    lockedBy: adminId,
-    lockedAt: now,
-    expiresAt: new Date(now.getTime() + LOCK_DURATION_MS),
-  };
-  item.reviewState = item.reviewState === REVIEW_QUEUE_STATE.PENDING ? REVIEW_QUEUE_STATE.IN_REVIEW : item.reviewState;
-  await item.save();
-
-  return { acquired: true, item };
+  const latest = await ReviewQueueItem.findById(queueItemId);
+  if (!latest) throw new Error('Queue item not found.');
+  const lockedBy = latest.lock?.lockedBy;
+  if (lockedBy && lockedBy.toString() !== adminId.toString() && latest.lock.expiresAt > now) {
+    const lockedAdmin = await User.findById(lockedBy).select('fullName email');
+    return { acquired: false, lockedBy: lockedAdmin || { fullName: 'Another Administrator' }, expiresAt: latest.lock.expiresAt };
+  }
+  throw new Error('Queue item changed while acquiring the review lock. Please retry.');
 };
 
 /**
  * Release soft review lock
  */
 const releaseLock = async (queueItemId, adminId) => {
-  const item = await ReviewQueueItem.findById(queueItemId);
-  if (!item) return;
-
-  if (item.lock?.lockedBy?.toString() === adminId.toString()) {
-    item.lock = { lockedBy: null, lockedAt: null, expiresAt: null };
-    await item.save();
-  }
+  const item = await ReviewQueueItem.findOneAndUpdate(
+    { _id: queueItemId, 'lock.lockedBy': adminId },
+    { $set: { lock: { lockedBy: null, lockedAt: null, expiresAt: null } }, $inc: { version: 1 } },
+    { new: true }
+  );
+  return Boolean(item);
 };
 
 /**
@@ -220,18 +283,16 @@ const takeoverLock = async (queueItemId, adminId, reason, req) => {
 
   const previousHolder = item.lock?.lockedBy;
   const now = new Date();
-
-  item.lock = {
-    lockedBy: adminId,
-    lockedAt: now,
-    expiresAt: new Date(now.getTime() + LOCK_DURATION_MS),
-  };
-  item.internalNotes.push({
-    admin: adminId,
-    note: `[Lock Takeover] Took over active review. Reason: ${reason || 'Priority escalation'}`,
-    createdAt: now,
-  });
-  await item.save();
+  const updated = await ReviewQueueItem.findOneAndUpdate(
+    { _id: queueItemId, version: item.version },
+    {
+      $set: { lock: { lockedBy: adminId, lockedAt: now, expiresAt: new Date(now.getTime() + LOCK_DURATION_MS) } },
+      $inc: { version: 1 },
+      $push: { internalNotes: { admin: adminId, note: `[Lock Takeover] Took over active review. Reason: ${reason}`, createdAt: now } },
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updated) throw new Error('Queue item changed while taking over the lock. Please retry.');
 
   await AuditLog.create({
     actor: adminId,
@@ -243,11 +304,13 @@ const takeoverLock = async (queueItemId, adminId, reason, req) => {
     userAgent: req?.headers?.['user-agent'] || '',
   });
 
-  return item;
+  return updated;
 };
 
 module.exports = {
   syncReviewQueue,
+  startReviewQueueSyncWorker,
+  stopReviewQueueSyncWorker,
   acquireLock,
   releaseLock,
   takeoverLock,

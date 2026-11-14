@@ -20,7 +20,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(loginSchema),
   });
 
@@ -119,28 +119,6 @@ export default function LoginPage() {
               {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Signing in...</> : 'Sign in'}
             </button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-5 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-500 mb-3 text-center">Demo accounts</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {[
-                { label: 'Owner', email: 'rahim@example.com', pass: 'Owner123!' },
-                { label: 'Technician', email: 'sumon@example.com', pass: 'Tech123!' },
-                { label: 'Organization', email: 'hope@example.com', pass: 'Org1234!' },
-              ].map((demo) => (
-                <button key={demo.label} type="button" onClick={() => {
-                  setValue('email', demo.email);
-                  setValue('password', demo.pass);
-                  onSubmit({ email: demo.email, password: demo.pass });
-                }}
-                  className="border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 text-left transition-colors">
-                  <span className="font-medium text-gray-700 block">{demo.label}</span>
-                  <span className="text-gray-400 truncate block">{demo.email}</span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <p className="text-sm text-gray-500 text-center mt-6">

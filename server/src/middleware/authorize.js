@@ -1,5 +1,21 @@
 const { hasPermission } = require('../services/permissionService');
-const { User } = require('../models');
+const { User, ReviewQueueItem } = require('../models');
+const { ADMIN_PERMISSIONS, REVIEW_QUEUE_TYPE } = require('../constants');
+const mongoose = require('mongoose');
+
+const hasAdminPermission = (user, permission) => {
+  if (user?.role !== 'admin' || !Array.isArray(user.adminPermissions)) return false;
+  return user.adminPermissions.includes(ADMIN_PERMISSIONS.SUPER_ADMIN) || user.adminPermissions.includes(permission);
+};
+
+const queuePermissionForType = (entityType) => ({
+  [REVIEW_QUEUE_TYPE.VERIFICATION]: ADMIN_PERMISSIONS.VERIFICATION,
+  [REVIEW_QUEUE_TYPE.SAFETY_FLAG]: ADMIN_PERMISSIONS.SAFETY,
+  [REVIEW_QUEUE_TYPE.DISPUTE]: ADMIN_PERMISSIONS.DISPUTES,
+  [REVIEW_QUEUE_TYPE.USER_APPEAL]: ADMIN_PERMISSIONS.SUPPORT,
+  [REVIEW_QUEUE_TYPE.STALLED_REQUEST]: ADMIN_PERMISSIONS.SUPPORT,
+  [REVIEW_QUEUE_TYPE.SYSTEM_HEALTH]: ADMIN_PERMISSIONS.AUDIT,
+}[entityType]);
 
 /**
  * Role-based authorization middleware
@@ -130,9 +146,7 @@ const requireAdminPermission = (permission) => {
       });
     }
 
-    // Super admin or explicit permission grant
-    const permissions = req.user.adminPermissions || ['super_admin'];
-    if (permissions.includes('super_admin') || permissions.includes(permission)) {
+    if (hasAdminPermission(req.user, permission)) {
       return next();
     }
 
@@ -142,6 +156,67 @@ const requireAdminPermission = (permission) => {
       message: `You do not have the required "${permission}" permission scope.`,
     });
   };
+};
+
+const requireAnyAdminPermission = (...permissions) => {
+  const allowedPermissions = permissions.flat();
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ success: false, code: 'AUTHENTICATION_REQUIRED', message: 'Authentication required.' });
+    }
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, code: 'PERMISSION_DENIED', message: 'Administrator access required.' });
+    }
+    if (req.user.adminPermissions?.includes(ADMIN_PERMISSIONS.SUPER_ADMIN) ||
+        allowedPermissions.some((permission) => req.user.adminPermissions?.includes(permission))) {
+      return next();
+    }
+    return res.status(403).json({ success: false, code: 'PERMISSION_SCOPE_DENIED', message: 'You do not have access to this admin workflow.' });
+  };
+};
+
+const requireQueueItemPermission = (paramName = 'id') => async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params[paramName])) {
+      return res.status(400).json({ success: false, code: 'INVALID_ID', message: 'Invalid queue item ID.' });
+    }
+    const item = await ReviewQueueItem.findById(req.params[paramName]).select('entityType');
+    if (!item) return res.status(404).json({ success: false, code: 'RESOURCE_NOT_FOUND', message: 'Queue item not found.' });
+    const permission = queuePermissionForType(item.entityType);
+    if (!permission || !hasAdminPermission(req.user, permission)) {
+      return res.status(403).json({ success: false, code: 'PERMISSION_SCOPE_DENIED', message: 'You do not have access to this queue item.' });
+    }
+    req.reviewQueueItemType = item.entityType;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+const requireQueueItemsPermission = async (req, res, next) => {
+  try {
+    const itemIds = req.body?.itemIds;
+    if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.length > 100) {
+      return res.status(400).json({ success: false, code: 'INVALID_QUEUE_ITEMS', message: 'Provide between 1 and 100 queue item IDs.' });
+    }
+    if (itemIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
+      return res.status(400).json({ success: false, code: 'INVALID_QUEUE_ITEMS', message: 'One or more queue item IDs are invalid.' });
+    }
+    const items = await ReviewQueueItem.find({ _id: { $in: itemIds } }).select('entityType');
+    if (items.length !== new Set(itemIds.map(String)).size) {
+      return res.status(404).json({ success: false, code: 'RESOURCE_NOT_FOUND', message: 'One or more queue items were not found.' });
+    }
+    const permitted = items.every((item) => {
+      const permission = queuePermissionForType(item.entityType);
+      return permission && hasAdminPermission(req.user, permission);
+    });
+    if (!permitted) {
+      return res.status(403).json({ success: false, code: 'PERMISSION_SCOPE_DENIED', message: 'You do not have access to every selected queue item.' });
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
@@ -159,11 +234,11 @@ const protectSuperAdminAction = async (targetUserId, actorUserId, requestedActio
   }
 
   const targetUser = await User.findById(targetUserId);
-  if (targetUser && targetUser.role === 'admin' && (targetUser.adminPermissions?.includes('super_admin') || targetUser.adminPermissions?.length === 0)) {
+  if (targetUser && targetUser.role === 'admin' && targetUser.adminPermissions?.includes(ADMIN_PERMISSIONS.SUPER_ADMIN)) {
     const superAdminCount = await User.countDocuments({
       role: 'admin',
       accountStatus: 'active',
-      $or: [{ adminPermissions: 'super_admin' }, { adminPermissions: { $size: 0 } }],
+      adminPermissions: ADMIN_PERMISSIONS.SUPER_ADMIN,
     });
 
     if (superAdminCount <= 1 && (requestedAction === 'suspend' || requestedAction === 'demote' || requestedAction === 'delete')) {
@@ -208,6 +283,11 @@ module.exports = {
   authorizeOwnerOrAdmin,
   requirePermission,
   requireAdminPermission,
+  requireAnyAdminPermission,
+  requireQueueItemPermission,
+  requireQueueItemsPermission,
+  hasAdminPermission,
+  queuePermissionForType,
   requireRecentAuth,
   protectSuperAdminAction,
 };

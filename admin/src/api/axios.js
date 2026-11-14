@@ -47,6 +47,15 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    if (error.response?.status === 403 && error.response?.data?.code === 'RECENT_AUTHENTICATION_REQUIRED') {
+      localStorage.removeItem('adminAccessToken');
+      localStorage.removeItem('adminRefreshToken');
+      localStorage.removeItem('adminUser');
+      const returnTo = `${window.location.pathname}${window.location.search}`;
+      window.location.href = `/login?reauth=1&returnTo=${encodeURIComponent(returnTo)}`;
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 429) {
       const retryAfter = error.response?.data?.retryAfter || error.response?.headers?.['retry-after'];
       const rateLimitError = new Error(

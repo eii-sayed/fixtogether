@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { OrganizationProfile, DonationOffer, DonationNeed, ImpactRecord } = require('../models');
+const { OrganizationProfile, DonationOffer, DonationNeed, ImpactRecord, ReviewQueueItem } = require('../models');
 const {
   asyncHandler,
   successResponse,
@@ -401,18 +401,52 @@ const getPendingOrganizations = asyncHandler(async (req, res) => {
  * PATCH /admin/organizations/:id/verification
  */
 const updateOrgVerificationStatus = asyncHandler(async (req, res) => {
-  const { verificationStatus, verificationNote, rejectionReason } = req.body;
-  const profile = await OrganizationProfile.findOne({ user: req.params.id });
+  const { verificationStatus, verificationNote, rejectionReason, adminNote, approvalChecklist } = req.body;
+  const applicantId = req.params.id;
+  if (applicantId.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot review your own organization verification application.', 403);
+  }
+  const allowedDecisions = [VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED, VERIFICATION_STATUS.MORE_INFO_NEEDED];
+  if (!allowedDecisions.includes(verificationStatus)) return errorResponse(res, 'Invalid verification decision.', 400);
+  const applicantNote = typeof rejectionReason === 'string' ? rejectionReason.trim() : typeof verificationNote === 'string' ? verificationNote.trim() : '';
+  if ([VERIFICATION_STATUS.REJECTED, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(verificationStatus) && !applicantNote) {
+    return errorResponse(res, 'Provide a reason for this verification decision.', 400);
+  }
+  if (verificationStatus === VERIFICATION_STATUS.APPROVED &&
+      !['identityVerified', 'credentialsChecked', 'documentsValid'].every((key) => approvalChecklist?.[key] === true)) {
+    return errorResponse(res, 'Complete the identity, credential, and document checklist before approval.', 400);
+  }
+
+  const profile = await OrganizationProfile.findOne({ user: applicantId });
 
   if (!profile) return errorResponse(res, 'Organization not found.', 404);
+  if (![VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(profile.verificationStatus)) {
+    return res.status(409).json({ success: false, code: 'VERIFICATION_ALREADY_REVIEWED', message: 'This application is no longer awaiting review.' });
+  }
 
-  profile.verificationStatus = verificationStatus;
-  if (verificationNote) profile.verificationNote = verificationNote;
-  if (rejectionReason) profile.verificationNote = `${rejectionReason}. ${verificationNote || ''}`;
-  await profile.save();
+  const updatedProfile = await OrganizationProfile.findOneAndUpdate(
+    {
+      _id: profile._id,
+      __v: profile.__v ?? { $exists: false },
+      updatedAt: profile.updatedAt,
+      verificationStatus: { $in: [VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED] },
+    },
+    {
+      $set: { verificationStatus, verificationNote: applicantNote },
+      $inc: { __v: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updatedProfile) {
+    return res.status(409).json({ success: false, code: 'VERIFICATION_CHANGED', message: 'This application changed while you were reviewing it. Refresh and try again.' });
+  }
+  await ReviewQueueItem.findOneAndUpdate(
+    { entityType: 'verification', entityId: updatedProfile._id },
+    { $set: { reviewState: 'resolved' }, $inc: { version: 1 } }
+  );
 
   await createNotification({
-    userId: req.params.id,
+    userId: applicantId,
     type:
       verificationStatus === VERIFICATION_STATUS.APPROVED
         ? NOTIFICATION_TYPES.ACCOUNT_VERIFIED
@@ -421,9 +455,9 @@ const updateOrgVerificationStatus = asyncHandler(async (req, res) => {
     message:
       verificationStatus === VERIFICATION_STATUS.APPROVED
         ? 'Your organization has been officially verified by FixTogether.'
-        : `Status: ${verificationStatus}. ${rejectionReason || verificationNote || ''}`,
+        : `Status: ${verificationStatus}. ${applicantNote}`,
     relatedEntityType: 'OrganizationProfile',
-    relatedEntityId: profile._id,
+    relatedEntityId: updatedProfile._id,
   });
 
   await createAuditLog(
@@ -431,13 +465,13 @@ const updateOrgVerificationStatus = asyncHandler(async (req, res) => {
       actor: req.user.userId,
       action: 'ORG_VERIFICATION_UPDATED',
       targetType: 'OrganizationProfile',
-      targetId: profile._id,
-      metadata: { verificationStatus, rejectionReason },
+      targetId: updatedProfile._id,
+      metadata: { verificationStatus, applicantNote, adminNote: adminNote || '', approvalChecklist: approvalChecklist || {} },
     },
     req
   );
 
-  return successResponse(res, { profile }, 'Verification updated');
+  return successResponse(res, { profile: updatedProfile }, 'Verification updated');
 });
 
 // ===== DONATION OFFERS OPERATIONAL CONTROLLER =====

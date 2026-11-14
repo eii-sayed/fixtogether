@@ -9,7 +9,8 @@ const {
 } = require('../utils/helpers');
 const { createAuditLog } = require('../middleware/auditLog');
 const uploadService = require('../services/uploadService');
-const { ROLES, REPAIR_JOB_STATUS, REPAIR_REQUEST_STATUS, DONATION_STATUS } = require('../constants');
+const { ROLES, ADMIN_PERMISSIONS, REPAIR_JOB_STATUS, REPAIR_REQUEST_STATUS, DONATION_STATUS } = require('../constants');
+const { protectSuperAdminAction } = require('../middleware/authorize');
 
 // Uses the existing donation impact estimate: 2.8 kg CO2e per kg of verified waste avoided.
 const CO2_EQUIVALENT_PER_KG_WASTE_AVOIDED = 2.8;
@@ -581,6 +582,8 @@ const getAllUsers = asyncHandler(async (req, res) => {
 const updateUserStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { accountStatus, suspensionReason } = req.body;
+  const allowedStatuses = ['active', 'suspended', 'deactivated', 'pending_verification'];
+  if (!allowedStatuses.includes(accountStatus)) return errorResponse(res, 'Invalid account status.', 400);
 
   // Self-action check
   if (id.toString() === req.user.userId.toString()) {
@@ -590,22 +593,17 @@ const updateUserStatus = asyncHandler(async (req, res) => {
   const user = await User.findById(id);
   if (!user) return errorResponse(res, 'User not found.', 404);
 
-  // Last-admin protection check
-  if (user.role === ROLES.ADMIN && accountStatus === 'suspended') {
-    const activeAdminCount = await User.countDocuments({
-      role: ROLES.ADMIN,
-      accountStatus: 'active',
-      _id: { $ne: user._id },
-    });
-    if (activeAdminCount === 0) {
-      return errorResponse(res, 'Cannot suspend the final active administrator on the platform.', 403);
-    }
+  if (user.role === ROLES.ADMIN && accountStatus !== 'active') {
+    await protectSuperAdminAction(user._id, req.user.userId, 'suspend');
   }
 
   user.accountStatus = accountStatus;
-  if (suspensionReason) user.suspensionReason = suspensionReason;
+  user.suspensionExpiresAt = null;
+  if (suspensionReason !== undefined) user.suspensionReason = suspensionReason;
   if (accountStatus === 'suspended') {
     user.refreshTokens = []; // Revoke active sessions
+  } else if (accountStatus === 'active') {
+    user.suspensionReason = '';
   }
   await user.save();
 
@@ -636,6 +634,15 @@ const moderateUser = asyncHandler(async (req, res) => {
     durationDays,
     affectedServices,
   } = req.body;
+  const validActions = ['warn', 'temporary_suspension', 'permanent_suspension', 'reactivate', 'invalidate_sessions', 'forced_password_reset', 'revoke_verification'];
+  if (!validActions.includes(action)) return errorResponse(res, 'Invalid moderation action.', 400);
+  if ((action !== 'reactivate' && (typeof reason !== 'string' || !reason.trim())) || (typeof reason === 'string' && reason.trim().length > 1000)) {
+    return errorResponse(res, 'Provide a moderation reason of 1,000 characters or fewer.', 400);
+  }
+  const moderationReason = typeof reason === 'string' && reason.trim() ? reason.trim() : 'Account reactivated by an administrator.';
+  if (action === 'temporary_suspension' && (!Number.isInteger(Number(durationDays)) || Number(durationDays) < 1 || Number(durationDays) > 365)) {
+    return errorResponse(res, 'Temporary suspension duration must be between 1 and 365 days.', 400);
+  }
 
   // Self-action check
   if (id.toString() === req.user.userId.toString()) {
@@ -645,16 +652,11 @@ const moderateUser = asyncHandler(async (req, res) => {
   const targetUser = await User.findById(id);
   if (!targetUser) return errorResponse(res, 'Target user not found.', 404);
 
-  // Last-admin protection check
   if (targetUser.role === ROLES.ADMIN && ['temporary_suspension', 'permanent_suspension'].includes(action)) {
-    const activeAdmins = await User.countDocuments({
-      role: ROLES.ADMIN,
-      accountStatus: 'active',
-      _id: { $ne: targetUser._id },
-    });
-    if (activeAdmins === 0) {
-      return errorResponse(res, 'Cannot suspend the final active administrator on the platform.', 403);
-    }
+    await protectSuperAdminAction(targetUser._id, req.user.userId, 'suspend');
+  }
+  if (action === 'revoke_verification' && ![ROLES.TECHNICIAN, ROLES.ORGANIZATION].includes(targetUser.role)) {
+    return errorResponse(res, 'Verification can only be revoked for technicians or organizations.', 400);
   }
 
   // Active-work impact assessment
@@ -673,15 +675,18 @@ const moderateUser = asyncHandler(async (req, res) => {
     const days = Number(durationDays) || 7;
     expiresAt = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     targetUser.accountStatus = 'suspended';
+    targetUser.suspensionExpiresAt = expiresAt;
     targetUser.suspensionReason = reason || 'Temporary suspension due to community guidelines violation';
     targetUser.refreshTokens = [];
   } else if (action === 'permanent_suspension') {
     targetUser.accountStatus = 'suspended';
+    targetUser.suspensionExpiresAt = null;
     targetUser.suspensionReason = reason || 'Permanent suspension';
     targetUser.refreshTokens = [];
   } else if (action === 'reactivate') {
     targetUser.accountStatus = 'active';
     targetUser.suspensionReason = '';
+    targetUser.suspensionExpiresAt = null;
   } else if (action === 'invalidate_sessions') {
     targetUser.refreshTokens = [];
   } else if (action === 'forced_password_reset') {
@@ -699,7 +704,7 @@ const moderateUser = asyncHandler(async (req, res) => {
   targetUser.moderationHistory.push({
     action,
     admin: req.user.userId,
-    reason: reason || 'Moderation intervention',
+    reason: moderationReason,
     internalNote: internalExplanation || '',
     affectedServices: affectedServices || ['all'],
     durationDays: durationDays || 0,
@@ -715,7 +720,7 @@ const moderateUser = asyncHandler(async (req, res) => {
       action: `USER_MODERATION_${action.toUpperCase()}`,
       targetType: 'User',
       targetId: targetUser._id,
-      metadata: { action, reason, activeWorkImpact: { activeRequests, activeJobs } },
+      metadata: { action, reason: moderationReason, activeWorkImpact: { activeRequests, activeJobs } },
     },
     req
   );
@@ -728,6 +733,41 @@ const moderateUser = asyncHandler(async (req, res) => {
     },
     `Moderation action "${action}" applied successfully.`
   );
+});
+
+const updateAdminPermissions = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { adminPermissions } = req.body;
+  if (!Array.isArray(adminPermissions) || adminPermissions.some((permission) => !Object.values(ADMIN_PERMISSIONS).includes(permission))) {
+    return errorResponse(res, 'Provide a list of valid administrator permission scopes.', 400);
+  }
+  if (id.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot change your own administrator permissions.', 403);
+  }
+
+  const targetAdmin = await User.findById(id);
+  if (!targetAdmin || targetAdmin.role !== ROLES.ADMIN) return errorResponse(res, 'Administrator account not found.', 404);
+
+  const normalizedPermissions = [...new Set(adminPermissions)];
+  if (normalizedPermissions.includes(ADMIN_PERMISSIONS.SUPER_ADMIN)) {
+    normalizedPermissions.splice(0, normalizedPermissions.length, ADMIN_PERMISSIONS.SUPER_ADMIN);
+  }
+  if (targetAdmin.adminPermissions?.includes(ADMIN_PERMISSIONS.SUPER_ADMIN) && !normalizedPermissions.includes(ADMIN_PERMISSIONS.SUPER_ADMIN)) {
+    await protectSuperAdminAction(targetAdmin._id, req.user.userId, 'demote');
+  }
+
+  const previousPermissions = targetAdmin.adminPermissions || [];
+  targetAdmin.adminPermissions = normalizedPermissions;
+  await targetAdmin.save();
+  await createAuditLog({
+    actor: req.user.userId,
+    action: 'ADMIN_PERMISSIONS_UPDATED',
+    targetType: 'User',
+    targetId: targetAdmin._id,
+    metadata: { previousPermissions, adminPermissions: normalizedPermissions },
+  }, req);
+
+  return successResponse(res, { user: targetAdmin }, 'Administrator permissions updated');
 });
 
 /**
@@ -805,6 +845,7 @@ module.exports = {
   getAllUsers,
   updateUserStatus,
   moderateUser,
+  updateAdminPermissions,
   getUserPublicProfile,
 };
 

@@ -26,23 +26,23 @@ const ADMIN_MENU_GROUPS = [
     title: 'OPERATIONS',
     items: [
       { label: 'Command Center', path: '/', icon: LayoutDashboard, exact: true },
-      { label: 'Review Queue', path: '/review-queue', icon: ClipboardList, badgeKey: 'urgentQueueCount', badgeColor: 'bg-rose-500 text-white' },
-      { label: 'Dispute Arbitration', path: '/disputes', icon: MessageSquare, badgeKey: 'disputesCount', badgeColor: 'bg-purple-600 text-white' },
+      { label: 'Review Queue', path: '/review-queue', icon: ClipboardList, anyScope: ['support', 'verification', 'safety', 'disputes', 'audit'], badgeKey: 'urgentQueueCount', badgeColor: 'bg-rose-500 text-white' },
+      { label: 'Dispute Arbitration', path: '/disputes', icon: MessageSquare, permission: 'disputes', badgeKey: 'disputesCount', badgeColor: 'bg-purple-600 text-white' },
     ],
   },
   {
     title: 'GOVERNANCE & TRUST',
     items: [
-      { label: 'User Directory', path: '/users', icon: Users },
-      { label: 'Verifications', path: '/verifications', icon: ShieldCheck, badgeKey: 'verificationsCount', badgeColor: 'bg-amber-500 text-white' },
-      { label: 'Safety & Screening', path: '/safety', icon: AlertTriangle },
+      { label: 'User Directory', path: '/users', icon: Users, permission: 'support' },
+      { label: 'Verifications', path: '/verifications', icon: ShieldCheck, permission: 'verification', badgeKey: 'verificationsCount', badgeColor: 'bg-amber-500 text-white' },
+      { label: 'Safety & Screening', path: '/safety', icon: AlertTriangle, permission: 'safety' },
     ],
   },
   {
     title: 'PLATFORM & SYSTEM',
     items: [
-      { label: 'Taxonomy Tree', path: '/taxonomy', icon: Package },
-      { label: 'Audit & AI Logs', path: '/audit-logs', icon: BarChart3 },
+      { label: 'Taxonomy Tree', path: '/taxonomy', icon: Package, permission: 'config' },
+      { label: 'Audit & AI Logs', path: '/audit-logs', icon: BarChart3, permission: 'audit' },
     ],
   },
 ];
@@ -54,6 +54,15 @@ export default function AdminLayout() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const hasPermission = (permission) => user?.adminPermissions?.includes('super_admin') || user?.adminPermissions?.includes(permission);
+  const visibleMenuGroups = ADMIN_MENU_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.permission) return hasPermission(item.permission);
+      if (item.anyScope) return user?.adminPermissions?.includes('super_admin') || item.anyScope.some(hasPermission);
+      return true;
+    }),
+  })).filter((group) => group.items.length > 0);
 
   // Close mobile drawer on route change
   React.useEffect(() => {
@@ -68,8 +77,8 @@ export default function AdminLayout() {
   });
 
   const badgeCounts = {
-    urgentQueueCount: dashboardData?.urgentQueue?.length || 0,
-    disputesCount: dashboardData?.criticalAlerts?.highPriorityDisputes?.length || 0,
+    urgentQueueCount: dashboardData?.urgentQueueCount || 0,
+    disputesCount: dashboardData?.criticalAlerts?.highPriorityDisputesCount || 0,
     verificationsCount: dashboardData?.criticalAlerts?.pendingVerificationsCount || 0,
   };
 
@@ -156,7 +165,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-2 pl-2 border-l border-gray-800">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-white truncate max-w-[120px]">{user?.fullName || 'Super Admin'}</p>
-              <p className="text-[10px] text-emerald-400 font-mono">ROLE: ADMIN</p>
+                  <p className="text-[10px] text-emerald-400 font-mono">ROLE: {user?.adminPermissions?.includes('super_admin') ? 'SUPER ADMIN' : 'ADMIN'}</p>
             </div>
             <button
               onClick={handleLogout}
@@ -196,7 +205,7 @@ export default function AdminLayout() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-5">
-            {ADMIN_MENU_GROUPS.map((group) => (
+            {visibleMenuGroups.map((group) => (
               <div key={group.title} className="space-y-1">
                 {!sidebarCollapsed && (
                   <p className="px-3 text-[10px] font-black uppercase tracking-wider text-gray-500 mb-1.5">
@@ -257,7 +266,7 @@ export default function AdminLayout() {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-4">
-                {ADMIN_MENU_GROUPS.map((group) => (
+                {visibleMenuGroups.map((group) => (
                   <div key={group.title} className="space-y-1">
                     <p className="text-[10px] font-black uppercase text-gray-500 px-2">{group.title}</p>
                     {group.items.map((item) => {

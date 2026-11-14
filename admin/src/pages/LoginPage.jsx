@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { ShieldAlert, Lock, Mail, Loader2, KeyRound, Sparkles } from 'lucide-react';
+import { ShieldAlert, Lock, Mail, Loader2, KeyRound } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedReturnTo = new URLSearchParams(location.search).get('returnTo');
+  const returnTo = requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
+    ? requestedReturnTo
+    : location.state?.from || '/';
+  const isReauthentication = new URLSearchParams(location.search).get('reauth') === '1';
 
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate('/', { replace: true });
+      navigate(returnTo, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, returnTo]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,17 +30,12 @@ export default function LoginPage() {
     try {
       await login(email.trim(), password);
       toast.success('Admin authenticated successfully');
-      navigate('/');
+      navigate(returnTo, { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoAdmin = () => {
-    setEmail('admin@fixtogether.com');
-    setPassword('Admin123!');
   };
 
   return (
@@ -55,6 +56,9 @@ export default function LoginPage() {
           <p className="text-xs text-gray-400">
             Internal administrative gateway • Restricted security boundary
           </p>
+          {isReauthentication && (
+            <p className="text-xs text-amber-300 mt-2">Sign in again to confirm this sensitive action, then retry it.</p>
+          )}
         </div>
 
         {/* Form Card */}
@@ -69,7 +73,7 @@ export default function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@fixtogether.com"
+                  placeholder="you@company.com"
                   className="input pl-10"
                 />
               </div>
@@ -108,19 +112,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* 1-Click Demo Fill */}
-          <div className="pt-3 border-t border-gray-800/80 flex items-center justify-between">
-            <span className="text-[11px] text-gray-500">Local Testing Credentials?</span>
-            <button
-              type="button"
-              onClick={handleDemoAdmin}
-              className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Fill Demo Admin</span>
-            </button>
-          </div>
         </div>
 
         <p className="text-center text-[10px] text-gray-600">

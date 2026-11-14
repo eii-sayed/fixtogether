@@ -21,11 +21,19 @@ export function AuthProvider({ children }) {
   // Sync freshest admin user data from backend or exchange SSO ticket
   useEffect(() => {
     const handleAuthInit = async () => {
+      const requiresReauthentication = new URLSearchParams(window.location.search).get('reauth') === '1';
+      if (requiresReauthentication) {
+        localStorage.removeItem('adminAccessToken');
+        localStorage.removeItem('adminRefreshToken');
+        localStorage.removeItem('adminUser');
+        setUser(null);
+      }
+
       // 1. Process SSO ticket exchange if coming from Client Portal
       const searchParams = new URLSearchParams(window.location.search);
       const ssoTicket = searchParams.get('sso_ticket');
 
-      if (ssoTicket) {
+      if (ssoTicket && !requiresReauthentication) {
         try {
           const { data } = await api.post('/auth/sso-exchange', { ticket: ssoTicket });
           const { user: u, accessToken, refreshToken } = data.data;
@@ -52,7 +60,9 @@ export function AuthProvider({ children }) {
       }
 
       // 2. Check existing stored admin tokens
-      const token = localStorage.getItem('adminAccessToken') || localStorage.getItem('accessToken');
+      const token = requiresReauthentication
+        ? null
+        : localStorage.getItem('adminAccessToken') || localStorage.getItem('accessToken');
       if (token) {
         try {
           const { data } = await api.get('/auth/me');

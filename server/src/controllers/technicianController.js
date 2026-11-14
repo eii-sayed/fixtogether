@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { TechnicianProfile, User } = require('../models');
+const { TechnicianProfile, User, ReviewQueueItem } = require('../models');
 const {
   asyncHandler,
   successResponse,
@@ -685,14 +685,49 @@ const getPendingTechnicians = asyncHandler(async (req, res) => {
  * PATCH /admin/technicians/:id/verification
  */
 const updateVerificationStatus = asyncHandler(async (req, res) => {
-  const { verificationStatus, verificationNote } = req.body;
-  const profile = await TechnicianProfile.findOne({ user: req.params.id });
+  const { verificationStatus, verificationNote, rejectionReason, adminNote, approvalChecklist } = req.body;
+  const applicantId = req.params.id;
+  if (applicantId.toString() === req.user.userId.toString()) {
+    return errorResponse(res, 'You cannot review your own verification application.', 403);
+  }
+  const allowedDecisions = [VERIFICATION_STATUS.APPROVED, VERIFICATION_STATUS.REJECTED, VERIFICATION_STATUS.MORE_INFO_NEEDED];
+  if (!allowedDecisions.includes(verificationStatus)) return errorResponse(res, 'Invalid verification decision.', 400);
+  const applicantNote = typeof rejectionReason === 'string' ? rejectionReason.trim() : typeof verificationNote === 'string' ? verificationNote.trim() : '';
+  if ([VERIFICATION_STATUS.REJECTED, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(verificationStatus) && !applicantNote) {
+    return errorResponse(res, 'Provide a reason for this verification decision.', 400);
+  }
+  if (verificationStatus === VERIFICATION_STATUS.APPROVED &&
+      !['identityVerified', 'credentialsChecked', 'documentsValid'].every((key) => approvalChecklist?.[key] === true)) {
+    return errorResponse(res, 'Complete the identity, credential, and document checklist before approval.', 400);
+  }
+
+  const profile = await TechnicianProfile.findOne({ user: applicantId });
 
   if (!profile) return errorResponse(res, 'Technician not found.', 404);
+  if (![VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(profile.verificationStatus)) {
+    return res.status(409).json({ success: false, code: 'VERIFICATION_ALREADY_REVIEWED', message: 'This application is no longer awaiting review.' });
+  }
 
-  profile.verificationStatus = verificationStatus;
-  if (verificationNote) profile.verificationNote = verificationNote;
-  await profile.save();
+  const updatedProfile = await TechnicianProfile.findOneAndUpdate(
+    {
+      _id: profile._id,
+      __v: profile.__v ?? { $exists: false },
+      updatedAt: profile.updatedAt,
+      verificationStatus: { $in: [VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED] },
+    },
+    {
+      $set: { verificationStatus, verificationNote: applicantNote },
+      $inc: { __v: 1 },
+    },
+    { new: true, runValidators: true }
+  );
+  if (!updatedProfile) {
+    return res.status(409).json({ success: false, code: 'VERIFICATION_CHANGED', message: 'This application changed while you were reviewing it. Refresh and try again.' });
+  }
+  await ReviewQueueItem.findOneAndUpdate(
+    { entityType: 'verification', entityId: updatedProfile._id },
+    { $set: { reviewState: 'resolved' }, $inc: { version: 1 } }
+  );
 
   const notifType =
     verificationStatus === VERIFICATION_STATUS.APPROVED
@@ -700,15 +735,15 @@ const updateVerificationStatus = asyncHandler(async (req, res) => {
       : NOTIFICATION_TYPES.ACCOUNT_REJECTED;
 
   await createNotification({
-    userId: req.params.id,
+    userId: applicantId,
     type: notifType,
     title: verificationStatus === VERIFICATION_STATUS.APPROVED ? 'Verification Approved' : 'Verification Update',
     message:
       verificationStatus === VERIFICATION_STATUS.APPROVED
         ? 'Your technician profile has been verified. You can now receive repair requests.'
-        : `Verification status: ${verificationStatus}. ${verificationNote || ''}`,
+        : `Verification status: ${verificationStatus}. ${applicantNote}`,
     relatedEntityType: 'TechnicianProfile',
-    relatedEntityId: profile._id,
+    relatedEntityId: updatedProfile._id,
   });
 
   await createAuditLog(
@@ -716,13 +751,13 @@ const updateVerificationStatus = asyncHandler(async (req, res) => {
       actor: req.user.userId,
       action: 'TECHNICIAN_VERIFICATION_UPDATED',
       targetType: 'TechnicianProfile',
-      targetId: profile._id,
-      metadata: { verificationStatus, verificationNote },
+      targetId: updatedProfile._id,
+      metadata: { verificationStatus, applicantNote, adminNote: adminNote || '', approvalChecklist: approvalChecklist || {} },
     },
     req
   );
 
-  return successResponse(res, { profile }, 'Verification status updated');
+  return successResponse(res, { profile: updatedProfile }, 'Verification status updated');
 });
 
 module.exports = {

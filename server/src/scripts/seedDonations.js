@@ -21,6 +21,9 @@ const {
 
 async function seedDonations(standalone = true) {
   try {
+    if ((process.env.NODE_ENV || 'production').toLowerCase() === 'production') {
+      throw new Error('Fixture seeding is disabled in production. Use reviewed migrations or production provisioning instead.');
+    }
     if (standalone) {
       console.log('Connecting to MongoDB...');
       await mongoose.connect(process.env.MONGODB_URI);
@@ -446,21 +449,6 @@ async function seedDonations(standalone = true) {
     console.log('\n======================================================');
     console.log('🎉 DONATION ECOSYSTEM SEEDED SUCCESSFULLY!');
     console.log('======================================================\n');
-    console.log('Demo Logins for Testing Donations:');
-    console.log('------------------------------------------------------');
-    console.log('1. Donors / Owners:');
-    console.log('   - rahim@example.com   / Owner123! (Has published, matched & completed offers)');
-    console.log('   - fatima@example.com  / Owner123! (Has scheduled handover with code FT-78421)');
-    console.log('   - karim@example.com   / Owner123! (Has received fan awaiting inspection)');
-    console.log('2. Donation Organizations:');
-    console.log('   - hope@example.com    / Org1234! (Hope Donations: Laptops & coding lab)');
-    console.log('   - communityaid@example.com / Org1234! (Community Aid: Desks & reading room)');
-    console.log('   - techforgood@example.com  / Org1234! (TechForGood: Tablets & monitors)');
-    console.log('3. Repair Groups:');
-    console.log('   - greenrepair@example.com  / Org1234! (Green Repair: Audio & appliances)');
-    console.log('4. Recycling Facilities:');
-    console.log('   - ecorecycle@example.com   / Org1234! (EcoRecycle: E-waste & metal)');
-    console.log('------------------------------------------------------\n');
 
     if (standalone) {
       await mongoose.disconnect();

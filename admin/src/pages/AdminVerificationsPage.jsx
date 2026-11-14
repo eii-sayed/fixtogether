@@ -41,11 +41,12 @@ export default function AdminVerificationsPage() {
   });
 
   const techMutation = useMutation({
-    mutationFn: ({ id, status, reason, note }) =>
+    mutationFn: ({ id, status, reason, note, approvalChecklist }) =>
       api.patch(`/admin/technicians/${id}/verification`, {
         verificationStatus: status,
         rejectionReason: reason,
         adminNote: note,
+        approvalChecklist,
       }),
     onSuccess: () => {
       setDecisionModal(null);
@@ -58,11 +59,12 @@ export default function AdminVerificationsPage() {
   });
 
   const orgMutation = useMutation({
-    mutationFn: ({ id, status, reason, note }) =>
+    mutationFn: ({ id, status, reason, note, approvalChecklist }) =>
       api.patch(`/admin/organizations/${id}/verification`, {
         verificationStatus: status,
         rejectionReason: reason,
         adminNote: note,
+        approvalChecklist,
       }),
     onSuccess: () => {
       setDecisionModal(null);
@@ -364,10 +366,10 @@ export default function AdminVerificationsPage() {
               </div>
             )}
 
-            {decisionModal.targetStatus === 'rejected' && (
+            {['rejected', 'more_info_needed'].includes(decisionModal.targetStatus) && (
               <div>
                 <label className="text-xs font-semibold text-gray-300 block mb-1">
-                  Rejection Reason (Delivered to applicant) <span className="text-red-500">*</span>
+                  {decisionModal.targetStatus === 'rejected' ? 'Rejection Reason' : 'Information Requested'} (Delivered to applicant) <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   rows={2}
@@ -405,6 +407,11 @@ export default function AdminVerificationsPage() {
                     status: decisionModal.targetStatus,
                     reason: decisionReason,
                     note: adminNote,
+                    approvalChecklist: {
+                      identityVerified: checklist.identityVerified,
+                      credentialsChecked: checklist.credentialsChecked,
+                      documentsValid: checklist.documentsValid,
+                    },
                   };
                   if (decisionModal.type === 'technician') {
                     techMutation.mutate(payload);
@@ -414,7 +421,7 @@ export default function AdminVerificationsPage() {
                 }}
                 disabled={
                   !isChecklistComplete ||
-                  (decisionModal.targetStatus === 'rejected' && !decisionReason.trim())
+                  (['rejected', 'more_info_needed'].includes(decisionModal.targetStatus) && !decisionReason.trim())
                 }
                 className="btn-primary text-xs font-semibold"
               >

@@ -6,6 +6,9 @@ const { User, ItemCategory, Thread, ThreadComment } = require('../models');
 
 async function seedThreads(standalone = true) {
   try {
+    if ((process.env.NODE_ENV || 'production').toLowerCase() === 'production') {
+      throw new Error('Fixture seeding is disabled in production. Use reviewed migrations or production provisioning instead.');
+    }
     if (standalone) {
       console.log('Connecting to MongoDB...');
       await mongoose.connect(process.env.MONGODB_URI);
