@@ -52,7 +52,7 @@ export default function RegisterPage() {
         state: {
           email: data.email,
           justRegistered: true,
-          devOtp: res?.otp,
+          devOtp: import.meta.env.DEV ? res?.otp : undefined,
           emailServiceConfigured: res?.emailServiceConfigured,
         },
       });

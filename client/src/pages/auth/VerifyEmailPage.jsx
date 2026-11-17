@@ -29,7 +29,9 @@ export default function VerifyEmailPage() {
   const isJustRegistered = !!location.state?.justRegistered;
   const [cooldown, setCooldown] = useState(isJustRegistered ? 60 : 0);
   const [canResend, setCanResend] = useState(!isJustRegistered);
-  const [devOtp, setDevOtp] = useState(location.state?.devOtp || null);
+  const [devOtp, setDevOtp] = useState(
+    import.meta.env.DEV ? location.state?.devOtp || null : null
+  );
   const [emailServiceConfigured, setEmailServiceConfigured] = useState(
     location.state?.emailServiceConfigured !== undefined ? location.state.emailServiceConfigured : null
   );
@@ -163,7 +165,7 @@ export default function VerifyEmailPage() {
 
     try {
       const res = await api.post('/auth/resend-verification', { email: cleanEmail });
-      if (res?.data?.data?.otp) {
+      if (import.meta.env.DEV && res?.data?.data?.otp) {
         setDevOtp(res.data.data.otp);
       }
       if (res?.data?.data?.emailServiceConfigured !== undefined) {
@@ -216,7 +218,7 @@ export default function VerifyEmailPage() {
           )}
 
           {/* Development Mode OTP helper banner */}
-          {devOtp && (
+          {import.meta.env.DEV && devOtp && (
             <div className="mb-5 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
