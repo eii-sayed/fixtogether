@@ -2,6 +2,18 @@ const Joi = require('joi');
 const { SERVICE_METHOD, ORGANIZATION_TYPES } = require('../constants');
 
 const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+const timeZoneSchema = Joi.string()
+  .trim()
+  .max(100)
+  .custom((value, helpers) => {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: value });
+      return value;
+    } catch {
+      return helpers.error('any.invalid');
+    }
+  })
+  .messages({ 'any.invalid': 'timeZone must be a valid IANA time zone, for example Asia/Dhaka.' });
 
 const updateUserProfileSchema = Joi.object({
   fullName: Joi.string().trim().min(2).max(100).optional(),
@@ -40,6 +52,7 @@ const updateTechnicianProfileSchema = Joi.object({
   minimumServiceCharge: Joi.number().min(0).optional(),
   languages: Joi.array().items(Joi.string().trim().max(50)).optional(),
   availabilityStatus: Joi.string().valid('available', 'busy', 'unavailable').optional(),
+  timeZone: timeZoneSchema.optional(),
   workingHours: Joi.object().optional(),
   priceRange: Joi.object({
     minimum: Joi.number().min(0).optional(),

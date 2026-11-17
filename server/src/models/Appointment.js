@@ -31,6 +31,14 @@ const appointmentSchema = new mongoose.Schema(
       type: Date,
       required: [true, 'Scheduled end time is required'],
     },
+    // IANA time zone supplied by the scheduling client. Instants remain in UTC
+    // in MongoDB; this preserves the intended local context for display/audits.
+    timeZone: {
+      type: String,
+      default: 'UTC',
+      trim: true,
+      maxlength: 100,
+    },
     location: {
       address: { type: String, default: '' },
       city: { type: String, default: '' },

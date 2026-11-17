@@ -135,19 +135,22 @@ export default function ChatPanel({ repairRequestId }) {
       markReadMutation.mutate();
     };
 
-    const handleTyping = ({ userId: typerId, fullName }) => {
+    const handleTyping = ({ repairRequestId: eventRequestId, userId: typerId, fullName }) => {
+      if (eventRequestId !== repairRequestId) return;
       if (typerId !== user?.userId) {
         setTypingUser(fullName);
       }
     };
 
-    const handleStopTyping = ({ userId: typerId }) => {
+    const handleStopTyping = ({ repairRequestId: eventRequestId, userId: typerId }) => {
+      if (eventRequestId !== repairRequestId) return;
       if (typerId !== user?.userId) {
         setTypingUser(null);
       }
     };
 
-    const handleRead = ({ readBy, readAt }) => {
+    const handleRead = ({ repairRequestId: eventRequestId, readBy, readAt }) => {
+      if (eventRequestId !== repairRequestId) return;
       if (readBy !== user?.userId) {
         // Other person read our messages
         queryClient.setQueryData(['messages', repairRequestId], (old) => {

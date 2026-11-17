@@ -43,7 +43,7 @@ export default function RegisterPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      const res = await registerUser(data);
+      await registerUser(data);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('pendingVerificationEmail', data.email);
       }
@@ -52,8 +52,6 @@ export default function RegisterPage() {
         state: {
           email: data.email,
           justRegistered: true,
-          devOtp: import.meta.env.DEV ? res?.otp : undefined,
-          emailServiceConfigured: res?.emailServiceConfigured,
         },
       });
     } catch (error) {

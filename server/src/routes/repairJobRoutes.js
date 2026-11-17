@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const rjController = require('../controllers/repairJobController');
+const paymentController = require('../controllers/paymentController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
+const { validate } = require('../middleware/validate');
+const { recordPaymentSchema, paymentDecisionSchema, requestRefundSchema, refundDecisionSchema } = require('../validators/requestValidators');
+const { writeLimiter } = require('../middleware/rateLimiter');
 
 // Repair jobs
 router.get('/', authenticate, rjController.getRepairJobs);
@@ -20,6 +24,14 @@ router.post('/:id/quick-solve', authenticate, authorize(ROLES.TECHNICIAN), uploa
 router.post('/:id/quick-start', authenticate, authorize(ROLES.TECHNICIAN), rjController.quickStart);
 router.post('/:id/owner-confirmation', authenticate, authorize(ROLES.OWNER), rjController.ownerConfirmCompletion);
 router.post('/:id/confirm-completion', authenticate, authorize(ROLES.OWNER), rjController.ownerConfirmCompletion);
+
+// Payment ledger: the platform records direct settlement evidence, while both
+// parties confirm money movement before the repair job balance changes.
+router.get('/:id/payments', authenticate, paymentController.getPaymentLedger);
+router.post('/:id/payments', authenticate, writeLimiter, validate(recordPaymentSchema), paymentController.recordPayment);
+router.patch('/:id/payments/:paymentId/decision', authenticate, writeLimiter, validate(paymentDecisionSchema), paymentController.decidePayment);
+router.post('/:id/payments/:paymentId/refunds', authenticate, writeLimiter, validate(requestRefundSchema), paymentController.requestRefund);
+router.patch('/:id/refunds/:refundId/decision', authenticate, writeLimiter, validate(refundDecisionSchema), paymentController.decideRefund);
 
 
 // Inspection

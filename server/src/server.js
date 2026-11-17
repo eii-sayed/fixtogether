@@ -87,7 +87,7 @@ const startServer = async () => {
         const { isParticipant } = require('./controllers/messageController');
 
         const repairRequest = await RepairRequest.findById(repairRequestId)
-          .select('owner selectedTechnicians selectedQuotation')
+          .select('owner selectedTechnicians selectedQuotation requestStatus')
           .lean();
 
         if (!repairRequest) {
@@ -102,41 +102,52 @@ const startServer = async () => {
           return;
         }
 
-        socket.join(`chat:${repairRequestId}`);
-        logger.debug(`Socket ${socket.id} (user ${socket.userId}) joined chat room: ${repairRequestId}`);
+        // Messages, typing, and repair updates are delivered directly to the
+        // authorized users' rooms. Do not create a shared request room: a
+        // request can involve multiple technicians.
+        logger.debug(`Socket ${socket.id} authorized for private chat: ${repairRequestId}`);
       } catch (err) {
         logger.error('Socket chat:join error:', err.message);
       }
     });
 
-    // Leave a chat room
+    // Kept for client compatibility. Private chat delivery has no shared room.
     socket.on('chat:leave', (repairRequestId) => {
       if (repairRequestId) {
-        socket.leave(`chat:${repairRequestId}`);
-        logger.debug(`Socket ${socket.id} left chat room: ${repairRequestId}`);
+        logger.debug(`Socket ${socket.id} left private chat: ${repairRequestId}`);
       }
     });
 
     // Typing indicator — verified identity relay to other participants in the room
-    socket.on('chat:typing', async ({ repairRequestId, fullName }) => {
+    // Private, server-authorized typing delivery. A shared request room can
+    // contain more than one technician and must never receive another pair's events.
+    const relayTyping = async (repairRequestId, eventName) => {
       if (!repairRequestId || !socket.userId) return;
 
-      socket.to(`chat:${repairRequestId}`).emit('chat:typing', {
-        repairRequestId,
-        userId: socket.userId,
-        fullName: fullName || 'User',
-      });
-    });
+      try {
+        const { RepairRequest, User } = require('./models');
+        const { isParticipant, getRecipient } = require('./controllers/messageController');
+        const repairRequest = await RepairRequest.findById(repairRequestId)
+          .select('owner selectedTechnicians selectedQuotation requestStatus')
+          .lean();
+        if (!repairRequest || !await isParticipant(socket.userId, socket.userRole, repairRequest)) return;
 
-    // Stop typing indicator
-    socket.on('chat:stop-typing', ({ repairRequestId }) => {
-      if (!repairRequestId || !socket.userId) return;
+        const recipientId = await getRecipient(socket.userId, repairRequest);
+        if (!recipientId) return;
 
-      socket.to(`chat:${repairRequestId}`).emit('chat:stop-typing', {
-        repairRequestId,
-        userId: socket.userId,
-      });
-    });
+        const payload = { repairRequestId, userId: socket.userId };
+        if (eventName === 'chat:typing') {
+          const sender = await User.findById(socket.userId).select('fullName').lean();
+          payload.fullName = sender?.fullName || 'User';
+        }
+        io.to(`user:${recipientId}`).emit(eventName, payload);
+      } catch (err) {
+        logger.error(`Socket ${eventName} error:`, err.message);
+      }
+    };
+
+    socket.on('chat:typing', ({ repairRequestId }) => relayTyping(repairRequestId, 'chat:typing'));
+    socket.on('chat:stop-typing', ({ repairRequestId }) => relayTyping(repairRequestId, 'chat:stop-typing'));
 
     socket.on('disconnect', () => {
       logger.debug(`Socket disconnected: ${socket.id}`);

@@ -5,7 +5,7 @@ const quotationController = require('../controllers/quotationController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { validate } = require('../middleware/validate');
-const { createRepairRequestSchema, updateRepairRequestSchema, aiReviewSchema, clarificationAnswersSchema, quickRepairRequestSchema, quickQuoteSchema, acceptJobSchema } = require('../validators/requestValidators');
+const { createRepairRequestSchema, updateRepairRequestSchema, aiReviewSchema, clarificationAnswersSchema, quickRepairRequestSchema, quickQuoteSchema, acceptJobSchema, createQuotationSchema } = require('../validators/requestValidators');
 const { writeLimiter, publishLimiter, aiLimiter } = require('../middleware/rateLimiter');
 const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
@@ -31,7 +31,7 @@ router.post('/:id/assign', authenticate, writeLimiter, rrController.assignTechni
 
 // Technician actions: 1-click job acceptance & quotations
 router.post('/:id/accept-job', authenticate, authorize(ROLES.TECHNICIAN), validate(acceptJobSchema), writeLimiter, rrController.acceptJob);
-router.post('/:id/quotations', authenticate, authorize(ROLES.TECHNICIAN), quotationController.createQuotation);
+router.post('/:id/quotations', authenticate, authorize(ROLES.TECHNICIAN), writeLimiter, validate(createQuotationSchema), quotationController.createQuotation);
 router.post('/:id/quick-quote', authenticate, authorize(ROLES.TECHNICIAN), validate(quickQuoteSchema), writeLimiter, quotationController.quickQuote);
 router.get('/:id/quotations', authenticate, quotationController.getQuotationsForRequest);
 

@@ -311,21 +311,24 @@ export default function RepairConversation({
       markReadMutation.mutate();
     };
 
-    const handleTyping = ({ userId: typerId, fullName }) => {
+    const handleTyping = ({ repairRequestId: eventRequestId, userId: typerId, fullName }) => {
+      if (eventRequestId !== repairRequestId) return;
       const currentUserId = user?.userId || user?._id;
       if (typerId !== currentUserId) {
         setTypingUser(fullName || 'Participant');
       }
     };
 
-    const handleStopTyping = ({ userId: typerId }) => {
+    const handleStopTyping = ({ repairRequestId: eventRequestId, userId: typerId }) => {
+      if (eventRequestId !== repairRequestId) return;
       const currentUserId = user?.userId || user?._id;
       if (typerId !== currentUserId) {
         setTypingUser(null);
       }
     };
 
-    const handleReadReceipt = ({ readBy, readAt }) => {
+    const handleReadReceipt = ({ repairRequestId: eventRequestId, readBy, readAt }) => {
+      if (eventRequestId !== repairRequestId) return;
       const currentUserId = user?.userId || user?._id;
       if (readBy !== currentUserId) {
         queryClient.setQueryData(['messages', repairRequestId], (old) => {

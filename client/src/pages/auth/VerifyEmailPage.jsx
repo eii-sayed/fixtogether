@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Loader2, ShieldCheck, RefreshCw, Mail, ArrowLeft, CheckCircle2, AlertTriangle, KeyRound } from 'lucide-react';
+import { Loader2, ShieldCheck, RefreshCw, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../api/axios';
 import SEO from '../../components/common/SEO';
@@ -29,13 +29,6 @@ export default function VerifyEmailPage() {
   const isJustRegistered = !!location.state?.justRegistered;
   const [cooldown, setCooldown] = useState(isJustRegistered ? 60 : 0);
   const [canResend, setCanResend] = useState(!isJustRegistered);
-  const [devOtp, setDevOtp] = useState(
-    import.meta.env.DEV ? location.state?.devOtp || null : null
-  );
-  const [emailServiceConfigured, setEmailServiceConfigured] = useState(
-    location.state?.emailServiceConfigured !== undefined ? location.state.emailServiceConfigured : null
-  );
-
   const inputRefs = useRef([]);
 
   // Auto focus first OTP input on mount
@@ -165,12 +158,6 @@ export default function VerifyEmailPage() {
 
     try {
       const res = await api.post('/auth/resend-verification', { email: cleanEmail });
-      if (import.meta.env.DEV && res?.data?.data?.otp) {
-        setDevOtp(res.data.data.otp);
-      }
-      if (res?.data?.data?.emailServiceConfigured !== undefined) {
-        setEmailServiceConfigured(res.data.data.emailServiceConfigured);
-      }
       toast.success(res?.data?.message || 'A new 6-digit verification code has been sent to your email.');
       setCooldown(60);
       setCanResend(false);
@@ -214,37 +201,6 @@ export default function VerifyEmailPage() {
           {error && (
             <div className="mb-5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs leading-relaxed">
               {error}
-            </div>
-          )}
-
-          {/* Development Mode OTP helper banner */}
-          {import.meta.env.DEV && devOtp && (
-            <div className="mb-5 p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex items-center justify-between gap-3 animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
-                <div>
-                  <span className="font-bold">Dev Code:</span>{' '}
-                  <span className="font-mono text-sm font-bold tracking-widest text-amber-900">{devOtp}</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => fillOtp(devOtp)}
-                className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-200 hover:bg-amber-300 text-amber-950 transition-colors shadow-2xs"
-              >
-                Auto-fill
-              </button>
-            </div>
-          )}
-
-          {/* Email Service Not Configured Advisory Banner */}
-          {emailServiceConfigured === false && (
-            <div className="mb-5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5 leading-relaxed">
-              <AlertTriangle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold block mb-0.5">SMTP Service Not Configured</span>
-                <span>The backend email credentials (<code>EMAIL_USER</code> / <code>EMAIL_PASSWORD</code>) are not configured. Check the server console logs for your OTP code or configure SMTP in your server environment.</span>
-              </div>
             </div>
           )}
 

@@ -13,7 +13,7 @@ export default function PaymentDisclosureBanner({ className = '' }) {
       <div>
         <strong className="font-semibold text-blue-950">Payment Arrangement Notice:</strong>
         <p className="text-blue-800 mt-0.5 leading-relaxed">
-          Payment is arranged directly between the owner and technician upon inspection or completion. FixTogether does not currently process, escrow, or hold funds. Cost figures are recorded for transparency, warranty tracking, and dispute reference.
+          Payment is arranged directly between the owner and technician upon inspection or completion. FixTogether does not process, escrow, or hold funds. Payment and refund records are confirmed by both parties and kept for transparency, warranty tracking, and dispute reference.
         </p>
       </div>
     </div>

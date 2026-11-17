@@ -133,6 +133,7 @@ async function transitionRepairRequest(repairRequestId, nextStatus, user, option
       actor: user.userId,
       payload: { previousStatus, nextStatus, reason },
       deduplicationKey: `repair-request:${request._id}:${nextStatus}:${Date.now()}`,
+      session,
     });
   } catch (err) {
     logger.warn('Failed to emit outbox event for repair request transition:', err.message);
@@ -265,6 +266,7 @@ async function transitionRepairJob(repairJobId, nextStatus, user, options = {}) 
       actor: user.userId,
       payload: { previousStatus, nextStatus, note },
       deduplicationKey: `repair-job:${job._id}:${nextStatus}:${Date.now()}`,
+      session,
     });
   } catch (err) {
     logger.warn('Failed to emit outbox event for repair job transition:', err.message);

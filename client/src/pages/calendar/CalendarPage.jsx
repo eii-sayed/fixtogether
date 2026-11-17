@@ -52,8 +52,8 @@ export default function CalendarPage() {
 
   // Reschedule mutation
   const rescheduleMutation = useMutation({
-    mutationFn: ({ id, scheduledStart, scheduledEnd }) =>
-      api.patch(`/appointments/${id}/reschedule`, { scheduledStart, scheduledEnd }),
+    mutationFn: ({ id, scheduledStart, scheduledEnd, timeZone }) =>
+      api.patch(`/appointments/${id}/reschedule`, { scheduledStart, scheduledEnd, timeZone }),
     onSuccess: () => {
       queryClient.invalidateQueries(['appointments']);
       toast.success('Appointment successfully rescheduled.');
@@ -143,6 +143,7 @@ export default function CalendarPage() {
       id: selectedAppointment._id,
       scheduledStart: scheduledStart.toISOString(),
       scheduledEnd: scheduledEnd.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     });
   };
 

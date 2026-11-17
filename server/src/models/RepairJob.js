@@ -115,6 +115,13 @@ const repairJobSchema = new mongoose.Schema(
       enum: ['pending', 'partial', 'paid', 'refunded', ''],
       default: '',
     },
+    paymentSummary: {
+      confirmedPaid: { type: Number, default: 0, min: 0 },
+      confirmedRefunded: { type: Number, default: 0, min: 0 },
+      balanceOutstanding: { type: Number, default: 0, min: 0 },
+      currency: { type: String, default: 'BDT' },
+      updatedAt: { type: Date, default: null },
+    },
     completionReport: {
       type: String,
       trim: true,

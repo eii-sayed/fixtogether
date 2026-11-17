@@ -197,6 +197,7 @@ const updateMyTechnicianProfile = asyncHandler(async (req, res) => {
     minimumServiceCharge,
     languages,
     availabilityStatus,
+    timeZone,
     activeStatus,
   } = req.body;
 
@@ -215,6 +216,7 @@ const updateMyTechnicianProfile = asyncHandler(async (req, res) => {
   if (minimumServiceCharge !== undefined) updates.minimumServiceCharge = minimumServiceCharge;
   if (languages) updates.languages = languages;
   if (availabilityStatus) updates.availabilityStatus = availabilityStatus;
+  if (timeZone !== undefined) updates.timeZone = timeZone;
   if (activeStatus !== undefined) updates.activeStatus = activeStatus;
 
   const profile = await TechnicianProfile.findOneAndUpdate(

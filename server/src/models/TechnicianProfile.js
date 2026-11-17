@@ -20,6 +20,20 @@ const technicianProfileSchema = new mongoose.Schema(
       enum: ['available', 'busy', 'unavailable'],
       default: 'available',
     },
+    // Updated with every booking or reschedule. This gives appointment
+    // transactions a common document to write, preventing concurrent
+    // overlapping-slot checks from both committing.
+    scheduleVersion: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    timeZone: {
+      type: String,
+      default: 'UTC',
+      trim: true,
+      maxlength: 100,
+    },
     warrantyPolicy: {
       type: String,
       trim: true,

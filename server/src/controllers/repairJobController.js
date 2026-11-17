@@ -432,7 +432,9 @@ const quickSolve = asyncHandler(async (req, res) => {
   const { getIO } = require('../services/notificationService');
   const io = getIO();
   if (io) {
-    io.to(`chat:${job.repairRequest}`).emit('repair-job:updated', { jobId: job._id, status: job.currentStatus });
+    const jobUpdate = { jobId: job._id, status: job.currentStatus };
+    io.to(`user:${job.owner}`).emit('repair-job:updated', jobUpdate);
+    io.to(`user:${job.technician}`).emit('repair-job:updated', jobUpdate);
     io.to(`user:${job.owner}`).emit('notification', {
       title: 'Problem Solved!',
       message: 'Technician has completed your repair.',
@@ -494,7 +496,9 @@ const ownerConfirmCompletion = asyncHandler(async (req, res) => {
 
   job.ownerAcceptedCompletion = true;
   job.completedAt = new Date();
-  job.paymentStatus = req.body.paymentStatus || 'paid';
+  // Payment status is calculated from confirmed ledger records. Completion
+  // cannot mark a job paid merely because the client sent a request field.
+  if (!job.paymentStatus) job.paymentStatus = 'pending';
   if (job.handoverDetails) {
     job.handoverDetails.ownerConfirmedAt = new Date();
   }

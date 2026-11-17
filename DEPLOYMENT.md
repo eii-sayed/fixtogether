@@ -25,6 +25,8 @@ At your domain registrar or DNS provider (e.g., Cloudflare, Namecheap, GoDaddy, 
 ```ini
 NODE_ENV=production
 PORT=5000
+# Number of trusted ingress proxies in front of Express (Render or the Caddy gateway: 1)
+TRUST_PROXY_HOPS=1
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/fixtogether?retryWrites=true&w=majority
 
 # Multi-Origin CORS (Permits both Client and Admin applications)
@@ -58,12 +60,18 @@ VAPID_SUBJECT=mailto:admin@fixtogether.com
 # Email Provider Configuration (REQUIRED for Email Verification & Password Resets)
 # For Gmail/SMTP, set EMAIL_USER and EMAIL_PASSWORD. For Gmail, use an App Password.
 # Alternatively, set EMAIL_PROVIDER=resend with RESEND_API_KEY, or sendgrid with SENDGRID_API_KEY.
+# Render Free web services block outbound SMTP ports 25, 465, and 587. Use an HTTPS provider (Resend/SendGrid)
+# on Render Free, or use a paid instance if you need SMTP.
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_USER=your_email@gmail.com
 EMAIL_PASSWORD=your_16char_google_app_password
 EMAIL_FROM="FixTogether" <your_email@gmail.com>
 ```
+
+For the API service, the application trusts one ingress proxy in production by default, which matches the documented Render and single-gateway deployments. Set `TRUST_PROXY_HOPS` to the exact number of trusted proxies in your deployment; use `0` when clients connect directly to the Express server.
+
+For Render Free, replace the Gmail SMTP values in the example with `EMAIL_PROVIDER=resend` and `RESEND_API_KEY=<your Resend API key>`, or use `EMAIL_PROVIDER=sendgrid` and `SENDGRID_API_KEY=<your SendGrid API key>`. Set `EMAIL_FROM` to a sender address accepted by that provider. The existing server integration sends through HTTPS for these providers.
 
 ### B. Public Client Application (`client/.env.production` or Vercel Environment Variables)
 ```ini

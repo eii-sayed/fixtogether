@@ -83,15 +83,31 @@ export function SocketProvider({ children }) {
       });
     };
 
+    const onChatMessage = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+    };
+
+    const onChatUnread = () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('notification', onNotification);
+    socket.on('chat:message', onChatMessage);
+    socket.on('chat:unread', onChatUnread);
 
     return () => {
       // Clean up named listeners to prevent stacking on remount (React StrictMode)
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('notification', onNotification);
+      socket.off('chat:message', onChatMessage);
+      socket.off('chat:unread', onChatUnread);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);

@@ -338,6 +338,15 @@ const APPOINTMENT_TYPE = {
   DROPOFF: 'dropoff',
 };
 
+const PAYMENT_TRANSACTION_STATUS = {
+  PENDING: 'pending',
+  CONFIRMED: 'confirmed',
+  REJECTED: 'rejected',
+  REFUND_REQUESTED: 'refund_requested',
+  REFUNDED: 'refunded',
+  DISPUTED: 'disputed',
+};
+
 const DONATION_STATUS = {
   DRAFT: 'draft',
   SUBMITTED: 'submitted',
@@ -551,6 +560,10 @@ const NOTIFICATION_TYPES = {
   APPOINTMENT_SCHEDULED: 'appointment_scheduled',
   APPOINTMENT_CHANGED: 'appointment_changed',
   APPOINTMENT_CANCELLED: 'appointment_cancelled',
+  PAYMENT_RECORDED: 'payment_recorded',
+  PAYMENT_CONFIRMED: 'payment_confirmed',
+  REFUND_REQUESTED: 'refund_requested',
+  REFUND_RESOLVED: 'refund_resolved',
   REPAIR_STATUS_UPDATED: 'repair_status_updated',
   OWNER_APPROVAL_REQUIRED: 'owner_approval_required',
   PART_REQUIRED: 'part_required',
@@ -653,6 +666,7 @@ module.exports = {
   QUOTATION_STATUS,
   APPOINTMENT_STATUS,
   APPOINTMENT_TYPE,
+  PAYMENT_TRANSACTION_STATUS,
   REPAIR_JOB_STATUS,
   REPAIR_JOB_TRANSITIONS,
   DONATION_STATUS,

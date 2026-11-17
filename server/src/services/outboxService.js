@@ -24,9 +24,10 @@ const createOutboxEvent = async ({
   payload = {},
   deduplicationKey = null,
   correlationId = '',
+  session = null,
 }) => {
   try {
-    const event = await OutboxEvent.create({
+    const event = new OutboxEvent({
       eventType,
       entityType,
       entityId,
@@ -36,6 +37,7 @@ const createOutboxEvent = async ({
       correlationId,
       status: 'queued',
     });
+    await event.save(session ? { session } : undefined);
     return event;
   } catch (error) {
     if (error.code === 11000) {

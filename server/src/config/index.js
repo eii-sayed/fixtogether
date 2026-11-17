@@ -4,6 +4,19 @@ const path = require('path');
 // Load .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+const runtimeEnv = (process.env.NODE_ENV || 'production').toLowerCase();
+const rateLimitStoreProvider = (process.env.RATE_LIMIT_STORE || 'memory').trim().toLowerCase();
+const trustProxyHops = process.env.TRUST_PROXY_HOPS === undefined
+  ? (runtimeEnv === 'production' ? 1 : 0)
+  : Number(process.env.TRUST_PROXY_HOPS);
+
+if (!Number.isSafeInteger(trustProxyHops) || trustProxyHops < 0) {
+  throw new Error('TRUST_PROXY_HOPS must be a non-negative integer.');
+}
+if (!['memory', 'redis'].includes(rateLimitStoreProvider)) {
+  throw new Error('RATE_LIMIT_STORE must be either "memory" or "redis".');
+}
+
 const emailHost = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
 const emailProvider = (
   process.env.EMAIL_PROVIDER ||
@@ -18,7 +31,10 @@ const emailProvider = (
 
 const config = {
   // Local development must be explicitly selected; an omitted NODE_ENV stays fail-closed.
-  env: (process.env.NODE_ENV || 'production').toLowerCase(),
+  env: runtimeEnv,
+  // Production deployments run behind one ingress/reverse proxy by default.
+  // Set TRUST_PROXY_HOPS to match the actual number of trusted proxy hops.
+  trustProxyHops,
   port: parseInt(process.env.PORT, 10) || 5000,
 
   // MongoDB
@@ -90,15 +106,19 @@ const config = {
   // Rate limiting (all configurable via env)
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_GENERAL_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_GENERAL_MAX || process.env.RATE_LIMIT_MAX, 10) || 300,
+    max: parseInt(process.env.RATE_LIMIT_GENERAL_MAX || process.env.RATE_LIMIT_MAX, 10) || 5000,
+  },
+  rateLimitStore: {
+    provider: rateLimitStoreProvider,
+    redisUrl: process.env.REDIS_URL || '',
   },
   publicRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX || process.env.RATE_LIMIT_MAX, 10) || 200,
+    max: parseInt(process.env.RATE_LIMIT_PUBLIC_MAX || process.env.RATE_LIMIT_MAX, 10) || 1000,
   },
   authReadRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_AUTH_READ_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-    max: parseInt(process.env.RATE_LIMIT_AUTH_READ_MAX, 10) || 600,
+    max: parseInt(process.env.RATE_LIMIT_AUTH_READ_MAX, 10) || 5000,
   },
   authRateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
@@ -171,6 +191,7 @@ if (config.env === 'production') {
   if (!hasMongo) missing.push('MONGODB_URI or DATABASE_URL');
   if (!hasAccessSecret) missing.push('JWT_ACCESS_SECRET');
   if (!hasRefreshSecret) missing.push('JWT_REFRESH_SECRET');
+  if (config.rateLimitStore.provider === 'redis' && !config.rateLimitStore.redisUrl) missing.push('REDIS_URL when RATE_LIMIT_STORE=redis');
 
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);

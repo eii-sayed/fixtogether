@@ -6,7 +6,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const config = require('./config');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
-const { generalLimiter } = require('./middleware/rateLimiter');
+const { generalLimiter, readLimiter } = require('./middleware/rateLimiter');
 const logger = require('./utils/logger');
 const { isOriginAllowed } = require('./utils/cors');
 
@@ -30,6 +30,10 @@ const threadRoutes = require('./routes/threadRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 
 const app = express();
+
+// Trust only the configured number of known ingress proxies so Express and
+// express-rate-limit can use the forwarded client IP safely.
+app.set('trust proxy', config.trustProxyHops);
 
 // Security middleware
 app.use(helmet({
@@ -93,7 +97,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// General rate limiting — applied after health checks
+// Reads use their own public/authenticated pools. Mutations use the general
+// pool and then any route-specific protection such as auth, message, or AI.
+app.use('/api/v1', readLimiter);
 app.use('/api', generalLimiter);
 
 // API v1 routes

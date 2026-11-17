@@ -1,4 +1,18 @@
 const Joi = require('joi');
+const { APPOINTMENT_STATUS } = require('../constants');
+
+const timeZoneSchema = Joi.string()
+  .trim()
+  .max(100)
+  .custom((value, helpers) => {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: value });
+      return value;
+    } catch {
+      return helpers.error('any.invalid');
+    }
+  })
+  .messages({ 'any.invalid': 'timeZone must be a valid IANA time zone, for example Asia/Dhaka.' });
 
 const createItemSchema = Joi.object({
   title: Joi.string().trim().min(3).max(200).required(),
@@ -86,13 +100,62 @@ const createAppointmentSchema = Joi.object({
   repairRequestId: Joi.string().required(),
   technicianId: Joi.string().required(),
   appointmentType: Joi.string().valid('inspection', 'repair', 'pickup', 'dropoff').required(),
-  scheduledStart: Joi.date().required(),
-  scheduledEnd: Joi.date().required(),
+  scheduledStart: Joi.date().iso().required(),
+  scheduledEnd: Joi.date().iso().greater(Joi.ref('scheduledStart')).required()
+    .messages({ 'date.greater': 'scheduledEnd must be after scheduledStart.' }),
+  timeZone: timeZoneSchema.default('UTC'),
   location: Joi.object({
     address: Joi.string().allow('').optional(),
     city: Joi.string().allow('').optional(),
   }).optional(),
   notes: Joi.string().max(1000).allow('').optional(),
+});
+
+const rescheduleAppointmentSchema = Joi.object({
+  scheduledStart: Joi.date().iso().required(),
+  scheduledEnd: Joi.date().iso().greater(Joi.ref('scheduledStart')).required()
+    .messages({ 'date.greater': 'scheduledEnd must be after scheduledStart.' }),
+  timeZone: timeZoneSchema.default('UTC'),
+});
+
+const cancelAppointmentSchema = Joi.object({
+  reason: Joi.string().trim().max(1000).allow('').default(''),
+});
+
+const updateAppointmentStatusSchema = Joi.object({
+  status: Joi.string()
+    .valid(
+      APPOINTMENT_STATUS.CONFIRMED,
+      APPOINTMENT_STATUS.IN_PROGRESS,
+      APPOINTMENT_STATUS.COMPLETED,
+      APPOINTMENT_STATUS.NO_SHOW
+    )
+    .required(),
+});
+
+const recordPaymentSchema = Joi.object({
+  amount: Joi.number().precision(2).positive().required(),
+  currency: Joi.string().uppercase().length(3).default('BDT'),
+  paymentMethod: Joi.string().valid('cash', 'bank_transfer', 'mobile_payment', 'other').required(),
+  reference: Joi.string().trim().max(200).allow('').default(''),
+  note: Joi.string().trim().max(1000).allow('').default(''),
+});
+
+const paymentDecisionSchema = Joi.object({
+  decision: Joi.string().valid('confirmed', 'rejected').required(),
+  note: Joi.string().trim().max(1000).allow('').default(''),
+});
+
+const requestRefundSchema = Joi.object({
+  amount: Joi.number().precision(2).positive().required(),
+  paymentMethod: Joi.string().valid('cash', 'bank_transfer', 'mobile_payment', 'other').required(),
+  reference: Joi.string().trim().max(200).allow('').default(''),
+  note: Joi.string().trim().min(3).max(1000).required(),
+});
+
+const refundDecisionSchema = Joi.object({
+  decision: Joi.string().valid('confirmed', 'disputed').required(),
+  note: Joi.string().trim().max(1000).allow('').default(''),
 });
 
 const inspectionSchema = Joi.object({
@@ -229,6 +292,13 @@ module.exports = {
   clarificationAnswersSchema,
   createQuotationSchema,
   createAppointmentSchema,
+  rescheduleAppointmentSchema,
+  cancelAppointmentSchema,
+  updateAppointmentStatusSchema,
+  recordPaymentSchema,
+  paymentDecisionSchema,
+  requestRefundSchema,
+  refundDecisionSchema,
   inspectionSchema,
   createReviewSchema,
   createDisputeSchema,

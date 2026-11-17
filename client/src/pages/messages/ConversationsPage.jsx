@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { MessageCircle, Search, Check, CheckCheck, ShieldCheck, Package, Sparkles, Inbox } from 'lucide-react';
 import RepairConversation from '../../components/chat/RepairConversation';
 
@@ -25,6 +26,7 @@ function formatRelativeTime(dateStr) {
 
 export default function ConversationsPage() {
   const { user } = useAuth();
+  const { connected } = useSocket();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedRequestId = searchParams.get('id');
@@ -35,7 +37,9 @@ export default function ConversationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => api.get('/messages/conversations').then((r) => r.data.data),
-    refetchInterval: 10000,
+    // Live chat events keep this list current. Use a sparse fallback only while
+    // the socket is unavailable so inactive tabs do not generate steady traffic.
+    refetchInterval: connected ? false : 120000,
   });
 
   const conversations = useMemo(() => data?.conversations || [], [data?.conversations]);

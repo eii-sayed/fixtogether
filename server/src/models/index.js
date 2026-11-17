@@ -29,6 +29,7 @@ const OutboxEvent = require('./OutboxEvent');
 const Thread = require('./Thread');
 const ThreadComment = require('./ThreadComment');
 const PushSubscription = require('./PushSubscription');
+const PaymentTransaction = require('./PaymentTransaction');
 
 module.exports = {
   User,
@@ -62,4 +63,5 @@ module.exports = {
   Thread,
   ThreadComment,
   PushSubscription,
+  PaymentTransaction,
 };

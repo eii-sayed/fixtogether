@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
     try {
       const { data } = await api.post('/auth/forgot-password', { email: email.trim().toLowerCase() });
       const resetToken = data?.data?.resetToken;
-      if (resetToken) {
+      if (import.meta.env.DEV && resetToken) {
         setResetLink(`${window.location.origin}/reset-password?token=${encodeURIComponent(resetToken)}`);
       }
       setEmailDeliveryFailed(Boolean(data?.data?.emailDeliveryFailed));
@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
               <p className="text-sm text-gray-500 mb-6">
                 If an account exists for <span className="font-medium text-gray-900">{email.trim()}</span>, a reset link has been sent. Check your inbox and spam folder.
               </p>
-              {resetLink && (
+              {import.meta.env.DEV && resetLink && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6 text-left">
                   <p className="text-sm font-semibold text-amber-900 mb-1">
                     {emailDeliveryFailed ? 'Email could not be sent' : emailSimulated ? 'Local email simulation' : 'Development reset link'}

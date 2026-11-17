@@ -8,7 +8,7 @@ const {
   TechnicianProfile,
   OrganizationProfile,
 } = require('../models');
-const { NOTIFICATION_TYPES } = require('../constants');
+const { NOTIFICATION_TYPES, QUOTATION_STATUS } = require('../constants');
 const { createNotification } = require('../services/notificationService');
 const logger = require('../utils/logger');
 
@@ -23,15 +23,10 @@ const isParticipant = async (userId, userRole, repairRequest) => {
   const ownerId = repairRequest.owner?._id || repairRequest.owner;
   if (ownerId && ownerId.toString() === userId.toString()) return true;
 
-  // Any technician can view and participate in conversations on published/active repair requests
-  if (userRole === 'technician' && !['draft', 'cancelled'].includes(repairRequest.requestStatus)) {
-    return true;
-  }
-
   // Technician invited via selectedTechnicians
   if (repairRequest.selectedTechnicians?.length > 0) {
     const isInvited = repairRequest.selectedTechnicians.some(
-      (t) => (t.technician?._id || t.technician)?.toString() === userId.toString()
+      (t) => (t.technician?._id || t.technician)?.toString() === userId.toString() && t.status !== 'declined'
     );
     if (isInvited) return true;
   }
@@ -40,6 +35,7 @@ const isParticipant = async (userId, userRole, repairRequest) => {
   const hasQuotation = await Quotation.exists({
     repairRequest: repairRequest._id,
     technician: userId,
+    status: { $in: [QUOTATION_STATUS.SUBMITTED, QUOTATION_STATUS.REVISED, QUOTATION_STATUS.ACCEPTED] },
   });
   if (hasQuotation) return true;
 
@@ -431,13 +427,13 @@ const sendMessage = async (req, res) => {
       createdAt: message.createdAt,
     };
 
-    // Emit via Socket.IO to the room and recipient
+    // Send only to the two participants. A repair request can involve several
+    // technicians, so a shared room would disclose private conversations.
     const { getIO } = require('../services/notificationService');
     const io = getIO();
     if (io) {
-      // Emit to the authorized chat room
-      io.to(`chat:${repairRequestId}`).emit('chat:message', messageData);
-      // Emit to recipient's personal room for badge and notification updates
+      io.to(`user:${senderId}`).emit('chat:message', messageData);
+      io.to(`user:${recipientId}`).emit('chat:message', messageData);
       io.to(`user:${recipientId}`).emit('chat:unread', {
         repairRequestId,
         message: messageData,
@@ -479,23 +475,19 @@ const markAsRead = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid repair request ID format' });
     }
 
-    const result = await Message.updateMany(
-      {
-        repairRequest: repairRequestId,
-        recipient: userId,
-        readAt: null,
-      },
-      { readAt: new Date() }
-    );
+    const unreadQuery = { repairRequest: repairRequestId, recipient: userId, readAt: null };
+    const readAt = new Date();
+    const senders = await Message.distinct('sender', unreadQuery);
+    const result = await Message.updateMany(unreadQuery, { readAt });
 
     // Emit read receipt via Socket.IO
     const { getIO } = require('../services/notificationService');
     const io = getIO();
     if (io) {
-      io.to(`chat:${repairRequestId}`).emit('chat:read', {
-        repairRequestId,
-        readBy: userId,
-        readAt: new Date(),
+      senders.forEach((senderId) => {
+        io.to(`user:${senderId}`).emit('chat:read', {
+          repairRequestId, readBy: userId, readAt,
+        });
       });
       // Also update user's own unread badge
       const unreadCount = await Message.countDocuments({ recipient: userId, readAt: null });

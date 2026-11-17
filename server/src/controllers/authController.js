@@ -102,12 +102,11 @@ const register = asyncHandler(async (req, res) => {
         },
         requiresVerification: true,
         email: existingUser.email,
-        otp: isDev ? otp : undefined,
         emailServiceConfigured: emailConfigured,
       },
       emailConfigured
         ? 'A new verification code has been sent to your email. Please verify your account.'
-        : 'Account exists and requires verification. Use the code included in this development response.',
+        : 'Email delivery is not configured. Configure an email provider to receive a verification code.',
       200
     );
   }
@@ -193,11 +192,10 @@ const register = asyncHandler(async (req, res) => {
     refreshToken,
     requiresVerification: true,
     email: user.email,
-    otp: isDev ? otp : undefined,
     emailServiceConfigured: emailConfigured,
   }, emailConfigured
     ? 'Registration successful. Please check your email for the verification code.'
-    : 'Registration successful. Use the verification code included in this development response.', 201);
+    : 'Registration saved, but email delivery is not configured. Configure an email provider to receive a verification code.', 201);
 });
 
 /**
@@ -693,12 +691,11 @@ const resendVerificationOtp = asyncHandler(async (req, res) => {
   return successResponse(
     res,
     {
-      otp: isDev ? otp : undefined,
       emailServiceConfigured: emailConfigured,
     },
     emailConfigured
       ? 'If an unverified account with that email exists, a new verification code has been sent.'
-      : 'Use the verification code included in this development response.'
+      : 'Email delivery is not configured. Configure an email provider to receive a verification code.'
   );
 });
 
