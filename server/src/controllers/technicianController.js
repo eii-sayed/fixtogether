@@ -11,6 +11,8 @@ const { VERIFICATION_STATUS, NOTIFICATION_TYPES, REPAIR_REQUEST_STATUS, QUOTATIO
 const uploadService = require('../services/uploadService');
 const { createAuditLog } = require('../middleware/auditLog');
 const { createNotification } = require('../services/notificationService');
+const { getProtectedFileUrl } = require('../services/uploadService');
+const { assertSafeVerificationFile } = require('../services/verificationDocumentService');
 
 /**
  * GET /technicians
@@ -650,12 +652,21 @@ const submitVerification = asyncHandler(async (req, res) => {
 
   const documents = [];
   if (req.files && req.files.length > 0) {
+    // Scan every file before persisting any of them so a later rejected upload
+    // cannot leave orphaned verification records in storage.
+    for (const file of req.files) await assertSafeVerificationFile(file);
     for (const file of req.files) {
-      const uploaded = await uploadService.uploadFile(file.path, { folder: 'fixtogether/verification' });
+      const uploaded = await uploadService.uploadFile(file.path, {
+        folder: 'fixtogether/verification',
+        resourceType: file.mimetype === 'application/pdf' ? 'raw' : 'image',
+      });
       documents.push({
         type: 'verification_document',
         url: uploaded.url,
         publicId: uploaded.publicId,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        deliveryType: 'authenticated',
         uploadedAt: new Date(),
       });
     }
@@ -687,10 +698,32 @@ const getPendingTechnicians = asyncHandler(async (req, res) => {
     TechnicianProfile.countDocuments({ verificationStatus: VERIFICATION_STATUS.PENDING }),
   ]);
 
+  const technicians = profiles.map((profile) => {
+    const item = profile.toObject();
+    item.verificationDocuments = item.verificationDocuments.map(({ _id, type, originalName, mimeType, uploadedAt }) => ({
+      _id, type, originalName, mimeType, uploadedAt,
+    }));
+    return item;
+  });
   return successResponse(res, {
-    technicians: profiles,
+    technicians,
     pagination: paginationMeta(total, page, limit),
   });
+});
+
+/**
+ * GET /admin/technicians/:id/verification-documents/:documentId
+ * File URLs are deliberately omitted from the pending list; only an authorized
+ * verification administrator can request one for a document they are reviewing.
+ */
+const getVerificationDocument = asyncHandler(async (req, res) => {
+  const profile = await TechnicianProfile.findOne({ user: req.params.id });
+  if (!profile) return errorResponse(res, 'Technician not found.', 404);
+  const document = profile.verificationDocuments.id(req.params.documentId);
+  if (!document) return errorResponse(res, 'Verification document not found.', 404);
+  const url = getProtectedFileUrl(document);
+  if (!url) return errorResponse(res, 'Verification document is unavailable.', 404);
+  return successResponse(res, { url, originalName: document.originalName, mimeType: document.mimeType });
 });
 
 /**
@@ -787,5 +820,6 @@ module.exports = {
   deletePortfolioItem,
   submitVerification,
   getPendingTechnicians,
+  getVerificationDocument,
   updateVerificationStatus,
 };

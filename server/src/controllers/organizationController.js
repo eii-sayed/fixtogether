@@ -23,6 +23,8 @@ const { createAuditLog } = require('../middleware/auditLog');
 const { createNotification } = require('../services/notificationService');
 const { transitionDonationStatus } = require('../services/donationTransitionService');
 const { calculateDonationMatch } = require('../services/donationMatchingService');
+const { getProtectedFileUrl } = require('../services/uploadService');
+const { assertSafeVerificationFile } = require('../services/verificationDocumentService');
 
 /**
  * GET /organizations
@@ -353,14 +355,19 @@ const submitOrgVerification = asyncHandler(async (req, res) => {
 
   const documents = [];
   if (req.files?.length > 0) {
+    for (const file of req.files) await assertSafeVerificationFile(file);
     for (const file of req.files) {
       const uploaded = await uploadService.uploadFile(file.path, {
         folder: 'fixtogether/org-verification',
+        resourceType: file.mimetype === 'application/pdf' ? 'raw' : 'image',
       });
       documents.push({
         type: req.body.documentType || 'legal_registration',
         url: uploaded.url,
         publicId: uploaded.publicId,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        deliveryType: 'authenticated',
         uploadedAt: new Date(),
       });
     }
@@ -401,10 +408,30 @@ const getPendingOrganizations = asyncHandler(async (req, res) => {
     OrganizationProfile.countDocuments({ verificationStatus: VERIFICATION_STATUS.PENDING }),
   ]);
 
+  const organizations = orgs.map((profile) => {
+    const item = profile.toObject();
+    item.verificationDocuments = item.verificationDocuments.map(({ _id, type, originalName, mimeType, uploadedAt }) => ({
+      _id, type, originalName, mimeType, uploadedAt,
+    }));
+    return item;
+  });
   return successResponse(res, {
-    organizations: orgs,
+    organizations,
     pagination: paginationMeta(total, page, limit),
   });
+});
+
+/**
+ * GET /admin/organizations/:id/verification-documents/:documentId
+ */
+const getOrgVerificationDocument = asyncHandler(async (req, res) => {
+  const profile = await OrganizationProfile.findOne({ user: req.params.id });
+  if (!profile) return errorResponse(res, 'Organization not found.', 404);
+  const document = profile.verificationDocuments.id(req.params.documentId);
+  if (!document) return errorResponse(res, 'Verification document not found.', 404);
+  const url = getProtectedFileUrl(document);
+  if (!url) return errorResponse(res, 'Verification document is unavailable.', 404);
+  return successResponse(res, { url, originalName: document.originalName, mimeType: document.mimeType });
 });
 
 /**
@@ -1281,6 +1308,7 @@ module.exports = {
   updateMyOrganizationProfile,
   submitOrgVerification,
   getPendingOrganizations,
+  getOrgVerificationDocument,
   updateOrgVerificationStatus,
   getMyWorkspace,
   getDonationOffers,

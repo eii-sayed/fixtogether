@@ -154,8 +154,14 @@ const config = {
     maxFileSize: 10 * 1024 * 1024, // 10MB
     allowedImageTypes: ['image/jpeg', 'image/png', 'image/webp'],
     allowedVideoTypes: ['video/mp4', 'video/webm'],
+    allowedDocumentTypes: ['application/pdf'],
     maxImages: 10,
     maxVideos: 2,
+  },
+  verificationScanning: {
+    clamavHost: process.env.CLAMAV_HOST || '',
+    clamavPort: parseInt(process.env.CLAMAV_PORT, 10) || 3310,
+    required: process.env.REQUIRE_VERIFICATION_MALWARE_SCAN === 'true',
   },
 
   // Pagination defaults

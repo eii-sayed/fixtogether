@@ -63,7 +63,7 @@ const safeUnlink = (filePath) => {
  * @returns {Promise<{url: string, publicId: string, storageProvider: string}>}
  */
 const uploadFile = async (filePath, options = {}) => {
-  const { folder = 'fixtogether', resourceType = 'image' } = options;
+  const { folder = 'fixtogether', resourceType = 'image', deliveryType = 'upload' } = options;
 
   // 1. Cloudinary upload path
   if (cloudinaryConfigured) {
@@ -71,8 +71,8 @@ const uploadFile = async (filePath, options = {}) => {
       const result = await cloudinary.uploader.upload(filePath, {
         folder,
         resource_type: resourceType,
-        quality: 'auto',
-        fetch_format: 'auto',
+        type: deliveryType,
+      ...(resourceType === 'image' ? { quality: 'auto', fetch_format: 'auto' } : {}),
       });
 
       // Remove local temp file immediately upon cloud confirmation
@@ -82,6 +82,7 @@ const uploadFile = async (filePath, options = {}) => {
         url: result.secure_url,
         publicId: result.public_id,
         storageProvider: 'cloudinary',
+        deliveryType,
       };
     } catch (error) {
       logger.error('Cloudinary upload error:', error.message);
@@ -122,7 +123,26 @@ const uploadFile = async (filePath, options = {}) => {
     url: `${serverUrl}/${urlPath}`,
     publicId: `local_${path.basename(filePath, path.extname(filePath))}`,
     storageProvider: 'local',
+    deliveryType: 'local',
   };
+};
+
+/**
+ * Builds a delivery URL only after the caller has passed application-level
+ * authorization. New verification files use Cloudinary's authenticated type;
+ * existing pre-migration uploads retain their original delivery type.
+ */
+const getProtectedFileUrl = (document) => {
+  if (!document?.url) return null;
+  if (!cloudinaryConfigured || document.deliveryType === 'local' || document.publicId?.startsWith('local_')) {
+    return document.url;
+  }
+  return cloudinary.url(document.publicId, {
+    resource_type: document.mimeType === 'application/pdf' ? 'raw' : 'image',
+    type: document.deliveryType || 'upload',
+    sign_url: true,
+    secure: true,
+  });
 };
 
 /**
@@ -158,12 +178,14 @@ const deleteFile = async (publicId) => {
     const possiblePaths = [
       path.join(uploadsDir, 'images', localPath),
       path.join(uploadsDir, 'videos', localPath),
+      path.join(uploadsDir, 'documents', localPath),
       path.join(os.tmpdir(), 'fixtogether-uploads', 'images', localPath),
       path.join(os.tmpdir(), 'fixtogether-uploads', 'videos', localPath),
+      path.join(os.tmpdir(), 'fixtogether-uploads', 'documents', localPath),
     ];
 
     for (const p of possiblePaths) {
-      const extensions = ['', '.jpg', '.jpeg', '.png', '.webp', '.mp4', '.webm'];
+      const extensions = ['', '.jpg', '.jpeg', '.png', '.webp', '.mp4', '.webm', '.pdf'];
       for (const ext of extensions) {
         const fullPath = p + ext;
         if (fs.existsSync(fullPath)) {
@@ -180,5 +202,6 @@ module.exports = {
   uploadMultiple,
   deleteFile,
   getStorageStatus,
+  getProtectedFileUrl,
   cloudinaryConfigured,
 };

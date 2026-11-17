@@ -5,7 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { requireVerifiedOrganization } = require('../middleware/professionalVerification');
 const { validate } = require('../middleware/validate');
-const { uploadMultipleImages } = require('../middleware/upload');
+const { uploadVerificationDocuments } = require('../middleware/upload');
 const { ROLES } = require('../constants');
 const { updateOrganizationProfileSchema } = require('../validators/profileValidators');
 
@@ -38,7 +38,7 @@ router.post(
   '/me/verification',
   authenticate,
   authorize(ROLES.ORGANIZATION),
-  uploadMultipleImages('documents', 5),
+  uploadVerificationDocuments,
   orgController.submitOrgVerification
 );
 

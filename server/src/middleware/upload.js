@@ -41,11 +41,25 @@ const mediaFilter = (req, file, cb) => {
   }
 };
 
+// Verification records may be images or PDF documents. Keep this separate
+// from general media uploads so executable/office-document uploads are never
+// accepted merely because they were named as a document.
+const verificationDocumentFilter = (req, file, cb) => {
+  const allowedTypes = [...config.upload.allowedImageTypes, ...config.upload.allowedDocumentTypes];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Verification documents must be JPEG, PNG, WebP, or PDF files.', 400, 'INVALID_FILE_TYPE'), false);
+  }
+};
+
 // Multer disk storage configuration
 const localStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const baseDir = getUploadsBaseDir();
-    const subDir = file.mimetype.startsWith('video') ? 'videos' : 'images';
+    const subDir = file.mimetype === 'application/pdf'
+      ? 'documents'
+      : file.mimetype.startsWith('video') ? 'videos' : 'images';
     const dir = path.join(baseDir, subDir);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -90,6 +104,9 @@ const uploadMultipleImages = (fieldName = 'images', maxCount = 10) => {
   return uploadImages.array(fieldName, maxCount);
 };
 
+const uploadVerificationDocuments = createUpload({ fileFilter: verificationDocumentFilter })
+  .array('documents', 5);
+
 // Mixed upload (images + documents)
 const uploadMixed = uploadMedia.fields([
   { name: 'images', maxCount: 10 },
@@ -104,6 +121,8 @@ module.exports = {
   uploadMixed,
   uploadMedia,
   uploadImages,
+  uploadVerificationDocuments,
   imageFilter,
   mediaFilter,
+  verificationDocumentFilter,
 };

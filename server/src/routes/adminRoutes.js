@@ -43,8 +43,10 @@ router.patch('/admins/:id/permissions', requireAdminPermission(ADMIN_PERMISSIONS
 
 // 4. Technician & Organization Verification
 router.get('/technicians/pending', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), techController.getPendingTechnicians);
+router.get('/technicians/:id/verification-documents/:documentId', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), techController.getVerificationDocument);
 router.patch('/technicians/:id/verification', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), requireRecentAuth(15), techController.updateVerificationStatus);
 router.get('/organizations/pending', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), orgController.getPendingOrganizations);
+router.get('/organizations/:id/verification-documents/:documentId', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), orgController.getOrgVerificationDocument);
 router.patch('/organizations/:id/verification', requireAdminPermission(ADMIN_PERMISSIONS.VERIFICATION), requireRecentAuth(15), orgController.updateOrgVerificationStatus);
 
 // 5. Taxonomy, Categories & Skills

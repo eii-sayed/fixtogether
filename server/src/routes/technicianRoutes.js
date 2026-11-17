@@ -5,7 +5,7 @@ const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
 const { validate } = require('../middleware/validate');
-const { uploadMultipleImages } = require('../middleware/upload');
+const { uploadMultipleImages, uploadVerificationDocuments } = require('../middleware/upload');
 const { ROLES } = require('../constants');
 const {
   updateTechnicianProfileSchema,
@@ -73,7 +73,7 @@ router.post(
   '/me/verification',
   authenticate,
   authorize(ROLES.TECHNICIAN),
-  uploadMultipleImages('documents', 5),
+  uploadVerificationDocuments,
   techController.submitVerification
 );
 

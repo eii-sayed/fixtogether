@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { User, MapPin, Calendar, Phone, Mail, Edit, Shield, ShieldCheck, Star, Package, Wrench, Heart, Recycle, Activity, CheckCircle2, Clock, Sparkles, Camera, Layers, Settings, Building, Briefcase, ExternalLink, ChevronRight, ShieldAlert, Globe2, Leaf } from 'lucide-react';
 import SEO from '../../components/common/SEO';
+import VerificationSubmissionCard from '../../components/profile/VerificationSubmissionCard';
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
@@ -258,6 +259,10 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {(userData?.role === 'technician' || userData?.role === 'organization') && (
+        <VerificationSubmissionCard role={userData.role} profile={roleProfile} />
+      )}
 
       {/* IMPACT ANALYTICS DASHBOARD */}
       <div className="card bg-gradient-to-br from-green-50 to-emerald-50/30 border border-green-100 overflow-hidden shadow-xs relative">

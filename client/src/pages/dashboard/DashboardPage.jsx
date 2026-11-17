@@ -8,6 +8,21 @@ import QuickAddItemModal from '../../components/items/QuickAddItemModal';
 import { Package, Wrench, ClipboardList, Heart, Plus, ArrowRight, Users, Shield, BarChart3, AlertTriangle, AlertCircle, Cog, Sparkles, Clock, CheckCircle2, Activity, Truck, Recycle } from 'lucide-react';
 import { getStatusConfig } from '../../utils/repairStatusConfig';
 
+function VerificationRequiredDashboard({ professional }) {
+  return (
+    <div className="page-container max-w-2xl py-12">
+      <div className="card border border-amber-200 bg-amber-50 p-6 text-center space-y-3">
+        <Shield className="w-10 h-10 text-amber-700 mx-auto" />
+        <h1 className="text-lg font-bold text-gray-900">Administrator verification required</h1>
+        <p className="text-sm text-gray-700">
+          Complete your {professional} profile and upload verification documents before accessing the operational workspace.
+        </p>
+        <Link to="/profile" className="btn-primary inline-flex text-xs">Open verification profile</Link>
+      </div>
+    </div>
+  );
+}
+
 function OwnerDashboard() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const { data: statsData } = useQuery({
@@ -247,6 +262,9 @@ function TechnicianDashboard() {
   const performance = workspaceData?.performance || {};
 
   if (isLoading) return <PageLoader />;
+  if (error?.response?.data?.code === 'PROFESSIONAL_VERIFICATION_REQUIRED') {
+    return <VerificationRequiredDashboard professional="technician" />;
+  }
   if (error) return <ErrorState error={error} />;
 
   return (
@@ -826,6 +844,9 @@ function OrgDashboard() {
   });
 
   if (isLoading) return <PageLoader />;
+  if (error?.response?.data?.code === 'PROFESSIONAL_VERIFICATION_REQUIRED') {
+    return <VerificationRequiredDashboard professional="organization" />;
+  }
   if (error) return <ErrorState error={error} />;
 
   const profile = workspaceData?.profile;
@@ -890,7 +911,7 @@ function OrgDashboard() {
             </div>
           </div>
           <Link
-            to="/donations?tab=verification"
+            to="/profile"
             className="btn-primary py-1.5 px-3 text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white shrink-0 shadow-xs"
           >
             Manage Verification
