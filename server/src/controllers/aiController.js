@@ -70,6 +70,8 @@ const handleAIChat = async (req, res) => {
     try {
       const techQuery = {
         vacationMode: { $ne: true },
+        activeStatus: true,
+        verificationStatus: 'approved',
       };
 
       // Search for top technicians

@@ -31,13 +31,8 @@ const matchTechnicians = async (repairRequest, options = {}) => {
     // Build query for eligible technicians
     const techQuery = {
       activeStatus: true,
+      verificationStatus: VERIFICATION_STATUS.APPROVED,
     };
-
-    // Only include verified technicians if category has high risk
-    if (repairRequest.item?.category?.riskLevel === 'high' ||
-        repairRequest.item?.category?.riskLevel === 'critical') {
-      techQuery.verificationStatus = VERIFICATION_STATUS.APPROVED;
-    }
 
     // Apply filters
     if (filters.serviceMethod) {

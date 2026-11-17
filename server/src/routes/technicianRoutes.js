@@ -3,6 +3,7 @@ const router = express.Router();
 const techController = require('../controllers/technicianController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
+const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
 const { validate } = require('../middleware/validate');
 const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
@@ -20,12 +21,14 @@ router.get(
   '/me/workspace',
   authenticate,
   authorize(ROLES.TECHNICIAN),
+  requireVerifiedTechnician,
   techController.getMyTechnicianWorkspace
 );
 router.get(
   '/requests/:requestId/match-details',
   authenticate,
   authorize(ROLES.TECHNICIAN),
+  requireVerifiedTechnician,
   techController.getRepairRequestMatchDetails
 );
 router.get(

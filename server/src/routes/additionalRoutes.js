@@ -4,6 +4,7 @@ const rjController = require('../controllers/repairJobController');
 const orgController = require('../controllers/organizationController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
+const { requireVerifiedOrganization } = require('../middleware/professionalVerification');
 const { ROLES } = require('../constants');
 
 // Inspections
@@ -47,6 +48,7 @@ notificationRouter.patch('/:id/read', authenticate, rjController.markNotificatio
 
 // Donation Operations Router
 const donationRouter = express.Router();
+donationRouter.use(authenticate, requireVerifiedOrganization);
 
 // Community Needs
 donationRouter.get('/needs', authenticate, orgController.getCommunityNeeds);

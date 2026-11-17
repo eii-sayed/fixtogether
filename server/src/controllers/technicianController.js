@@ -19,7 +19,7 @@ const getTechnicians = asyncHandler(async (req, res) => {
   const { page, limit, skip } = parsePagination(req.query);
   const { skill, category, minRating, search, availability } = req.query;
 
-  const query = { activeStatus: true };
+  const query = { activeStatus: true, verificationStatus: VERIFICATION_STATUS.APPROVED };
 
   if (skill) query.skills = skill;
   if (category) query.supportedCategories = category;
@@ -100,7 +100,10 @@ const getTechnicianById = asyncHandler(async (req, res) => {
 
   let query = {};
   if (mongoose.Types.ObjectId.isValid(id)) {
-    query = { $or: [{ _id: id }, { user: id }] };
+    query = {
+      verificationStatus: VERIFICATION_STATUS.APPROVED,
+      $or: [{ _id: id }, { user: id }],
+    };
   } else {
     return errorResponse(res, 'Invalid technician ID format.', 400);
   }
@@ -641,6 +644,9 @@ const deletePortfolioItem = asyncHandler(async (req, res) => {
 const submitVerification = asyncHandler(async (req, res) => {
   const profile = await TechnicianProfile.findOne({ user: req.user.userId });
   if (!profile) return errorResponse(res, 'Profile not found.', 404);
+  if (profile.verificationStatus === VERIFICATION_STATUS.APPROVED) {
+    return errorResponse(res, 'This technician profile is already approved.', 409);
+  }
 
   const documents = [];
   if (req.files && req.files.length > 0) {
@@ -655,8 +661,12 @@ const submitVerification = asyncHandler(async (req, res) => {
     }
   }
 
+  if (documents.length === 0 && profile.verificationDocuments.length === 0) {
+    return errorResponse(res, 'Upload at least one verification document before submitting.', 400);
+  }
   profile.verificationDocuments.push(...documents);
   profile.verificationStatus = VERIFICATION_STATUS.PENDING;
+  profile.verificationNote = '';
   await profile.save();
 
   return successResponse(res, { profile }, 'Verification documents submitted');
@@ -708,6 +718,9 @@ const updateVerificationStatus = asyncHandler(async (req, res) => {
   if (!profile) return errorResponse(res, 'Technician not found.', 404);
   if (![VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(profile.verificationStatus)) {
     return res.status(409).json({ success: false, code: 'VERIFICATION_ALREADY_REVIEWED', message: 'This application is no longer awaiting review.' });
+  }
+  if (verificationStatus === VERIFICATION_STATUS.APPROVED && profile.verificationDocuments.length === 0) {
+    return errorResponse(res, 'At least one submitted verification document is required for approval.', 400);
   }
 
   const updatedProfile = await TechnicianProfile.findOneAndUpdate(

@@ -3,6 +3,7 @@ const router = express.Router();
 const orgController = require('../controllers/organizationController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
+const { requireVerifiedOrganization } = require('../middleware/professionalVerification');
 const { validate } = require('../middleware/validate');
 const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
@@ -17,6 +18,7 @@ router.get(
   '/me/workspace',
   authenticate,
   authorize(ROLES.ORGANIZATION),
+  requireVerifiedOrganization,
   orgController.getMyWorkspace
 );
 router.get(
@@ -45,18 +47,21 @@ router.get(
   '/me/hubs',
   authenticate,
   authorize(ROLES.ORGANIZATION),
+  requireVerifiedOrganization,
   orgController.getCollectionHubs
 );
 router.post(
   '/me/hubs',
   authenticate,
   authorize(ROLES.ORGANIZATION),
+  requireVerifiedOrganization,
   orgController.createCollectionHub
 );
 router.patch(
   '/me/hubs/:hubId/status',
   authenticate,
   authorize(ROLES.ORGANIZATION),
+  requireVerifiedOrganization,
   orgController.updateHubStatus
 );
 
@@ -65,6 +70,7 @@ router.get(
   '/me/impact',
   authenticate,
   authorize(ROLES.ORGANIZATION),
+  requireVerifiedOrganization,
   orgController.getOrganizationImpact
 );
 

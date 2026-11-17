@@ -83,7 +83,10 @@ const getOrganizationById = asyncHandler(async (req, res) => {
 
   let query = {};
   if (mongoose.Types.ObjectId.isValid(id)) {
-    query = { $or: [{ _id: id }, { user: id }] };
+    query = {
+      verificationStatus: VERIFICATION_STATUS.APPROVED,
+      $or: [{ _id: id }, { user: id }],
+    };
   } else {
     return errorResponse(res, 'Invalid organization ID format.', 400);
   }
@@ -344,6 +347,9 @@ const updateMyOrganizationProfile = asyncHandler(async (req, res) => {
 const submitOrgVerification = asyncHandler(async (req, res) => {
   const profile = await OrganizationProfile.findOne({ user: req.user.userId });
   if (!profile) return errorResponse(res, 'Profile not found.', 404);
+  if (profile.verificationStatus === VERIFICATION_STATUS.APPROVED) {
+    return errorResponse(res, 'This organization is already approved.', 409);
+  }
 
   const documents = [];
   if (req.files?.length > 0) {
@@ -360,8 +366,12 @@ const submitOrgVerification = asyncHandler(async (req, res) => {
     }
   }
 
+  if (documents.length === 0 && profile.verificationDocuments.length === 0) {
+    return errorResponse(res, 'Upload at least one verification document before submitting.', 400);
+  }
   profile.verificationDocuments.push(...documents);
   profile.verificationStatus = VERIFICATION_STATUS.PENDING;
+  profile.verificationNote = '';
   await profile.save();
 
   await createNotification({
@@ -422,6 +432,9 @@ const updateOrgVerificationStatus = asyncHandler(async (req, res) => {
   if (!profile) return errorResponse(res, 'Organization not found.', 404);
   if (![VERIFICATION_STATUS.PENDING, VERIFICATION_STATUS.MORE_INFO_NEEDED].includes(profile.verificationStatus)) {
     return res.status(409).json({ success: false, code: 'VERIFICATION_ALREADY_REVIEWED', message: 'This application is no longer awaiting review.' });
+  }
+  if (verificationStatus === VERIFICATION_STATUS.APPROVED && profile.verificationDocuments.length === 0) {
+    return errorResponse(res, 'At least one submitted verification document is required for approval.', 400);
   }
 
   const updatedProfile = await OrganizationProfile.findOneAndUpdate(

@@ -19,6 +19,16 @@ const logger = require('../utils/logger');
 const isParticipant = async (userId, userRole, repairRequest) => {
   if (userRole === 'admin') return true;
 
+  // A technician cannot communicate with owners until the administrator has
+  // approved the professional profile, even if an old invitation exists.
+  if (userRole === 'technician') {
+    const verified = await TechnicianProfile.exists({
+      user: userId,
+      verificationStatus: 'approved',
+    });
+    if (!verified) return false;
+  }
+
   // Owner of the repair request
   const ownerId = repairRequest.owner?._id || repairRequest.owner;
   if (ownerId && ownerId.toString() === userId.toString()) return true;

@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
 const { authenticate } = require('../middleware/auth');
+const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
 const { validate } = require('../middleware/validate');
 const { sendMessageSchema, getMessagesQuerySchema } = require('../validators/messageValidators');
 const { messageLimiter } = require('../middleware/rateLimiter');
 
 // All routes require authentication
-router.use(authenticate);
+router.use(authenticate, requireVerifiedTechnician);
 
 // Unread count (must be before :repairRequestId to avoid conflict)
 router.get('/unread-count', messageController.getUnreadCount);

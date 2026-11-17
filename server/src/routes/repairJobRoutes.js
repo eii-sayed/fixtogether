@@ -4,11 +4,14 @@ const rjController = require('../controllers/repairJobController');
 const paymentController = require('../controllers/paymentController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
+const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
 const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
 const { validate } = require('../middleware/validate');
 const { recordPaymentSchema, paymentDecisionSchema, requestRefundSchema, refundDecisionSchema } = require('../validators/requestValidators');
 const { writeLimiter } = require('../middleware/rateLimiter');
+
+router.use(authenticate, requireVerifiedTechnician);
 
 // Repair jobs
 router.get('/', authenticate, rjController.getRepairJobs);

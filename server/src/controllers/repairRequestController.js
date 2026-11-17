@@ -727,7 +727,11 @@ const getMatches = asyncHandler(async (req, res) => {
   // Populate technician profiles
   const enrichedMatches = [];
   for (const match of matches) {
-    const profile = await TechnicianProfile.findOne({ user: match.technician._id })
+    const profile = await TechnicianProfile.findOne({
+      user: match.technician._id,
+      verificationStatus: 'approved',
+      activeStatus: true,
+    })
       .populate('skills', 'name')
       .populate('supportedCategories', 'name');
 
