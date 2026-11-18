@@ -274,7 +274,7 @@ export default function RepairJobsPage() {
 
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <Link
-                      to={`/chat?repairId=${job.repairRequest?._id}`}
+                      to={`/repair-requests/${job.repairRequest?._id}/messages`}
                       className="btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5"
                     >
                       <MessageSquare className="w-3.5 h-3.5 text-gray-500" />

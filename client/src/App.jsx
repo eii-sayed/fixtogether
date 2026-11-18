@@ -142,6 +142,7 @@ export default function App() {
         <Route path="/repair-requests/:id" element={<ProtectedRoute><RepairRequestDetailPage /></ProtectedRoute>} />
         <Route path="/repair-requests/:id/matches" element={<ProtectedRoute><RepairRequestMatchesPage /></ProtectedRoute>} />
         <Route path="/repair-requests/:id/messages" element={<ProtectedRoute><RepairRequestMessagesPage /></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><RepairRequestMessagesPage /></ProtectedRoute>} />
 
         {/* Repair Jobs */}
         <Route path="/repair-jobs" element={<ProtectedRoute><RepairJobsPage /></ProtectedRoute>} />

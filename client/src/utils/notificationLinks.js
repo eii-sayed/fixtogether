@@ -14,7 +14,7 @@ export const getNotificationDestination = (notification, userRole) => {
   // 1. By Explicit Entity Relationship
   if (relatedEntityType === 'RepairRequest' && relatedEntityId) {
     if (type === 'new_message') {
-      return `/chat?repairId=${relatedEntityId}`;
+      return `/repair-requests/${relatedEntityId}/messages`;
     }
     return `/repair-requests/${relatedEntityId}`;
   }
@@ -65,7 +65,7 @@ export const getNotificationDestination = (notification, userRole) => {
 
     // Direct Messages / Chat
     if (type === 'new_message') {
-      return relatedEntityId ? `/chat?repairId=${relatedEntityId}` : '/messages';
+      return relatedEntityId ? `/repair-requests/${relatedEntityId}/messages` : '/messages';
     }
 
     // Community / Forum
