@@ -930,8 +930,8 @@ export default function DonationsPage() {
                                 decisionMutation.mutate({
                                   id: offer._id,
                                   payload: {
-                                    action: 'accept',
-                                    decisionReason: 'Accepted hardware donation for community reuse initiative.',
+                                    decision: 'accept',
+                                    reason: 'Accepted hardware donation for community reuse initiative.',
                                     expectedVersion: offer.version,
                                   },
                                 });

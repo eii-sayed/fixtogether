@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DonationsPage from '../pages/donations/DonationsPage';
@@ -111,6 +111,50 @@ describe('DonationsPage', () => {
     });
 
     expect(screen.getByRole('button', { name: /Community Needs/i })).toBeInTheDocument();
+  });
+
+  it('sends the API decision fields when an organization accepts an offer', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/organizations/me/workspace') {
+        return Promise.resolve({
+          data: { data: { profile: { verificationStatus: 'approved' } } },
+        });
+      }
+
+      if (url.startsWith('/donations/offers?')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              offers: [
+                {
+                  _id: 'don-accept',
+                  title: 'Working Laptop',
+                  status: 'published',
+                  version: 3,
+                  item: { images: [] },
+                },
+              ],
+              pagination: { total: 1, page: 1, limit: 12, totalPages: 1 },
+            },
+          },
+        });
+      }
+
+      return Promise.resolve({ data: { data: { categories: [] } } });
+    });
+    api.post.mockResolvedValue({ data: { data: { offer: { status: 'accepted' } } } });
+
+    render(<DonationsPage />, { wrapper: createWrapper() });
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Accept$/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/donations/offers/don-accept/decision', {
+        decision: 'accept',
+        reason: 'Accepted hardware donation for community reuse initiative.',
+        expectedVersion: 3,
+      });
+    });
   });
 
   it('displays call to action button for organization or donor', async () => {
