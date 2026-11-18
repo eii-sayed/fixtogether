@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { PageLoader, ErrorState, EmptyState, StatusBadge, Pagination } from '../../components/ui';
-import { Wrench, Star, Package, MessageSquare, Zap, CheckCircle, Loader2, X, Check } from 'lucide-react';
+import { Wrench, Star, Package, MessageSquare, Zap, CheckCircle, Loader2, X, Check, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../context/AuthContext';
 import WriteReviewModal from '../../components/reviews/WriteReviewModal';
@@ -73,6 +73,15 @@ export default function RepairJobsPage() {
       }
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to confirm completion'),
+  });
+
+  const invoiceMutation = useMutation({
+    mutationFn: (jobId) => api.put(`/repair-jobs/${jobId}/invoice`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['technician-invoices'] });
+      toast.success('Invoice generated from the final cost and confirmed payments.');
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Could not generate invoice'),
   });
 
   const statuses = [
@@ -280,6 +289,18 @@ export default function RepairJobsPage() {
                       >
                         <Package className="w-3.5 h-3.5 text-gray-500" />
                         <span>Parts ({job.requiredParts?.length || 0})</span>
+                      </button>
+                    )}
+
+                    {isTechnician && job.finalTotalCost > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => invoiceMutation.mutate(job._id)}
+                        disabled={invoiceMutation.isPending}
+                        className="btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5"
+                      >
+                        <ReceiptText className="w-3.5 h-3.5 text-gray-500" />
+                        <span>{invoiceMutation.isPending ? 'Generating...' : 'Invoice'}</span>
                       </button>
                     )}
 

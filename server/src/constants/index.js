@@ -560,6 +560,8 @@ const NOTIFICATION_TYPES = {
   APPOINTMENT_SCHEDULED: 'appointment_scheduled',
   APPOINTMENT_CHANGED: 'appointment_changed',
   APPOINTMENT_CANCELLED: 'appointment_cancelled',
+  APPOINTMENT_REMINDER: 'appointment_reminder',
+  APPOINTMENT_MISSED: 'appointment_missed',
   PAYMENT_RECORDED: 'payment_recorded',
   PAYMENT_CONFIRMED: 'payment_confirmed',
   REFUND_REQUESTED: 'refund_requested',

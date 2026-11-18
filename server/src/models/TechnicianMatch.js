@@ -18,6 +18,9 @@ const technicianMatchSchema = new mongoose.Schema(
     ratingScore: { type: Number, default: 0, min: 0, max: 100 },
     experienceScore: { type: Number, default: 0, min: 0, max: 100 },
     completionScore: { type: Number, default: 0, min: 0, max: 100 },
+    priceScore: { type: Number, default: 0, min: 0, max: 100 },
+    responseScore: { type: Number, default: 0, min: 0, max: 100 },
+    capacityScore: { type: Number, default: 0, min: 0, max: 100 },
     totalScore: { type: Number, default: 0, min: 0, max: 100 },
     explanation: { type: String, default: '' },
     status: {

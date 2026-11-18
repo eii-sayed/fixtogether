@@ -1,18 +1,31 @@
-const { TechnicianProfile } = require('../models');
-const { VERIFICATION_STATUS, ACCOUNT_STATUS } = require('../constants');
+const { TechnicianProfile, RepairJob } = require('../models');
+const { VERIFICATION_STATUS, ACCOUNT_STATUS, REPAIR_JOB_STATUS } = require('../constants');
 const logger = require('../utils/logger');
 
 /**
  * Matching weights (configurable by admin)
  */
 const DEFAULT_WEIGHTS = {
-  skill: 35,
-  distance: 20,
-  availability: 15,
+  skill: 26,
+  distance: 16,
+  availability: 14,
   rating: 10,
-  experience: 10,
+  experience: 8,
   completion: 10,
+  price: 8,
+  response: 4,
+  capacity: 4,
 };
+
+const ACTIVE_JOB_STATUSES = [
+  REPAIR_JOB_STATUS.PENDING_INSPECTION,
+  REPAIR_JOB_STATUS.INSPECTING,
+  REPAIR_JOB_STATUS.AWAITING_APPROVAL,
+  REPAIR_JOB_STATUS.WAITING_FOR_PARTS,
+  REPAIR_JOB_STATUS.IN_PROGRESS,
+  REPAIR_JOB_STATUS.QUALITY_CHECK,
+  REPAIR_JOB_STATUS.READY_FOR_COLLECTION,
+];
 
 /**
  * Match technicians to a repair request
@@ -53,9 +66,14 @@ const matchTechnicians = async (repairRequest, options = {}) => {
       .limit(100);
 
     // Filter out suspended users
-    const activeTechnicians = technicians.filter(
-      (t) => t.user && t.user.accountStatus === ACCOUNT_STATUS.ACTIVE
-    );
+    const activeTechnicians = technicians.filter((t) => (
+      t.user &&
+      t.user.accountStatus === ACCOUNT_STATUS.ACTIVE &&
+      t.availabilityStatus !== 'unavailable' &&
+      (!t.vacationMode || (t.vacationUntil && new Date(t.vacationUntil) < new Date())) &&
+      isCategoryAvailable(t, repairRequest)
+    ));
+    const activeJobCounts = await getActiveJobCounts(activeTechnicians);
 
     // Score each technician
     const matches = [];
@@ -70,7 +88,7 @@ const matchTechnicians = async (repairRequest, options = {}) => {
       scores.distance = calculateDistanceScore(tech, repairRequest);
 
       // Apply max distance filter
-      if (filters.maxDistance && scores._distanceKm > filters.maxDistance) {
+      if (filters.maxDistance && tech._distanceKm > filters.maxDistance) {
         continue;
       }
 
@@ -86,6 +104,12 @@ const matchTechnicians = async (repairRequest, options = {}) => {
       // 6. Completion score (10%)
       scores.completion = calculateCompletionScore(tech);
 
+      // Include customer affordability, responsiveness and current workload.
+      scores.price = calculatePriceScore(tech, repairRequest);
+      scores.response = calculateResponseScore(tech);
+      scores.capacity = calculateCapacityScore(tech, activeJobCounts.get(tech.user._id.toString()) || 0);
+      if (scores.capacity === 0) continue;
+
       // Calculate weighted total
       const totalScore =
         (scores.skill * weights.skill +
@@ -93,7 +117,10 @@ const matchTechnicians = async (repairRequest, options = {}) => {
           scores.availability * weights.availability +
           scores.rating * weights.rating +
           scores.experience * weights.experience +
-          scores.completion * weights.completion) / 100;
+          scores.completion * weights.completion +
+          scores.price * weights.price +
+          scores.response * weights.response +
+          scores.capacity * weights.capacity) / 100;
 
       // Generate explanation
       const explanation = generateExplanation(scores, tech);
@@ -107,6 +134,9 @@ const matchTechnicians = async (repairRequest, options = {}) => {
         ratingScore: Math.round(scores.rating),
         experienceScore: Math.round(scores.experience),
         completionScore: Math.round(scores.completion),
+        priceScore: Math.round(scores.price),
+        responseScore: Math.round(scores.response),
+        capacityScore: Math.round(scores.capacity),
         totalScore: Math.round(totalScore),
         explanation,
       });
@@ -119,7 +149,7 @@ const matchTechnicians = async (repairRequest, options = {}) => {
     if (filters.maxPrice) {
       return matches.filter(
         (m) =>
-          !m.technicianProfile.priceRange.minimum ||
+          !m.technicianProfile.priceRange?.minimum ||
           m.technicianProfile.priceRange.minimum <= filters.maxPrice
       ).slice(0, maxResults);
     }
@@ -199,6 +229,8 @@ function calculateDistanceScore(tech, repairRequest) {
  * Calculate availability score (0-100)
  */
 function calculateAvailabilityScore(tech, _repairRequest) {
+  if (tech.availabilityStatus === 'unavailable' || (tech.vacationMode && (!tech.vacationUntil || new Date(tech.vacationUntil) >= new Date()))) return 0;
+  if (tech.availabilityStatus === 'busy') return 35;
   if (!tech.workingHours) return 50;
 
   const now = new Date();
@@ -219,6 +251,52 @@ function calculateAvailabilityScore(tech, _repairRequest) {
   }
 
   return Math.min(availableSoon * 25 + 20, 100);
+}
+
+function isCategoryAvailable(tech, repairRequest) {
+  const categoryId = repairRequest.item?.category?._id || repairRequest.item?.category;
+  if (!categoryId || !tech.categoryAvailability?.length) return true;
+  const override = tech.categoryAvailability.find((entry) => (
+    (entry.category?._id || entry.category)?.toString() === categoryId.toString()
+  ));
+  return !override || override.available;
+}
+
+async function getActiveJobCounts(technicians) {
+  const technicianIds = technicians.map((tech) => tech.user?._id).filter(Boolean);
+  if (!technicianIds.length) return new Map();
+  const rows = await RepairJob.aggregate([
+    { $match: { technician: { $in: technicianIds }, currentStatus: { $in: ACTIVE_JOB_STATUSES } } },
+    { $group: { _id: '$technician', count: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((row) => [row._id.toString(), row.count]));
+}
+
+function calculatePriceScore(tech, repairRequest) {
+  const budgetMinimum = Number(repairRequest.budgetMinimum || 0);
+  const budgetMaximum = Number(repairRequest.budgetMaximum || 0);
+  const techMinimum = Number(tech.priceRange?.minimum || tech.minimumServiceCharge || 0);
+  const techMaximum = Number(tech.priceRange?.maximum || 0);
+  if (!budgetMinimum && !budgetMaximum) return 50;
+  if (!techMinimum && !techMaximum) return 50;
+  if (budgetMaximum && techMinimum > budgetMaximum) return 0;
+  if (budgetMinimum && techMaximum && techMaximum < budgetMinimum) return 40;
+  if ((!budgetMinimum || techMinimum >= budgetMinimum) && (!budgetMaximum || !techMaximum || techMaximum <= budgetMaximum)) return 100;
+  return 70;
+}
+
+function calculateResponseScore(tech) {
+  const responseTime = Number(tech.averageResponseTime || 0);
+  if (!responseTime) return 50;
+  if (responseTime <= 2) return 100;
+  if (responseTime >= 72) return 0;
+  return Math.round(100 - ((responseTime - 2) / 70) * 100);
+}
+
+function calculateCapacityScore(tech, activeJobs) {
+  const maxJobs = Number(tech.maxConcurrentJobs || 5);
+  if (activeJobs >= maxJobs) return 0;
+  return Math.max(10, Math.round(((maxJobs - activeJobs) / maxJobs) * 100));
 }
 
 /**
@@ -272,6 +350,9 @@ function generateExplanation(scores, tech) {
   if (scores.rating >= 80 && tech.averageRating) parts.push(`Highly rated (${tech.averageRating.toFixed(1)}/5)`);
   if (scores.experience >= 70) parts.push('Experienced');
   if (scores.completion >= 70) parts.push('Reliable track record');
+  if (scores.price >= 80) parts.push('Fits your budget');
+  if (scores.response >= 80) parts.push('Fast responder');
+  if (scores.capacity >= 75) parts.push('Has near-term capacity');
 
   return parts.join(' • ') || 'Available technician';
 }
@@ -306,6 +387,9 @@ const saveMatches = async (repairRequestId, matches) => {
     ratingScore: m.ratingScore,
     experienceScore: m.experienceScore,
     completionScore: m.completionScore,
+    priceScore: m.priceScore,
+    responseScore: m.responseScore,
+    capacityScore: m.capacityScore,
     totalScore: m.totalScore,
     explanation: m.explanation,
     status: 'generated',
@@ -321,7 +405,7 @@ const saveMatches = async (repairRequestId, matches) => {
 /**
  * Generate structured breakdown for why a technician matches a request
  */
-function getMatchDetailsForTechnician(repairRequest, tech) {
+function getMatchDetailsForTechnician(repairRequest, tech, activeJobs = 0) {
   const scores = {};
   scores.skill = calculateSkillScore(tech, repairRequest);
   scores.distance = calculateDistanceScore(tech, repairRequest);
@@ -329,6 +413,9 @@ function getMatchDetailsForTechnician(repairRequest, tech) {
   scores.rating = calculateRatingScore(tech);
   scores.experience = calculateExperienceScore(tech);
   scores.completion = calculateCompletionScore(tech);
+  scores.price = calculatePriceScore(tech, repairRequest);
+  scores.response = calculateResponseScore(tech);
+  scores.capacity = calculateCapacityScore(tech, activeJobs);
 
   const totalScore = Math.round(
     (scores.skill * DEFAULT_WEIGHTS.skill +
@@ -336,7 +423,10 @@ function getMatchDetailsForTechnician(repairRequest, tech) {
       scores.availability * DEFAULT_WEIGHTS.availability +
       scores.rating * DEFAULT_WEIGHTS.rating +
       scores.experience * DEFAULT_WEIGHTS.experience +
-      scores.completion * DEFAULT_WEIGHTS.completion) / 100
+      scores.completion * DEFAULT_WEIGHTS.completion +
+      scores.price * DEFAULT_WEIGHTS.price +
+      scores.response * DEFAULT_WEIGHTS.response +
+      scores.capacity * DEFAULT_WEIGHTS.capacity) / 100
   );
 
   const breakdown = [
@@ -379,6 +469,22 @@ function getMatchDetailsForTechnician(repairRequest, tech) {
       maxScore: 100,
       match: scores.completion >= 50,
       description: `${tech.completedRepairCount || 0} completed repairs (${tech.completionRate || 100}% completion rate)`,
+    },
+    {
+      factor: 'budget',
+      label: 'Budget Compatibility',
+      score: Math.round(scores.price),
+      maxScore: 100,
+      match: scores.price >= 50,
+      description: scores.price >= 80 ? 'Your listed pricing fits this customer budget' : scores.price > 0 ? 'Pricing may need a clear quotation' : 'Your minimum listed price exceeds the customer budget',
+    },
+    {
+      factor: 'workload',
+      label: 'Response & Workload',
+      score: Math.round((scores.response + scores.capacity) / 2),
+      maxScore: 100,
+      match: scores.capacity > 0,
+      description: scores.capacity > 0 ? `${activeJobs} active job${activeJobs === 1 ? '' : 's'} within your ${tech.maxConcurrentJobs || 5}-job limit` : 'Your active workload is at its configured limit',
     },
   ];
 

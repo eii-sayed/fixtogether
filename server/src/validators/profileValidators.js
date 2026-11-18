@@ -63,8 +63,16 @@ const updateTechnicianProfileSchema = Joi.object({
 });
 
 const updateTechnicianAvailabilitySchema = Joi.object({
-  availabilityStatus: Joi.string().valid('available', 'busy', 'unavailable').required(),
-});
+  availabilityStatus: Joi.string().valid('available', 'busy', 'unavailable').optional(),
+  vacationMode: Joi.boolean().optional(),
+  vacationUntil: Joi.date().allow(null).optional(),
+  maxConcurrentJobs: Joi.number().integer().min(1).max(50).optional(),
+  workingHours: Joi.object().optional(),
+  categoryAvailability: Joi.array().items(Joi.object({
+    category: Joi.string().pattern(objectIdPattern).required(),
+    available: Joi.boolean().required(),
+  })).optional(),
+}).min(1);
 
 const addPortfolioSchema = Joi.object({
   title: Joi.string().trim().min(2).max(150).required(),

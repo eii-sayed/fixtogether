@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const techController = require('../controllers/technicianController');
+const businessController = require('../controllers/technicianBusinessController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
@@ -12,6 +13,11 @@ const {
   updateTechnicianAvailabilitySchema,
   addPortfolioSchema,
 } = require('../validators/profileValidators');
+const {
+  createServiceTemplateSchema,
+  updateServiceTemplateSchema,
+  earningsQuerySchema,
+} = require('../validators/technicianBusinessValidators');
 
 // Public listing
 router.get('/', techController.getTechnicians);
@@ -51,6 +57,16 @@ router.patch(
   validate(updateTechnicianAvailabilitySchema),
   techController.updateAvailability
 );
+
+// Technician business tools. These are intentionally restricted to approved
+// technicians because they expose customer and settlement information.
+router.get('/me/service-templates', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, businessController.listServiceTemplates);
+router.post('/me/service-templates', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, validate(createServiceTemplateSchema), businessController.createServiceTemplate);
+router.patch('/me/service-templates/:id', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, validate(updateServiceTemplateSchema), businessController.updateServiceTemplate);
+router.delete('/me/service-templates/:id', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, businessController.deleteServiceTemplate);
+router.get('/me/customers', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, businessController.getCustomerHistory);
+router.get('/me/earnings', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, validate(earningsQuerySchema, 'query'), businessController.getEarningsAnalytics);
+router.get('/me/invoices', authenticate, authorize(ROLES.TECHNICIAN), requireVerifiedTechnician, businessController.listMyInvoices);
 
 // Portfolio management
 router.post(

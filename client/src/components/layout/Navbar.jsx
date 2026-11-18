@@ -35,6 +35,7 @@ const roleNavItems = {
     { label: 'Community Forum', path: '/forum', icon: MessagesSquare },
     { label: 'Repair Requests', path: '/repair-requests', icon: ClipboardList },
     { label: 'My Jobs', path: '/repair-jobs', icon: Wrench },
+    { label: 'Business', path: '/technician-business', icon: ClipboardList },
     { label: 'Messages', path: '/messages', icon: MessageCircle },
   ],
   organization: [

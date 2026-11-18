@@ -9,6 +9,7 @@ const { setSocketIO } = require('./services/notificationService');
 const { startOutboxWorker, stopOutboxWorker } = require('./services/outboxService');
 const { startSuspensionExpiryWorker, stopSuspensionExpiryWorker } = require('./services/moderationService');
 const { startReviewQueueSyncWorker, stopReviewQueueSyncWorker } = require('./services/reviewQueueService');
+const { startAppointmentReminderWorker, stopAppointmentReminderWorker } = require('./services/appointmentReminderService');
 
 const startServer = async () => {
   // Connect to database
@@ -40,6 +41,7 @@ const startServer = async () => {
   startOutboxWorker(5000);
   startSuspensionExpiryWorker(60_000);
   startReviewQueueSyncWorker(120_000);
+  startAppointmentReminderWorker();
 
   // Socket.IO authentication middleware
   io.use((socket, next) => {
@@ -167,6 +169,7 @@ const startServer = async () => {
     stopOutboxWorker();
     stopSuspensionExpiryWorker();
     stopReviewQueueSyncWorker();
+    stopAppointmentReminderWorker();
     server.close(() => {
       logger.info('HTTP server closed');
       process.exit(0);

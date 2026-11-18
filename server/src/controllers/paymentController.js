@@ -1,4 +1,4 @@
-const { RepairJob, PaymentTransaction, Dispute } = require('../models');
+const { RepairJob, PaymentTransaction, Dispute, Invoice } = require('../models');
 const {
   ROLES,
   PAYMENT_TRANSACTION_STATUS,
@@ -43,6 +43,19 @@ const refreshPaymentSummary = async (job, session) => {
         ? 'partial'
         : 'paid';
   await job.save({ session });
+  // An invoice is an operational snapshot. Keep its settlement figures in
+  // sync with the confirmed ledger without letting a request body alter them.
+  await Invoice.updateOne(
+    { repairJob: job._id },
+    {
+      $set: {
+        amountPaid: confirmedPaid,
+        amountRefunded: confirmedRefunded,
+        balanceDue: Math.max(0, (job.finalTotalCost || 0) - confirmedPaid + confirmedRefunded),
+      },
+    },
+    { session }
+  );
   return job;
 };
 

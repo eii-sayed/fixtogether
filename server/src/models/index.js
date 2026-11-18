@@ -30,6 +30,8 @@ const Thread = require('./Thread');
 const ThreadComment = require('./ThreadComment');
 const PushSubscription = require('./PushSubscription');
 const PaymentTransaction = require('./PaymentTransaction');
+const ServiceTemplate = require('./ServiceTemplate');
+const Invoice = require('./Invoice');
 
 module.exports = {
   User,
@@ -64,4 +66,6 @@ module.exports = {
   ThreadComment,
   PushSubscription,
   PaymentTransaction,
+  ServiceTemplate,
+  Invoice,
 };

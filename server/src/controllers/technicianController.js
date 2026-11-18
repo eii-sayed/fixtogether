@@ -264,7 +264,7 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
   ];
 
   // 1. Fetch active jobs & count
-  const [activeJobs, activeJobsCount, completedCount] = await Promise.all([
+  const [activeJobs, activeJobsCount, completedCount, acceptedQuotesCount] = await Promise.all([
     RepairJob.find({
       technician: req.user.userId,
       currentStatus: { $in: activeJobStatuses },
@@ -286,6 +286,7 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
       technician: req.user.userId,
       currentStatus: 'completed',
     }),
+    Quotation.countDocuments({ technician: req.user.userId, status: QUOTATION_STATUS.ACCEPTED }),
   ]);
 
   // 2. Fetch direct invitations
@@ -324,7 +325,7 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
     if (Appointment) {
       upcomingAppointments = await Appointment.find({
         technician: req.user.userId,
-        status: { $in: ['scheduled', 'confirmed'] },
+        status: { $in: ['scheduled', 'confirmed', 'rescheduled'] },
       })
         .populate('owner', 'fullName')
         .populate({
@@ -332,7 +333,7 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
           select: 'problemDescription',
           populate: { path: 'item', select: 'title' },
         })
-        .sort({ appointmentDate: 1 })
+        .sort({ scheduledStart: 1 })
         .limit(5);
     }
   } catch (err) {
@@ -465,13 +466,13 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
     .filter((r) => r.item)
     .slice(0, 6)
     .map((r) => {
-      const matchDetails = getMatchDetailsForTechnician(r, profile);
+      const matchDetails = getMatchDetailsForTechnician(r, profile, activeJobsCount);
       return {
         _id: r._id,
         title: r.item.title,
         problemDescription: r.problemDescription,
         category: r.item.category,
-        budget: r.budget,
+        budget: { minimum: r.budgetMinimum, maximum: r.budgetMaximum },
         urgency: r.urgency,
         preferredServiceMethod: r.preferredServiceMethod,
         safetyLevel: r.safetyScreening?.riskLevel || 'low',
@@ -504,6 +505,15 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
       activeJobsCount,
       capacityUtilization,
       isAtCapacity: activeJobsCount >= maxCapacity,
+      capacityWarning: activeJobsCount >= maxCapacity,
+    },
+    performance: {
+      completedRepairs: completedCount,
+      rating: profile.averageRating,
+      reviewCount: profile.reviewCount,
+      quotesAccepted: acceptedQuotesCount,
+      completionRate: profile.completionRate,
+      averageResponseTime: profile.averageResponseTime,
     },
     urgentActions,
     activeJobs,
@@ -511,6 +521,16 @@ const getMyTechnicianWorkspace = asyncHandler(async (req, res) => {
     pendingInvitations,
     myPendingQuotes,
     upcomingAppointments,
+    todayAppointments: upcomingAppointments.map((appointment) => ({
+      _id: appointment._id,
+      itemTitle: appointment.repairRequest?.item?.title || 'Repair appointment',
+      ownerName: appointment.owner?.fullName || 'Customer',
+      time: new Intl.DateTimeFormat('en-US', {
+        timeZone: appointment.timeZone || profile.timeZone || 'UTC',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).format(appointment.scheduledStart),
+      scheduledStart: appointment.scheduledStart,
+    })),
   });
 });
 

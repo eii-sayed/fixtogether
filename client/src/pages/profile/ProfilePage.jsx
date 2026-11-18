@@ -101,6 +101,17 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCapacityChange = async (maxConcurrentJobs) => {
+    try {
+      await api.patch('/technicians/me/availability', { maxConcurrentJobs: Number(maxConcurrentJobs) });
+      toast.success('Active-job limit updated');
+      queryClient.invalidateQueries(['my-profile']);
+      queryClient.invalidateQueries(['technician-workspace']);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update active-job limit');
+    }
+  };
+
   if (isLoading) return <PageLoader />;
   if (error) return <ErrorState error={error} />;
 
@@ -515,7 +526,17 @@ export default function ProfilePage() {
                   <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                     Capacity Limit
                   </label>
-                  <div className="text-sm font-extrabold text-gray-900">
+                  <select
+                    value={roleProfile?.maxConcurrentJobs || 5}
+                    onChange={(e) => handleCapacityChange(e.target.value)}
+                    className="input !py-1.5 !text-xs font-semibold"
+                    aria-label="Maximum concurrent repair jobs"
+                  >
+                    {[1, 2, 3, 5, 8, 10, 15, 20, 30, 50].map((value) => (
+                      <option key={value} value={value}>Max {value} concurrent jobs</option>
+                    ))}
+                  </select>
+                  <div className="hidden">
                     Max {roleProfile?.maxConcurrentJobs ?? '—'} Concurrent Jobs
                   </div>
                   {roleProfile?.vacationMode && (

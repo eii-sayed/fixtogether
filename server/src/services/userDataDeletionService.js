@@ -210,6 +210,10 @@ const deleteUserData = async (userId, session) => {
   await deleteMany('RepairStatusHistory', {
     $or: [{ repairRequest: { $in: requestIds } }, { repairJob: { $in: jobIds } }],
   }, session, deletedRecords);
+  await deleteMany('Invoice', { repairJob: { $in: jobIds } }, session, deletedRecords);
+  await deleteMany('PaymentTransaction', {
+    $or: [{ repairJob: { $in: jobIds } }, { owner: userId }, { technician: userId }],
+  }, session, deletedRecords);
   await deleteMany('Message', {
     $or: [{ repairRequest: { $in: requestIds } }, { sender: userId }, { recipient: userId }],
   }, session, deletedRecords);
@@ -235,6 +239,7 @@ const deleteUserData = async (userId, session) => {
   }, session, deletedRecords);
   await deleteMany('Address', { user: userId }, session, deletedRecords);
   await deleteMany('TechnicianProfile', { _id: { $in: technicianProfileIds } }, session, deletedRecords);
+  await deleteMany('ServiceTemplate', { technician: userId }, session, deletedRecords);
   await deleteMany('OrganizationProfile', { _id: { $in: organizationProfileIds } }, session, deletedRecords);
   await deleteMany('Notification', { user: userId }, session, deletedRecords);
   await deleteMany('PushSubscription', { user: userId }, session, deletedRecords);

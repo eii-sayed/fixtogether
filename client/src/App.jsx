@@ -26,6 +26,7 @@ const NewDonationPage = lazy(() => import('./pages/donations/NewDonationPage'));
 const ConversationsPage = lazy(() => import('./pages/messages/ConversationsPage'));
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'));
 const TechnicianProfilePage = lazy(() => import('./pages/profile/TechnicianProfilePage'));
+const TechnicianBusinessPage = lazy(() => import('./pages/technician/TechnicianBusinessPage'));
 const TechniciansPage = lazy(() => import('./pages/profile/TechniciansPage'));
 const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'));
 const OrganizationProfilePage = lazy(() => import('./pages/profile/OrganizationProfilePage'));
@@ -144,6 +145,7 @@ export default function App() {
 
         {/* Repair Jobs */}
         <Route path="/repair-jobs" element={<ProtectedRoute><RepairJobsPage /></ProtectedRoute>} />
+        <Route path="/technician-business" element={<ProtectedRoute><TechnicianBusinessPage /></ProtectedRoute>} />
 
         {/* Donations */}
         <Route path="/donations" element={<ProtectedRoute><DonationsPage /></ProtectedRoute>} />

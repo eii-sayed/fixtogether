@@ -222,6 +222,49 @@ const getAppointmentById = asyncHandler(async (req, res) => {
   return successResponse(res, { appointment });
 });
 
+const escapeIcsText = (value = '') => String(value)
+  .replace(/\\/g, '\\\\')
+  .replace(/;/g, '\\;')
+  .replace(/,/g, '\\,')
+  .replace(/\r?\n/g, '\\n');
+
+const toIcsUtc = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+const exportAppointmentCalendar = asyncHandler(async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) return errorResponse(res, 'Invalid appointment ID.', 400);
+  const appointment = await Appointment.findById(req.params.id)
+    .populate({ path: 'repairRequest', select: 'item', populate: { path: 'item', select: 'title' } });
+  if (!appointment) return errorResponse(res, 'Not found.', 404);
+  if (!canAccessAppointment(appointment, req.user)) return errorResponse(res, 'Access denied.', 403);
+
+  const itemTitle = appointment.repairRequest?.item?.title || 'Repair appointment';
+  const location = [appointment.location?.address, appointment.location?.city].filter(Boolean).join(', ');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//FixTogether//Appointments//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:appointment-${appointment._id}@fixtogether`,
+    `DTSTAMP:${toIcsUtc(new Date())}`,
+    `DTSTART:${toIcsUtc(appointment.scheduledStart)}`,
+    `DTEND:${toIcsUtc(appointment.scheduledEnd)}`,
+    `SUMMARY:${escapeIcsText(`${appointment.appointmentType} - ${itemTitle}`)}`,
+    `DESCRIPTION:${escapeIcsText('FixTogether repair appointment. Open FixTogether for current details or changes.')}`,
+    location ? `LOCATION:${escapeIcsText(location)}` : '',
+    `STATUS:${appointment.status === APPOINTMENT_STATUS.CANCELLED ? 'CANCELLED' : 'CONFIRMED'}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean);
+
+  res
+    .status(200)
+    .set('Content-Type', 'text/calendar; charset=utf-8')
+    .set('Content-Disposition', `attachment; filename="fixtogether-appointment-${appointment._id}.ics"`)
+    .send(`${lines.join('\r\n')}\r\n`);
+});
+
 const rescheduleAppointment = asyncHandler(async (req, res) => {
   const { scheduledStart, scheduledEnd, timeZone } = req.body;
   const start = new Date(scheduledStart);
@@ -248,6 +291,13 @@ const rescheduleAppointment = asyncHandler(async (req, res) => {
       current.scheduledEnd = end;
       current.timeZone = timeZone;
       current.status = APPOINTMENT_STATUS.RESCHEDULED;
+      current.reminderStatus = {
+        owner24HourReminded: false,
+        technician24HourReminded: false,
+        owner1HourReminded: false,
+        technician1HourReminded: false,
+        noShowProcessed: false,
+      };
       await current.save({ session });
       return current;
     });
@@ -314,4 +364,4 @@ const updateAppointmentStatus = asyncHandler(async (req, res) => {
   return successResponse(res, { appointment }, 'Status updated');
 });
 
-module.exports = { createAppointment, getAppointments, getAppointmentById, rescheduleAppointment, cancelAppointment, updateAppointmentStatus };
+module.exports = { createAppointment, getAppointments, getAppointmentById, exportAppointmentCalendar, rescheduleAppointment, cancelAppointment, updateAppointmentStatus };

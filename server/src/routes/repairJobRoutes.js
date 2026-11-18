@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const rjController = require('../controllers/repairJobController');
 const paymentController = require('../controllers/paymentController');
+const technicianBusinessController = require('../controllers/technicianBusinessController');
 const { authenticate } = require('../middleware/auth');
 const { authorize } = require('../middleware/authorize');
 const { requireVerifiedTechnician } = require('../middleware/professionalVerification');
@@ -9,6 +10,7 @@ const { uploadMultipleImages } = require('../middleware/upload');
 const { ROLES } = require('../constants');
 const { validate } = require('../middleware/validate');
 const { recordPaymentSchema, paymentDecisionSchema, requestRefundSchema, refundDecisionSchema } = require('../validators/requestValidators');
+const { invoiceSchema } = require('../validators/technicianBusinessValidators');
 const { writeLimiter } = require('../middleware/rateLimiter');
 
 router.use(authenticate, requireVerifiedTechnician);
@@ -31,6 +33,8 @@ router.post('/:id/confirm-completion', authenticate, authorize(ROLES.OWNER), rjC
 // Payment ledger: the platform records direct settlement evidence, while both
 // parties confirm money movement before the repair job balance changes.
 router.get('/:id/payments', authenticate, paymentController.getPaymentLedger);
+router.get('/:id/invoice', authenticate, technicianBusinessController.getInvoiceForRepairJob);
+router.put('/:id/invoice', authenticate, authorize(ROLES.TECHNICIAN, ROLES.ADMIN), validate(invoiceSchema), technicianBusinessController.createOrRefreshInvoice);
 router.post('/:id/payments', authenticate, writeLimiter, validate(recordPaymentSchema), paymentController.recordPayment);
 router.patch('/:id/payments/:paymentId/decision', authenticate, writeLimiter, validate(paymentDecisionSchema), paymentController.decidePayment);
 router.post('/:id/payments/:paymentId/refunds', authenticate, writeLimiter, validate(requestRefundSchema), paymentController.requestRefund);

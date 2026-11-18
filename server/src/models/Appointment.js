@@ -54,8 +54,11 @@ const appointmentSchema = new mongoose.Schema(
     },
     cancellationReason: { type: String, default: '' },
     reminderStatus: {
-      ownerReminded: { type: Boolean, default: false },
-      technicianReminded: { type: Boolean, default: false },
+      owner24HourReminded: { type: Boolean, default: false },
+      technician24HourReminded: { type: Boolean, default: false },
+      owner1HourReminded: { type: Boolean, default: false },
+      technician1HourReminded: { type: Boolean, default: false },
+      noShowProcessed: { type: Boolean, default: false },
     },
     checkInTime: { type: Date, default: null },
     completionTime: { type: Date, default: null },

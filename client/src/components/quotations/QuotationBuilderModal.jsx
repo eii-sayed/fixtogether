@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../api/axios';
 import { toast } from 'sonner';
 import { X, Sparkles, DollarSign, Clock, FileText, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Zap, Loader2, Send } from 'lucide-react';
@@ -52,6 +52,33 @@ export default function QuotationBuilderModal({
 
   const [submitError, setSubmitError] = useState(null);
   const [draftSaved, setDraftSaved] = useState(false);
+  const { data: templateData } = useQuery({
+    queryKey: ['service-templates', 'quote-builder'],
+    queryFn: () => api.get('/technicians/me/service-templates?active=true&limit=30').then((response) => response.data.data),
+    enabled: open && !existingQuotation,
+  });
+
+  const applyTemplate = (template) => {
+    const total = Number(template.laborCost || 0) + Number(template.partsAllowance || 0);
+    setQuickData((current) => ({
+      ...current,
+      estimatedTotal: total || current.estimatedTotal,
+      estimatedDays: Math.max(1, Math.ceil((template.estimatedDurationMinutes || 60) / 480)).toString(),
+      warrantyDays: String(template.warrantyDays || current.warrantyDays),
+      notes: [template.description, template.checklist?.length ? `Checklist: ${template.checklist.join(', ')}` : ''].filter(Boolean).join('\n'),
+    }));
+    setFormData((current) => ({
+      ...current,
+      laborCostMinimum: template.laborCost || 0,
+      laborCostMaximum: template.laborCost || 0,
+      partsEstimate: template.partsAllowance || 0,
+      expectedDurationValue: Math.max(1, Math.ceil((template.estimatedDurationMinutes || 60) / 480)),
+      expectedDurationUnit: 'days',
+      warrantyDays: template.warrantyDays || 0,
+      technicianNotes: template.description || current.technicianNotes,
+    }));
+    toast.success(`Applied ${template.name}`);
+  };
 
   // Quick quote mutation
   const quickQuoteMutation = useMutation({
@@ -312,6 +339,19 @@ export default function QuotationBuilderModal({
             </div>
 
             {/* Quick Quote Form */}
+            {(templateData?.templates || []).length > 0 && (
+              <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-3">
+                <label className="block text-xs font-semibold text-primary-900 mb-2">Start from a saved service template</label>
+                <select defaultValue="" onChange={(event) => {
+                  const template = templateData.templates.find((item) => item._id === event.target.value);
+                  if (template) applyTemplate(template);
+                  event.target.value = '';
+                }} className="input-field text-xs">
+                  <option value="">Choose a template…</option>
+                  {templateData.templates.map((template) => <option key={template._id} value={template._id}>{template.name}</option>)}
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label" htmlFor="quickTotal">Total Cost Estimate (৳) *</label>

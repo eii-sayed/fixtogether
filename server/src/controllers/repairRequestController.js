@@ -7,6 +7,7 @@ const aiService = require('../services/ai');
 const safetyService = require('../services/safetyService');
 const matchingService = require('../services/matchingService');
 const { createNotification, createBulkNotifications, getIO } = require('../services/notificationService');
+const { assertTechnicianCapacity } = require('../services/technicianCapacityService');
 const logger = require('../utils/logger');
 
 /**
@@ -866,6 +867,8 @@ const assignTechnician = asyncHandler(async (req, res) => {
   if (!techUser || techUser.role !== ROLES.TECHNICIAN) {
     return errorResponse(res, 'Target user is not a registered technician.', 400);
   }
+  const existingRepairJob = await RepairJob.findOne({ repairRequest: request._id });
+  if (!existingRepairJob) await assertTechnicianCapacity(techUser._id);
 
   // Check if technician already has an active quote
   let quotation = await Quotation.findOne({
@@ -933,7 +936,7 @@ const assignTechnician = asyncHandler(async (req, res) => {
   await request.save();
 
   // Find or create RepairJob
-  let repairJob = await RepairJob.findOne({ repairRequest: request._id });
+  let repairJob = existingRepairJob;
   if (!repairJob) {
     repairJob = await RepairJob.create({
       repairRequest: request._id,
@@ -1033,6 +1036,8 @@ const acceptJob = asyncHandler(async (req, res) => {
   if (!techUser || techUser.role !== ROLES.TECHNICIAN) {
     return errorResponse(res, 'Only registered technicians can accept repair jobs.', 403);
   }
+  const existingRepairJob = await RepairJob.findOne({ repairRequest: request._id });
+  if (!existingRepairJob) await assertTechnicianCapacity(techUser._id);
 
   // Determine cost & timeline
   const finalCost =
@@ -1114,7 +1119,7 @@ const acceptJob = asyncHandler(async (req, res) => {
   await request.save();
 
   // Find or create RepairJob
-  let repairJob = await RepairJob.findOne({ repairRequest: request._id });
+  let repairJob = existingRepairJob;
   if (!repairJob) {
     repairJob = await RepairJob.create({
       repairRequest: request._id,

@@ -5,6 +5,7 @@ const { asyncHandler, successResponse, errorResponse } = require('../utils/helpe
 const { createNotification } = require('../services/notificationService');
 const { transitionRepairRequest } = require('../services/stateTransitionService');
 const { withTransaction } = require('../utils/transaction');
+const { assertTechnicianCapacity } = require('../services/technicianCapacityService');
 
 const QUOTABLE_REQUEST_STATUSES = [
   REPAIR_REQUEST_STATUS.PUBLISHED,
@@ -237,6 +238,7 @@ const acceptQuotation = asyncHandler(async (req, res) => {
 
       let repairJob = await RepairJob.findOne({ repairRequest: request._id }).session(session);
       if (!repairJob) {
+        await assertTechnicianCapacity(quotation.technician, session);
         [repairJob] = await RepairJob.create([{
           repairRequest: request._id,
           owner: request.owner,

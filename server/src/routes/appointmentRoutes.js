@@ -14,6 +14,7 @@ const { writeLimiter } = require('../middleware/rateLimiter');
 
 router.post('/', authenticate, requireVerifiedTechnician, writeLimiter, validate(createAppointmentSchema), aptController.createAppointment);
 router.get('/', authenticate, requireVerifiedTechnician, aptController.getAppointments);
+router.get('/:id/calendar', authenticate, requireVerifiedTechnician, aptController.exportAppointmentCalendar);
 router.get('/:id', authenticate, requireVerifiedTechnician, aptController.getAppointmentById);
 router.patch('/:id/reschedule', authenticate, requireVerifiedTechnician, writeLimiter, validate(rescheduleAppointmentSchema), aptController.rescheduleAppointment);
 router.patch('/:id/cancel', authenticate, requireVerifiedTechnician, writeLimiter, validate(cancelAppointmentSchema), aptController.cancelAppointment);
